@@ -32,4 +32,26 @@ close(p.inc, 11);
 close(actualCostPct(3, 11), 30);
 assert.deepEqual(recipeAllergens(r, ings), ['Gluten', 'Wheat']);
 
+// Sub-recipes
+const sauce = { id: 'sauce', name: 'Sauce', portions: 4, yieldQty: 2, yieldUnit: 'L', items: [{ ingredientId: 'flour', qty: 1, unit: 'kg' }] }; // $2 batch
+const noYield = { id: 'ny', name: 'No yield', portions: 1, items: [] };
+const dish = { id: 'dish', name: 'Dish', portions: 1, items: [
+  { recipeId: 'sauce', qty: 500, unit: 'ml' },  // 0.5 / 2 L of $2 = 0.50
+  { recipeId: 'sauce', qty: 1, unit: 'portion' }, // $2 / 4 = 0.50
+] };
+const recs = new Map([sauce, noYield, dish].map(x => [x.id, x]));
+close(recipeCost(dish, ings, recs).total, 1);
+assert.deepEqual(recipeAllergens(dish, ings, recs), ['Gluten', 'Wheat']);
+assert.equal(recipeCost({ id: 'x', portions: 1, items: [{ recipeId: 'ny', qty: 1, unit: 'kg' }] }, ings, recs).problems.length, 1);
+assert.equal(recipeCost({ id: 'x', portions: 1, items: [{ recipeId: 'gone', qty: 1, unit: 'portion' }] }, ings, recs).problems.length, 1);
+
+// Circular: a uses b, b uses a -> finishes with a warning instead of recursing forever
+const a = { id: 'a', name: 'A', portions: 1, items: [{ recipeId: 'b', qty: 1, unit: 'portion' }] };
+const b = { id: 'b', name: 'B', portions: 1, items: [{ recipeId: 'a', qty: 1, unit: 'portion' }, { ingredientId: 'flour', qty: 1, unit: 'kg' }] };
+const cyc = new Map([[a.id, a], [b.id, b]]);
+const ca = recipeCost(a, ings, cyc);
+close(ca.total, 2);
+assert.ok(ca.problems.some(p => p.includes('circular')));
+assert.deepEqual(recipeAllergens(a, ings, cyc), ['Gluten', 'Wheat']);
+
 console.log('calc ok');

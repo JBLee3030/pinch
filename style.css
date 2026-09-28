@@ -103,7 +103,7 @@ td.n { text-align: right; white-space: nowrap; font-variant-numeric: tabular-num
 .matrix td.c { text-align: center; color: var(--danger); }
 .matrix th:first-child, .matrix td:first-child { position: sticky; left: 0; background: var(--bg); min-width: 130px; }
 
-.item { display: grid; grid-template-columns: 1fr 70px 70px 36px; gap: 6px; margin-bottom: 8px; }
+.item { display: grid; grid-template-columns: 1fr 64px 86px 36px; gap: 6px; margin-bottom: 8px; }
 .item select, .item input { padding: 8px; }
 
 .progress { height: 8px; margin-top: 6px; background: var(--chip); border-radius: 4px; overflow: hidden; }

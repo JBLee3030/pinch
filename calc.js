@@ -16,21 +16,38 @@ export function convert(qty, from, to) {
   return bf && bf === bt ? qty * f / t : NaN;
 }
 
-export function lineCost(item, ing) {
-  if (!ing) return NaN;
-  const qty = convert(Number(item.qty), item.unit, ing.unit);
-  const yieldFrac = (Number(ing.yieldPct) || 100) / 100;
-  return qty * (Number(ing.price) || 0) / yieldFrac;
+// An item is either { ingredientId, qty, unit } or a sub-recipe { recipeId, qty, unit }.
+// Sub-recipe unit is 'portion', or any unit convertible to the sub-recipe's batch yield.
+// `seen` holds the recipe ids above this item, to stop circular sub-recipes.
+export function itemCost(it, ings, recs = new Map(), seen = new Set()) {
+  const qty = Number(it.qty);
+  if (it.recipeId) {
+    const sub = recs.get(it.recipeId);
+    if (!sub) return { cost: NaN, problems: ['A sub-recipe was deleted'] };
+    if (seen.has(sub.id)) return { cost: NaN, problems: [`${sub.name}: circular sub-recipe`] };
+    const c = recipeCost(sub, ings, recs, new Set([...seen, sub.id]));
+    const problems = c.problems.map(p => `${sub.name} → ${p}`);
+    if (it.unit === 'portion') return { cost: qty * c.perPortion, problems };
+    const q = convert(qty, it.unit, sub.yieldUnit);
+    if (!(sub.yieldQty > 0) || !Number.isFinite(q)) {
+      return { cost: NaN, problems: [...problems, `${sub.name}: set its batch yield in ${it.unit}, or use portions`] };
+    }
+    return { cost: c.total * q / sub.yieldQty, problems };
+  }
+  const ing = ings.get(it.ingredientId);
+  if (!ing) return { cost: NaN, problems: ['An ingredient was deleted from Pantry'] };
+  const q = convert(qty, it.unit, ing.unit);
+  if (!Number.isFinite(q)) return { cost: NaN, problems: [`${ing.name}: can't convert ${it.unit} to ${ing.unit}`] };
+  return { cost: q * (Number(ing.price) || 0) / ((Number(ing.yieldPct) || 100) / 100), problems: [] };
 }
 
-export function recipeCost(recipe, ings) {
+export function recipeCost(recipe, ings, recs = new Map(), seen = new Set([recipe.id])) {
   let total = 0;
   const problems = [];
   for (const it of recipe.items ?? []) {
-    const ing = ings.get(it.ingredientId);
-    const c = lineCost(it, ing);
-    if (Number.isFinite(c)) total += c;
-    else problems.push(ing ? `${ing.name}: can't convert ${it.unit} to ${ing.unit}` : 'An ingredient was deleted from Pantry');
+    const c = itemCost(it, ings, recs, seen);
+    if (Number.isFinite(c.cost)) total += c.cost;
+    problems.push(...c.problems);
   }
   return { total, perPortion: total / Math.max(1, Number(recipe.portions) || 1), problems };
 }
@@ -44,8 +61,21 @@ export function suggestedPrice(perPortion, targetPct) {
 export const actualCostPct = (perPortion, menuPriceInc) =>
   menuPriceInc > 0 ? perPortion / (menuPriceInc / (1 + GST)) * 100 : NaN;
 
-export const recipeAllergens = (recipe, ings) =>
-  ALLERGENS.filter(a => (recipe.items ?? []).some(it => ings.get(it.ingredientId)?.allergens?.includes(a)));
+function allergenSet(recipe, ings, recs, seen, out = new Set()) {
+  for (const it of recipe.items ?? []) {
+    const sub = it.recipeId && recs.get(it.recipeId);
+    if (sub && !seen.has(sub.id)) allergenSet(sub, ings, recs, new Set([...seen, sub.id]), out);
+    else ings.get(it.ingredientId)?.allergens?.forEach(a => out.add(a));
+  }
+  return out;
+}
+
+export function recipeAllergens(recipe, ings, recs = new Map()) {
+  const s = allergenSet(recipe, ings, recs, new Set([recipe.id]));
+  return ALLERGENS.filter(a => s.has(a));
+}
+
+export const usesRecipe = (recipe, id) => (recipe.items ?? []).some(it => it.recipeId === id);
 
 export const money = n => Number.isFinite(n) ? '$' + n.toFixed(2) : '—';
 export const pct = n => Number.isFinite(n) ? n.toFixed(1) + '%' : '—';

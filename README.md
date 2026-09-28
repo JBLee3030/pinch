@@ -7,6 +7,7 @@ Installable web app (PWA), works offline, data stays on your phone.
 
 ## Features
 - **Recipes** — ingredients, method, photo, scale to any number of portions
+- **Sub-recipes** — use a sauce or dough inside a dish, by portion or by weight/volume; cost and allergens roll up
 - **Costing** — cost per portion, suggested menu price (inc GST) from a target food cost %, actual food cost %
 - **Pantry** — ingredient prices per kg / L / each with trim yield %
 - **Allergens** — Australian mandatory allergens per ingredient, rolled up per recipe and as a chart

@@ -1,5 +1,5 @@
 import * as db from './db.js';
-import { ALLERGENS, PURCHASE_UNITS, UNITS, recipeCost, lineCost, suggestedPrice, actualCostPct, recipeAllergens, money, pct } from './calc.js';
+import { ALLERGENS, PURCHASE_UNITS, UNITS, recipeCost, itemCost, suggestedPrice, actualCostPct, recipeAllergens, usesRecipe, money, pct } from './calc.js';
 
 const view = document.getElementById('view');
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -18,6 +18,7 @@ async function settings() {
 async function ingMap() {
   return new Map((await db.all('ingredients')).map(i => [i.id, i]));
 }
+const toMap = list => new Map(list.map(x => [x.id, x]));
 
 function page(tab, title, body, { back, action = '' } = {}) {
   document.querySelectorAll('nav a').forEach(a => a.classList.toggle('on', a.dataset.tab === tab));
@@ -44,6 +45,7 @@ const photoValue = async (fd, old) => fd.get('rmPhoto') ? null : (await readPhot
 async function recipeList() {
   const [recipes, ings] = await Promise.all([db.all('recipes'), ingMap()]);
   recipes.sort(byName);
+  const recs = toMap(recipes);
   const cats = [...new Set(recipes.map(r => r.category).filter(Boolean))].sort();
   page('recipes', 'Recipes', recipes.length ? `
     <div class="bar"><input type="search" id="q" placeholder="Search recipes" aria-label="Search recipes">
@@ -51,7 +53,7 @@ async function recipeList() {
     <p><a href="#/allergens">Allergen chart →</a></p>
     <ul class="list">${recipes.map(r => `<li data-q="${esc(r.name.toLowerCase())}" data-cat="${esc(r.category)}"><a href="#/recipe/${esc(r.id)}">
       ${r.photo ? `<img src="${esc(r.photo)}" alt="">` : '<span class="ph"></span>'}
-      <div><b>${esc(r.name)}</b><small>${esc(r.category || 'Uncategorised')} · ${money(recipeCost(r, ings).perPortion)} / portion</small></div></a></li>`).join('')}</ul>`
+      <div><b>${esc(r.name)}</b><small>${esc(r.category || 'Uncategorised')} · ${money(recipeCost(r, ings, recs).perPortion)} / portion</small></div></a></li>`).join('')}</ul>`
     : `<div class="empty"><p>No recipes yet.</p><p>Add ingredients with prices in <a href="#/pantry">Pantry</a>, then create a recipe.</p>
        <button class="ghost" id="sample">Load sample Italian recipes</button></div>`,
     { action: '<a class="btn" href="#/recipe/new/edit">+ New</a>' });
@@ -68,15 +70,18 @@ async function recipeList() {
 async function recipeView(id) {
   const r = await db.get('recipes', id);
   if (!r) return go('#/recipes');
-  const [ings, s] = await Promise.all([ingMap(), settings()]);
-  const c = recipeCost(r, ings);
+  const [ings, s, recipes] = await Promise.all([ingMap(), settings(), db.all('recipes')]);
+  const recs = toMap(recipes);
+  const c = recipeCost(r, ings, recs);
   const target = r.targetCostPct || s.targetCostPct;
   const price = suggestedPrice(c.perPortion, target);
-  const allergens = recipeAllergens(r, ings);
+  const allergens = recipeAllergens(r, ings, recs);
+  const usedIn = recipes.filter(x => usesRecipe(x, r.id)).sort(byName);
 
   page('recipes', r.name, `
     ${r.photo ? `<img class="hero" src="${esc(r.photo)}" alt="">` : ''}
-    <p class="muted">${esc(r.category || 'Uncategorised')} · ${esc({ school: 'From school', work: 'From work', own: 'My own' }[r.source] || '')}</p>
+    <p class="muted">${esc(r.category || 'Uncategorised')} · ${esc({ school: 'From school', work: 'From work', own: 'My own' }[r.source] || '')}${r.yieldQty ? ` · Yields ${esc(r.yieldQty)} ${esc(r.yieldUnit)}` : ''}</p>
+    ${usedIn.length ? `<p class="muted">Used in: ${usedIn.map(x => `<a href="#/recipe/${esc(x.id)}">${esc(x.name)}</a>`).join(', ')}</p>` : ''}
     <div class="card"><h2>Allergens</h2>${allergens.length
       ? `<div class="chips">${allergens.map(a => `<span class="chip alert">${a}</span>`).join('')}</div>`
       : '<p class="muted">None declared in Pantry.</p>'}
@@ -100,10 +105,12 @@ async function recipeView(id) {
     const f = (Number(scale.value) || r.portions) / r.portions;
     let total = 0;
     document.getElementById('items').innerHTML = (r.items ?? []).map(it => {
-      const ing = ings.get(it.ingredientId);
-      const cost = lineCost(it, ing) * f;
+      const cost = itemCost(it, ings, recs, new Set([r.id])).cost * f;
       if (Number.isFinite(cost)) total += cost;
-      return `<tr><td>${esc(ing?.name ?? '(deleted)')}</td><td class="n">${fmtQty(it.qty * f)} ${esc(it.unit)}</td><td class="n muted">${money(cost)}</td></tr>`;
+      const sub = it.recipeId && recs.get(it.recipeId);
+      const name = sub ? `<a href="#/recipe/${esc(sub.id)}">${esc(sub.name)}</a><br><small>Sub-recipe</small>`
+        : esc(it.recipeId ? '(deleted)' : ings.get(it.ingredientId)?.name ?? '(deleted)');
+      return `<tr><td>${name}</td><td class="n">${fmtQty(it.qty * f)} ${esc(it.unit)}</td><td class="n muted">${money(cost)}</td></tr>`;
     }).join('') + `<tr><th>Total</th><td></td><td class="n"><b>${money(total)}</b></td></tr>`;
   };
   scale.addEventListener('input', drawItems);
@@ -116,15 +123,27 @@ async function recipeEdit(id) {
   if (!r) return go('#/recipes');
   const [ingList, recipes, s] = await Promise.all([db.all('ingredients'), db.all('recipes'), settings()]);
   ingList.sort(byName);
+  const ingById = toMap(ingList), recs = toMap(recipes);
   const usage = { kg: 'g', L: 'ml', each: 'each' };
+  // A recipe can't be a sub-recipe of itself or of anything it (indirectly) contains.
+  const reaches = (x, target, seen = new Set()) => x.id === target ||
+    (!seen.has(x.id) && seen.add(x.id) && (x.items ?? []).some(it => recs.has(it.recipeId) && reaches(recs.get(it.recipeId), target, seen)));
+  const subs = recipes.filter(x => !reaches(x, r.id)).sort(byName);
 
+  // Row keys: 'i:<ingredientId>' or 'r:<recipeId>'.
+  const keyOf = it => it.recipeId ? 'r:' + it.recipeId : it.ingredientId ? 'i:' + it.ingredientId : '';
+  const unitsFor = k => k.startsWith('r:') ? ['portion', ...UNITS] : UNITS;
+  const defaultUnit = k => k.startsWith('r:') ? recs.get(k.slice(2))?.yieldUnit || 'portion' : usage[ingById.get(k.slice(2))?.unit] ?? 'g';
+  const opt = (v, label, sel) => `<option value="${esc(v)}" ${v === sel ? 'selected' : ''}>${esc(label)}</option>`;
   const row = (it = {}) => {
-    const known = ingList.some(i => i.id === it.ingredientId);
+    const k = keyOf(it) || (ingList[0] ? 'i:' + ingList[0].id : subs[0] ? 'r:' + subs[0].id : '');
+    const listed = ingList.some(i => 'i:' + i.id === k) || subs.some(x => 'r:' + x.id === k);
     return `<div class="item">
-      <select name="ing" aria-label="Ingredient">${it.ingredientId && !known ? `<option value="${esc(it.ingredientId)}" selected>(deleted)</option>` : ''}
-        ${ingList.map(i => `<option value="${esc(i.id)}" ${i.id === it.ingredientId ? 'selected' : ''}>${esc(i.name)}</option>`).join('')}</select>
+      <select name="ing" aria-label="Ingredient or sub-recipe">${k && !listed ? `<option value="${esc(k)}" selected>(deleted)</option>` : ''}
+        <optgroup label="Pantry">${ingList.map(i => opt('i:' + i.id, i.name, k)).join('')}</optgroup>
+        ${subs.length ? `<optgroup label="Sub-recipes">${subs.map(x => opt('r:' + x.id, x.name, k)).join('')}</optgroup>` : ''}</select>
       <input name="qty" type="number" step="any" min="0" inputmode="decimal" placeholder="Qty" aria-label="Quantity" value="${esc(it.qty)}">
-      <select name="unit" aria-label="Unit">${opts(UNITS, it.unit ?? usage[ingList[0]?.unit])}</select>
+      <select name="unit" aria-label="Unit">${opts(unitsFor(k), it.unit ?? defaultUnit(k))}</select>
       <button type="button" class="x" aria-label="Remove">×</button></div>`;
   };
 
@@ -140,8 +159,12 @@ async function recipeEdit(id) {
       <label>Target food cost %<input name="targetCostPct" type="number" min="1" max="100" step="any" inputmode="decimal" placeholder="${s.targetCostPct}" value="${esc(r.targetCostPct)}"></label>
     </div>
     <label>Menu price inc GST (optional)<input name="menuPrice" type="number" min="0" step="0.01" inputmode="decimal" value="${esc(r.menuPrice)}"></label>
+    <div class="row2">
+      <label>Batch yield <small>(to use as sub-recipe by weight/volume)</small><input name="yieldQty" type="number" min="0" step="any" inputmode="decimal" placeholder="e.g. 2.2" value="${esc(r.yieldQty)}"></label>
+      <label>Yield unit<select name="yieldUnit">${opts(['L', 'ml', 'kg', 'g'], r.yieldUnit ?? 'L')}</select></label>
+    </div>
     <h2>Ingredients</h2>
-    ${ingList.length ? `<div id="rows">${(r.items.length ? r.items : [{}]).map(row).join('')}</div>
+    ${ingList.length || subs.length ? `<div id="rows">${(r.items.length ? r.items : [{}]).map(row).join('')}</div>
       <button type="button" class="ghost" id="add">+ Add ingredient</button>`
       : '<p class="warn">Add ingredients in <a href="#/pantry">Pantry</a> first.</p>'}
     <label style="margin-top:16px">Method<textarea name="method" placeholder="1. …">${esc(r.method)}</textarea></label>
@@ -154,40 +177,43 @@ async function recipeEdit(id) {
   rows?.addEventListener('click', e => e.target.matches('.x') && e.target.closest('.item').remove());
   rows?.addEventListener('change', e => {
     if (e.target.name !== 'ing') return;
-    const ing = ingList.find(i => i.id === e.target.value);
-    if (ing) e.target.closest('.item').querySelector('[name=unit]').value = usage[ing.unit];
+    e.target.closest('.item').querySelector('[name=unit]').innerHTML = opts(unitsFor(e.target.value), defaultUnit(e.target.value));
   });
 
   const form = document.getElementById('f');
   form.onsubmit = async e => {
     e.preventDefault();
     const fd = new FormData(form);
-    const items = [...form.querySelectorAll('.item')].map(el => ({
-      ingredientId: el.querySelector('[name=ing]').value,
-      qty: num(el.querySelector('[name=qty]').value),
-      unit: el.querySelector('[name=unit]').value,
-    })).filter(it => it.ingredientId && it.qty > 0);
+    const items = [...form.querySelectorAll('.item')].map(el => {
+      const k = el.querySelector('[name=ing]').value;
+      return { [k.startsWith('r:') ? 'recipeId' : 'ingredientId']: k.slice(2), qty: num(el.querySelector('[name=qty]').value), unit: el.querySelector('[name=unit]').value };
+    }).filter(it => (it.recipeId || it.ingredientId) && it.qty > 0);
     await db.put('recipes', {
       ...r,
       name: fd.get('name').trim(), category: fd.get('category').trim(), source: fd.get('source'),
       portions: num(fd.get('portions')), targetCostPct: num(fd.get('targetCostPct')), menuPrice: num(fd.get('menuPrice')),
+      yieldQty: num(fd.get('yieldQty')), yieldUnit: fd.get('yieldUnit'),
       items, method: fd.get('method'), photo: await photoValue(fd, r.photo),
       createdAt: r.createdAt ?? Date.now(), updatedAt: Date.now(),
     });
     go(`#/recipe/${r.id}`);
   };
   document.getElementById('del')?.addEventListener('click', async () => {
-    if (confirm(`Delete "${r.name}"?`)) { await db.del('recipes', r.id); go('#/recipes'); }
+    const n = recipes.filter(x => usesRecipe(x, r.id)).length;
+    if (confirm(n ? `"${r.name}" is a sub-recipe in ${n} recipe(s). Their costing will show a warning. Delete anyway?` : `Delete "${r.name}"?`)) {
+      await db.del('recipes', r.id); go('#/recipes');
+    }
   });
 }
 
 async function allergenChart() {
   const [recipes, ings] = await Promise.all([db.all('recipes'), ingMap()]);
   recipes.sort(byName);
+  const recs = toMap(recipes);
   page('recipes', 'Allergen chart', recipes.length ? `
     <div class="matrix"><table><thead><tr><th>Recipe</th>${ALLERGENS.map(a => `<th class="v">${a}</th>`).join('')}</tr></thead>
     <tbody>${recipes.map(r => {
-      const has = recipeAllergens(r, ings);
+      const has = recipeAllergens(r, ings, recs);
       return `<tr><td><a href="#/recipe/${esc(r.id)}">${esc(r.name)}</a></td>${ALLERGENS.map(a => `<td class="c">${has.includes(a) ? '<span class="dot" aria-label="contains">●</span>' : ''}</td>`).join('')}</tr>`;
     }).join('')}</tbody></table></div>
     <p><small>Based on Pantry data. Always check supplier labels.</small></p>`
@@ -375,13 +401,17 @@ async function loadSample() {
     I('s-par', 'Parmigiano Reggiano', 'kg', 45, 90, ['Milk']),
   ]);
   const t = Date.now();
-  await db.put('recipes', { id: 's-pomo', name: 'Pomodoro sauce', category: 'Sauce', source: 'school', portions: 10, targetCostPct: null, menuPrice: null,
+  await db.put('recipes', { id: 's-pomo', name: 'Pomodoro sauce', category: 'Sauce', source: 'school', portions: 10, targetCostPct: null, menuPrice: null, yieldQty: 2.2, yieldUnit: 'L',
     items: [{ ingredientId: 's-tom', qty: 2500, unit: 'g' }, { ingredientId: 's-oil', qty: 150, unit: 'ml' }, { ingredientId: 's-gar', qty: 40, unit: 'g' },
       { ingredientId: 's-oni', qty: 300, unit: 'g' }, { ingredientId: 's-bas', qty: 1, unit: 'each' }],
     method: '1. Sweat onion and garlic in olive oil, no colour.\n2. Add crushed tomatoes, simmer 45 min.\n3. Finish with torn basil. Season.', createdAt: t, updatedAt: t });
-  await db.put('recipes', { id: 's-pasta', name: 'Fresh egg pasta', category: 'Pasta', source: 'school', portions: 6, targetCostPct: null, menuPrice: null,
+  await db.put('recipes', { id: 's-pasta', name: 'Fresh egg pasta', category: 'Pasta', source: 'school', portions: 6, targetCostPct: null, menuPrice: null, yieldQty: 0.9, yieldUnit: 'kg',
     items: [{ ingredientId: 's-flo', qty: 600, unit: 'g' }, { ingredientId: 's-egg', qty: 6, unit: 'each' }, { ingredientId: 's-par', qty: 60, unit: 'g' }],
     method: '1. Well the flour, add eggs, bring together.\n2. Knead 10 min until smooth. Rest 30 min wrapped.\n3. Roll to setting 6, cut.', createdAt: t, updatedAt: t });
+  await db.put('recipes', { id: 's-tag', name: 'Tagliatelle al pomodoro', category: 'Main', source: 'school', portions: 1, targetCostPct: null, menuPrice: 26,
+    items: [{ recipeId: 's-pasta', qty: 150, unit: 'g' }, { recipeId: 's-pomo', qty: 180, unit: 'ml' }, { ingredientId: 's-par', qty: 15, unit: 'g' },
+      { ingredientId: 's-oil', qty: 10, unit: 'ml' }],
+    method: '1. Cook tagliatelle 2 min in salted boiling water.\n2. Toss with hot pomodoro and a splash of pasta water.\n3. Plate, finish with parmigiano and olive oil.', createdAt: t, updatedAt: t });
 }
 
 // ---------- Router ----------
