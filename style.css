@@ -108,3 +108,33 @@ td.n { text-align: right; white-space: nowrap; font-variant-numeric: tabular-num
 
 .progress { height: 8px; margin-top: 6px; background: var(--chip); border-radius: 4px; overflow: hidden; }
 .progress i { display: block; height: 100%; background: var(--accent); }
+
+/* Recipe card: paper-like on screen, clean A4 in print */
+.btn.wide { display: flex; width: 100%; margin-top: 12px; }
+.sheet-wrap { overflow-x: auto; }
+.sheet { min-width: 560px; background: #fff; color: #1c1c1a; border: 1px solid var(--line); border-radius: 6px; padding: 24px; font-size: 13px; }
+.sheet h1 { margin: 0 0 4px; font-size: 22px; }
+.sheet h2 { margin: 16px 0 6px; font-size: 14px; }
+.sheet .muted, .sheet small { color: #6b6a64; }
+.sheet .eyebrow { margin: 0; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: #2e6a4d; font-weight: 700; }
+.sheet .alert-text, .sheet .warn { color: #b3261e; }
+.sheet-head { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; border-bottom: 2px solid #1c1c1a; padding-bottom: 10px; margin-bottom: 10px; }
+.sheet-head img { width: 120px; height: 90px; object-fit: cover; border-radius: 4px; }
+.sheet table { font-size: 13px; }
+.sheet th, .sheet td { border-bottom: 1px solid #e3dfd5; padding: 5px 4px; }
+.sheet thead th { border-bottom: 1.5px solid #1c1c1a; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
+.sheet th.n { text-align: right; }
+.sheet tfoot th, .sheet tfoot td { border-bottom: 0; border-top: 1.5px solid #1c1c1a; }
+.sheet-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 12px; }
+.sheet .kv dt { color: #6b6a64; font-size: 13px; }
+.sheet-foot { margin-top: 20px; font-size: 10px; color: #6b6a64; }
+
+@media print {
+  @page { size: A4; margin: 14mm; }
+  header, nav, .no-print { display: none !important; }
+  body { background: #fff; padding: 0; }
+  main { padding: 0; max-width: none; }
+  .sheet-wrap { overflow: visible; }
+  .sheet { min-width: 0; border: 0; padding: 0; font-size: 11pt; zoom: 1 !important; }
+  .sheet tr, .sheet-grid { break-inside: avoid; }
+}

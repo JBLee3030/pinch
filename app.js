@@ -13,7 +13,7 @@ const byName = (a, b) => a.name.localeCompare(b.name);
 const go = h => { location.hash = h; };
 
 async function settings() {
-  return { targetCostPct: 30, logTarget: 48, lastBackup: null, ...(await db.get('settings', 'settings')) };
+  return { targetCostPct: 30, logTarget: 48, lastBackup: null, cookName: '', ...(await db.get('settings', 'settings')) };
 }
 async function ingMap() {
   return new Map((await db.all('ingredients')).map(i => [i.id, i]));
@@ -93,7 +93,8 @@ async function recipeView(id) {
       <dt>Suggested price ex GST</dt><dd>${money(price.ex)}</dd>
       <dt>Suggested menu price inc GST</dt><dd class="big">${money(price.inc)}</dd>
       ${r.menuPrice ? `<dt>Menu price inc GST</dt><dd>${money(r.menuPrice)}</dd><dt>Actual food cost</dt><dd class="big">${pct(actualCostPct(c.perPortion, r.menuPrice))}</dd>` : ''}
-    </dl>${c.problems.map(p => `<p class="warn">⚠ ${esc(p)}</p>`).join('')}</div>
+    </dl>${c.problems.map(p => `<p class="warn">⚠ ${esc(p)}</p>`).join('')}
+      <a class="btn ghost wide" href="#/recipe/${esc(r.id)}/card">Costed recipe card (PDF)</a></div>
     <div class="card"><h2>Ingredients</h2>
       <label class="inline">Scale to <input type="number" id="scale" min="1" step="1" inputmode="numeric" value="${esc(r.portions)}"> portions</label>
       <table><tbody id="items"></tbody></table></div>
@@ -115,6 +116,75 @@ async function recipeView(id) {
   };
   scale.addEventListener('input', drawItems);
   drawItems();
+}
+
+// Costed standard recipe card, printable to A4 / PDF.
+async function recipeCard(id) {
+  const r = await db.get('recipes', id);
+  if (!r) return go('#/recipes');
+  const [ings, s, recipes] = await Promise.all([ingMap(), settings(), db.all('recipes')]);
+  const recs = toMap(recipes);
+  const target = r.targetCostPct || s.targetCostPct;
+  const sourceLabel = { school: 'School', work: 'Work', own: 'Own recipe' }[r.source] || '';
+
+  page('recipes', 'Recipe card', `
+    <div class="no-print bar"><label class="inline">Portions <input type="number" id="cp" min="1" step="1" inputmode="numeric" value="${esc(r.portions)}"></label>
+      <button id="print">Print / Save PDF</button></div>
+    <div class="sheet-wrap"><article class="sheet" id="sheet"></article></div>`, { back: `#/recipe/${esc(r.id)}` });
+
+  const cp = document.getElementById('cp'), sheet = document.getElementById('sheet');
+  const draw = () => {
+    const portions = Number(cp.value) || r.portions, f = portions / r.portions;
+    const c = recipeCost(r, ings, recs);
+    const price = suggestedPrice(c.perPortion, target);
+    const allergens = recipeAllergens(r, ings, recs);
+    const rows = (r.items ?? []).map(it => {
+      const cost = itemCost(it, ings, recs, new Set([r.id])).cost * f;
+      const sub = it.recipeId && recs.get(it.recipeId);
+      let name, unitPrice = '—', yieldPct = '—';
+      if (sub) {
+        const sc = recipeCost(sub, ings, recs, new Set([r.id, sub.id]));
+        name = `${esc(sub.name)} <small>(sub-recipe)</small>`;
+        unitPrice = sub.yieldQty > 0 ? `${money(sc.total / sub.yieldQty)}/${esc(sub.yieldUnit)}` : `${money(sc.perPortion)}/portion`;
+      } else {
+        const ing = ings.get(it.ingredientId);
+        name = esc(ing?.name ?? '(deleted)');
+        if (ing) { unitPrice = `${money(ing.price)}/${esc(ing.unit)}`; yieldPct = `${esc(ing.yieldPct)}%`; }
+      }
+      return `<tr><td>${name}</td><td class="n">${fmtQty(it.qty * f)}</td><td>${esc(it.unit)}</td><td class="n">${unitPrice}</td><td class="n">${yieldPct}</td><td class="n">${money(cost)}</td></tr>`;
+    }).join('');
+
+    sheet.innerHTML = `
+      <div class="sheet-head">
+        <div><p class="eyebrow">Standard recipe card</p><h1>${esc(r.name)}</h1>
+          <p class="muted">${[r.category, sourceLabel, s.cookName && `Prepared by ${s.cookName}`, new Date().toLocaleDateString('en-AU')].filter(Boolean).map(esc).join(' · ')}</p></div>
+        ${r.photo ? `<img src="${esc(r.photo)}" alt="">` : ''}
+      </div>
+      <table class="costing">
+        <thead><tr><th>Ingredient</th><th class="n">Qty</th><th>Unit</th><th class="n">Price</th><th class="n">Yield</th><th class="n">Cost</th></tr></thead>
+        <tbody>${rows}</tbody>
+        <tfoot><tr><th colspan="5">Total cost (${portions} portions)</th><td class="n"><b>${money(c.total * f)}</b></td></tr></tfoot>
+      </table>
+      ${c.problems.map(p => `<p class="warn">⚠ ${esc(p)}</p>`).join('')}
+      <div class="sheet-grid">
+        <dl class="kv">
+          <dt>Cost per portion</dt><dd><b>${money(c.perPortion)}</b></dd>
+          <dt>Target food cost</dt><dd>${pct(target)}</dd>
+          <dt>Suggested price ex GST</dt><dd>${money(price.ex)}</dd>
+          <dt>Suggested price inc GST</dt><dd><b>${money(price.inc)}</b></dd>
+          ${r.menuPrice ? `<dt>Menu price inc GST</dt><dd>${money(r.menuPrice)}</dd><dt>Actual food cost</dt><dd><b>${pct(actualCostPct(c.perPortion, r.menuPrice))}</b></dd>` : ''}
+          ${r.yieldQty ? `<dt>Batch yield</dt><dd>${fmtQty(r.yieldQty * f)} ${esc(r.yieldUnit)}</dd>` : ''}
+        </dl>
+        <div><h2>Allergens</h2><p>${allergens.length ? allergens.map(a => `<b class="alert-text">${a}</b>`).join(', ') : 'None declared'}</p></div>
+      </div>
+      ${r.method ? `<h2>Method</h2><div class="method">${esc(r.method)}</div>` : ''}
+      <p class="sheet-foot">Costs from Pinch pantry prices. Allergens based on recorded ingredients; check supplier labels.</p>`;
+  };
+  cp.addEventListener('input', draw);
+  document.getElementById('print').onclick = () => window.print();
+  draw();
+  // Shrink the A4-width preview to fit the phone screen; print ignores this (zoom reset in print CSS).
+  sheet.style.zoom = Math.min(1, sheet.parentElement.clientWidth / sheet.offsetWidth).toFixed(3);
 }
 
 async function recipeEdit(id) {
@@ -339,6 +409,7 @@ async function settingsView() {
   const est = await navigator.storage?.estimate?.().catch(() => null);
   page('settings', 'Settings', `
     <form id="f" class="card">
+      <label>Your name <small>(shown on recipe cards)</small><input name="cookName" autocomplete="name" value="${esc(s.cookName)}"></label>
       <label>Default target food cost %<input name="targetCostPct" type="number" min="1" max="100" step="any" inputmode="decimal" required value="${esc(s.targetCostPct)}"></label>
       <label>School service periods required<input name="logTarget" type="number" min="1" step="1" inputmode="numeric" required value="${esc(s.logTarget)}"></label>
       <button type="submit">Save</button> <span id="saved" class="muted"></span>
@@ -354,7 +425,7 @@ async function settingsView() {
   form.onsubmit = async e => {
     e.preventDefault();
     const fd = new FormData(form);
-    await db.put('settings', { ...s, id: 'settings', targetCostPct: num(fd.get('targetCostPct')), logTarget: num(fd.get('logTarget')) });
+    await db.put('settings', { ...s, id: 'settings', targetCostPct: num(fd.get('targetCostPct')), logTarget: num(fd.get('logTarget')), cookName: fd.get('cookName').trim() });
     document.getElementById('saved').textContent = 'Saved';
   };
 
@@ -421,6 +492,7 @@ const routes = [
   [/^#\/allergens$/, allergenChart],
   [/^#\/recipe\/([^/]+)$/, recipeView],
   [/^#\/recipe\/([^/]+)\/edit$/, recipeEdit],
+  [/^#\/recipe\/([^/]+)\/card$/, recipeCard],
   [/^#\/pantry$/, pantryList],
   [/^#\/ingredient\/([^/]+)\/edit$/, ingredientEdit],
   [/^#\/log$/, logList],
