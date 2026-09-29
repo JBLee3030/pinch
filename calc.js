@@ -7,6 +7,9 @@ export const PURCHASE_UNITS = ['kg', 'L', 'each'];
 export const UNITS = ['g', 'kg', 'ml', 'L', 'each'];
 export const GST = 0.1;
 
+// Ingredients added while writing a recipe have no price until filled in Pantry.
+export const hasPrice = ing => ing.price != null && ing.price !== '';
+
 const BASE = { g: ['kg', 0.001], kg: ['kg', 1], ml: ['L', 0.001], L: ['L', 1], each: ['each', 1] };
 
 // NaN when units can't convert (e.g. g -> L).
@@ -36,6 +39,7 @@ export function itemCost(it, ings, recs = new Map(), seen = new Set()) {
   }
   const ing = ings.get(it.ingredientId);
   if (!ing) return { cost: NaN, problems: ['An ingredient was deleted from Pantry'] };
+  if (!hasPrice(ing)) return { cost: NaN, problems: [`Price missing: ${ing.name}`] };
   const q = convert(qty, it.unit, ing.unit);
   if (!Number.isFinite(q)) return { cost: NaN, problems: [`${ing.name}: can't convert ${it.unit} to ${ing.unit}`] };
   return { cost: q * (Number(ing.price) || 0) / ((Number(ing.yieldPct) || 100) / 100), problems: [] };
@@ -49,7 +53,7 @@ export function recipeCost(recipe, ings, recs = new Map(), seen = new Set([recip
     if (Number.isFinite(c.cost)) total += c.cost;
     problems.push(...c.problems);
   }
-  return { total, perPortion: total / Math.max(1, Number(recipe.portions) || 1), problems };
+  return { total, perPortion: total / Math.max(1, Number(recipe.portions) || 1), problems: [...new Set(problems)] };
 }
 
 // Food cost % is measured against the ex-GST price.

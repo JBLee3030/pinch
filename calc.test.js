@@ -45,6 +45,12 @@ assert.deepEqual(recipeAllergens(dish, ings, recs), ['Gluten', 'Wheat']);
 assert.equal(recipeCost({ id: 'x', portions: 1, items: [{ recipeId: 'ny', qty: 1, unit: 'kg' }] }, ings, recs).problems.length, 1);
 assert.equal(recipeCost({ id: 'x', portions: 1, items: [{ recipeId: 'gone', qty: 1, unit: 'portion' }] }, ings, recs).problems.length, 1);
 
+// Missing price: flagged, not silently $0; a real $0 price is still allowed
+const ings2 = new Map([...ings, ['salt', { name: 'Salt', unit: 'kg', price: null, yieldPct: 100 }], ['water', { name: 'Water', unit: 'L', price: 0, yieldPct: 100 }]]);
+const mp = recipeCost({ id: 'm', portions: 1, items: [{ ingredientId: 'salt', qty: 5, unit: 'g' }, { ingredientId: 'water', qty: 1, unit: 'L' }, { ingredientId: 'flour', qty: 1, unit: 'kg' }] }, ings2);
+close(mp.total, 2);
+assert.deepEqual(mp.problems, ['Price missing: Salt']);
+
 // Circular: a uses b, b uses a -> finishes with a warning instead of recursing forever
 const a = { id: 'a', name: 'A', portions: 1, items: [{ recipeId: 'b', qty: 1, unit: 'portion' }] };
 const b = { id: 'b', name: 'B', portions: 1, items: [{ recipeId: 'a', qty: 1, unit: 'portion' }, { ingredientId: 'flour', qty: 1, unit: 'kg' }] };
