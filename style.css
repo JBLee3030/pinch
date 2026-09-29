@@ -3,7 +3,7 @@
 
 /* ---------- Tokens ---------- */
 :root {
-  color-scheme: light dark;
+  color-scheme: light; /* light only: form controls and scrollbars stay light even when the phone is in dark mode */
 
   /* Color (contrast-checked, see DESIGN.md) */
   --bg: #F2F4F6;          /* canvas */
@@ -52,26 +52,6 @@
   --dur-enter: 220ms;
 
   --tabbar-h: 60px;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #101013;
-    --surface: #1C1C21;
-    --fill: #2A2A31;
-    --text: #F1F2F4;
-    --text-2: #C3C8CF;
-    --text-3: #9BA3AE;
-    --line: #2E2F36;
-    --accent: #3CCB8F;
-    --accent-ink: #06231A;
-    --accent-weak: #183A2E;
-    --danger: #FF7A85;
-    --danger-weak: #3A1D22;
-    --warn: #F2B25C;
-    --warn-weak: #3A2D18;
-    --scrim: rgb(0 0 0 / .6);
-  }
 }
 
 /* ---------- Base ---------- */
@@ -386,3 +366,4 @@ form:not(.card) :is(input, select, textarea):focus { background-color: var(--sur
 .have-field span { color: var(--text-3); }
 .total-row { display: flex; justify-content: space-between; align-items: baseline; padding: var(--s4) 0 0; border-top: 1px solid var(--line); font-weight: 600; }
 .total-row b { font: 700 20px/1.2 var(--font); }
+form:not(.card) .checks label:not(:has(input:checked)) { background: var(--surface); }

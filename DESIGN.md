@@ -8,27 +8,27 @@ Mobile-first, Toss-inspired: a calm grey canvas, flat white cards, big numbers f
 2. **The number first.** If a screen is about a number (cost per portion, order quantity, checks failed), it is the biggest thing on the screen.
 3. **Group, don't box.** Related rows live together in one white card. No border around every row.
 4. **Say it plainly.** Short, friendly sentences. No jargon the kitchen doesn't use, no em dashes, at most one `·` per line.
-5. **Works in the kitchen.** 44 px minimum touch targets, 16 px+ text, high contrast, works offline, dark mode for late services.
+5. **Works in the kitchen.** 44 px minimum touch targets, 16 px+ text, high contrast, works offline. Light theme only, so screens look the same on every phone.
 
 ## Tokens
 
 ### Colour
 
-| Token | Light | Dark | Use |
-|---|---|---|---|
-| `--bg` | `#F2F4F6` | `#101013` | Canvas |
-| `--surface` | `#FFFFFF` | `#1C1C21` | Cards, tab bar, fields on the canvas |
-| `--fill` | `#EEF0F3` | `#2A2A31` | Fields inside cards, secondary buttons, pressed rows |
-| `--text` | `#191F28` | `#F1F2F4` | Primary text |
-| `--text-2` | `#4E5968` | `#C3C8CF` | Labels, secondary text |
-| `--text-3` | `#5F6A77` | `#9BA3AE` | Captions, placeholders |
-| `--line` | `#E5E8EB` | `#2E2F36` | Dividers |
-| `--accent` | `#0B7A50` | `#3CCB8F` | The one accent: primary buttons, active tab, links |
-| `--accent-weak` | `#E6F4EC` | `#183A2E` | Tinted buttons, PASS, selected chips |
-| `--danger` / `-weak` | `#C62A38` / `#FDECEE` | `#FF7A85` / `#3A1D22` | Delete, FAIL, allergens |
-| `--warn` / `-weak` | `#A5580C` / `#FEF3E2` | `#F2B25C` / `#3A2D18` | Missing prices, OPEN checks |
+| Token | Value | Use |
+|---|---|---|
+| `--bg` | `#F2F4F6` | Canvas |
+| `--surface` | `#FFFFFF` | Cards, tab bar, fields on the canvas |
+| `--fill` | `#EEF0F3` | Fields inside cards, secondary buttons, pressed rows |
+| `--text` | `#191F28` | Primary text |
+| `--text-2` | `#4E5968` | Labels, secondary text |
+| `--text-3` | `#5F6A77` | Captions, placeholders |
+| `--line` | `#E5E8EB` | Dividers |
+| `--accent` | `#0B7A50` | The one accent: primary buttons, active tab, links |
+| `--accent-weak` | `#E6F4EC` | Tinted buttons, PASS, selected chips |
+| `--danger` / `-weak` | `#C62A38` / `#FDECEE` | Delete, FAIL, allergens |
+| `--warn` / `-weak` | `#A5580C` / `#FEF3E2` | Missing prices, OPEN checks |
 
-Every text/background pair used is at least **4.5:1** (WCAG AA) in both themes. Lowest pairs: `--text-3` on `--fill` 4.82 (light), `--accent` on `--fill` 4.70 (light).
+Every text/background pair used is at least **4.5:1** (WCAG AA). Lowest pairs: `--text-3` on `--fill` 4.82, `--accent` on `--fill` 4.70.
 
 ### Type
 
@@ -85,7 +85,7 @@ System UI font (SF Pro on iPhone, Roboto on Android): native feel, zero download
 
 ## Paper output
 
-Recipe cards and the portfolio (`.sheet`) are paper: white, near-black text and the accent for the one label, the same in both themes, printed to A4.
+Recipe cards and the portfolio (`.sheet`) are paper: white, near-black text and the accent for the one label, printed to A4.
 
 ## Checklist for a new screen
 
@@ -94,5 +94,5 @@ Recipe cards and the portfolio (`.sheet`) are paper: white, near-black text and 
 - [ ] Rows grouped in one card, value on the right
 - [ ] Labels above fields, right `inputmode`
 - [ ] Touch targets ≥ 44 px
-- [ ] Tokens only; checked in light and dark
+- [ ] Tokens only
 - [ ] No em dashes; at most one `·` per line

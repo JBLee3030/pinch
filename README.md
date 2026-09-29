@@ -59,7 +59,7 @@ I built Pinch while studying Commercial Cookery and Kitchen Management in Melbou
 
 ## Design
 
-Mobile-first and Toss-inspired: grey canvas, flat white cards, the key number biggest, one primary action per screen, 44 px touch targets, WCAG AA contrast in light and dark. Tokens, components and rules: [`DESIGN.md`](DESIGN.md).
+Mobile-first and Toss-inspired: grey canvas, flat white cards, the key number biggest, one primary action per screen, 44 px touch targets, WCAG AA contrast. Tokens, components and rules: [`DESIGN.md`](DESIGN.md).
 
 ## How it's built
 
