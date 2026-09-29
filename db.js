@@ -1,12 +1,16 @@
 // All storage goes through here. Swap this file for a cloud backend later.
-export const STORES = ['ingredients', 'recipes', 'logs', 'settings'];
+export const STORES = ['ingredients', 'recipes', 'logs', 'settings', 'temps'];
 let dbp;
 
 function open() {
   return dbp ??= new Promise((res, rej) => {
-    const r = indexedDB.open('pinch', 1);
-    r.onupgradeneeded = () => STORES.forEach(s => r.result.createObjectStore(s, { keyPath: 'id' }));
-    r.onsuccess = () => res(r.result);
+    // v2 added 'temps'. Upgrades only create missing stores, so existing data is untouched.
+    const r = indexedDB.open('pinch', 2);
+    r.onupgradeneeded = () => STORES.forEach(s => r.result.objectStoreNames.contains(s) || r.result.createObjectStore(s, { keyPath: 'id' }));
+    r.onsuccess = () => {
+      r.result.onversionchange = () => r.result.close(); // let a newer version in another tab upgrade
+      res(r.result);
+    };
     r.onerror = () => rej(r.error);
   });
 }
@@ -33,15 +37,17 @@ export async function exportAll() {
 }
 
 // Replaces everything in one transaction: either the whole backup lands or nothing changes.
+// Stores missing from older backups (e.g. 'temps') import as empty.
 export function importAll(data) {
-  if (data?.app !== 'pinch' || !STORES.every(s => Array.isArray(data[s]) && data[s].every(o => o && typeof o.id === 'string'))) {
+  const rows = s => data[s] ?? [];
+  if (data?.app !== 'pinch' || !STORES.every(s => Array.isArray(rows(s)) && rows(s).every(o => o && typeof o.id === 'string'))) {
     throw new Error('Not a Pinch backup file');
   }
   return tx(STORES, 'readwrite', t => {
     for (const s of STORES) {
       const st = t.objectStore(s);
       st.clear();
-      data[s].forEach(o => st.put(o));
+      rows(s).forEach(o => st.put(o));
     }
   });
 }

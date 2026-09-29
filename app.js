@@ -1,5 +1,5 @@
 import * as db from './db.js';
-import { ALLERGENS, PURCHASE_UNITS, UNITS, recipeCost, itemCost, suggestedPrice, actualCostPct, recipeAllergens, usesRecipe, hasPrice, orderList, fmtAmount, money, pct } from './calc.js';
+import { ALLERGENS, PURCHASE_UNITS, UNITS, recipeCost, itemCost, suggestedPrice, actualCostPct, recipeAllergens, usesRecipe, hasPrice, orderList, fmtAmount, TEMP_CHECKS, tempStatus, money, pct } from './calc.js';
 
 const view = document.getElementById('view');
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -463,7 +463,7 @@ async function logList() {
   const work = logs.filter(l => l.type === 'work');
   const hours = work.reduce((n, l) => n + (l.hours || 0), 0);
   page('log', 'Service log', `
-    <p><a href="#/portfolio">Portfolio →</a></p>
+    <div class="links"><a href="#/temps">Temp log →</a><a href="#/portfolio">Portfolio →</a></div>
     <div class="card"><div class="row2">
       <div><small>School service periods</small><div class="big">${school} / ${esc(s.logTarget)}</div>
         <div class="progress"><i style="width:${Math.min(100, school / s.logTarget * 100)}%"></i></div></div>
@@ -512,6 +512,104 @@ async function logEdit(id) {
   };
   document.getElementById('del')?.addEventListener('click', async () => {
     if (confirm('Delete this service entry?')) { await db.del('logs', l.id); go('#/log'); }
+  });
+}
+
+// ---------- Temperature log ----------
+
+const nowLocal = () => { const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 16); };
+const badge = st => `<span class="badge ${st.status}">${{ pass: 'PASS', fail: 'FAIL', pending: 'OPEN' }[st.status]}</span>`;
+const tempValue = e => e.type === 'cooling'
+  ? [e.start, e.stage1, e.stage2].filter(r => r?.temp != null && r.temp !== '').map(r => `${r.temp}°`).join(' → ')
+  : `${e.temp ?? '—'} °C`;
+
+async function tempList() {
+  const temps = (await db.all('temps')).sort((a, b) => b.at.localeCompare(a.at));
+  const todays = temps.filter(t => t.at.startsWith(today()));
+  const fails = todays.filter(t => tempStatus(t).status === 'fail').length;
+  const open = temps.filter(t => tempStatus(t).status === 'pending').length;
+  const days = [...new Set(temps.map(t => t.at.slice(0, 10)))];
+  page('log', 'Temp log', `
+    <div class="card"><div class="row2">
+      <div><small>Checks today</small><div class="big">${todays.length}</div></div>
+      <div><small>Failed today</small><div class="big ${fails ? 'alert-text' : ''}">${fails}</div></div></div>
+      ${open ? `<p class="warn">⚠ ${open} check(s) still open — finish the cooling readings.</p>` : ''}</div>
+    ${days.length ? days.map(d => `<h2 class="day">${esc(new Date(d + 'T00:00').toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }))}</h2>
+      <ul class="list">${temps.filter(t => t.at.startsWith(d)).map(t => {
+        const st = tempStatus(t);
+        return `<li><a href="#/temp/${esc(t.id)}/edit"><div class="grow"><b>${esc(t.item || TEMP_CHECKS[t.type]?.label)}</b>
+          <small>${esc(t.at.slice(11, 16))} · ${esc(TEMP_CHECKS[t.type]?.label ?? t.type)} · ${esc(tempValue(t))}${t.action ? `<br>Action: ${esc(t.action)}` : ''}</small></div>${badge(st)}</a></li>`;
+      }).join('')}</ul>`).join('')
+      : '<p class="empty">Record fridge, freezer, delivery, hot-holding, cooking and cooling temperatures. Each check is marked PASS or FAIL against food safety limits.</p>'}
+    ${temps.length ? '<div class="actions no-print"><button type="button" class="ghost" id="print">Print</button></div>' : ''}`,
+    { back: '#/log', action: '<a class="btn" href="#/temp/new/edit">+ New</a>' });
+  document.getElementById('print')?.addEventListener('click', () => window.print());
+}
+
+async function tempEdit(id) {
+  const isNew = id === 'new';
+  const temps = await db.all('temps');
+  const last = [...temps].sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0))[0];
+  const t = isNew ? { id: uid(), at: nowLocal(), type: last?.type ?? 'fridge' } : temps.find(x => x.id === id);
+  if (!t) return go('#/temps');
+  const reading = (key, label, hint) => `<fieldset class="reading"><legend>${label} <small>${hint}</small></legend><div class="row2">
+    <label>Time<input name="${key}At" type="datetime-local" value="${esc(t[key]?.at ?? (key === 'start' ? t.at : ''))}"></label>
+    <label>°C<input name="${key}Temp" type="number" step="0.1" inputmode="decimal" value="${esc(t[key]?.temp)}"></label></div></fieldset>`;
+
+  page('log', isNew ? 'New temp check' : 'Edit temp check', `<form id="f">
+    <label>Check<select name="type">${Object.entries(TEMP_CHECKS).map(([k, c]) => `<option value="${k}" ${k === t.type ? 'selected' : ''}>${esc(c.label)}</option>`).join('')}</select></label>
+    <label>Equipment or food<input name="item" list="items" placeholder="Walk-in cool room, Bain-marie, Beef ragù…" value="${esc(t.item)}"></label>
+    ${datalist('items', temps.map(x => x.item))}
+    <div id="spot" class="row2">
+      <label>Time<input name="at" type="datetime-local" value="${esc(t.at)}"></label>
+      <label>Temperature °C<input name="temp" type="number" step="0.1" inputmode="decimal" value="${esc(t.temp)}"></label></div>
+    <div id="cool">${reading('start', 'Start', '~60 °C')}${reading('stage1', 'Stage 1', '≤ 21 °C within 2 h')}${reading('stage2', 'Stage 2', '≤ 5 °C within 6 h of start')}</div>
+    <p id="status"></p>
+    <label>Corrective action<input name="action" list="actions" placeholder="What you did if it failed" value="${esc(t.action)}"></label>
+    ${datalist('actions', ['Discarded food', 'Moved food to another fridge', 'Reheated to 75 °C', 'Adjusted thermostat and rechecked', 'Reported to chef', ...temps.map(x => x.action)])}
+    <label>Notes<input name="note" value="${esc(t.note)}"></label>
+    <div class="actions"><button type="submit">Save</button>${isNew ? '' : '<button type="button" class="danger" id="del">Delete</button>'}</div>
+  </form>`, { back: '#/temps' });
+
+  const form = document.getElementById('f');
+  const read = () => {
+    const fd = new FormData(form), type = fd.get('type');
+    const rd = k => ({ at: fd.get(k + 'At'), temp: num(fd.get(k + 'Temp')) });
+    const e = { ...t, type, item: fd.get('item').trim(), action: fd.get('action').trim(), note: fd.get('note').trim() };
+    delete e.start; delete e.stage1; delete e.stage2;
+    if (type === 'cooling') {
+      Object.assign(e, { start: rd('start'), stage1: rd('stage1'), stage2: rd('stage2'), temp: null });
+      e.at = e.start.at || fd.get('at') || nowLocal();
+    } else {
+      Object.assign(e, { at: fd.get('at') || nowLocal(), temp: num(fd.get('temp')) });
+    }
+    return e;
+  };
+  const refresh = () => {
+    const e = read(), st = tempStatus(e);
+    document.getElementById('spot').hidden = e.type === 'cooling';
+    document.getElementById('cool').hidden = e.type !== 'cooling';
+    document.getElementById('status').innerHTML = `${badge(st)} ${esc(st.note)}${st.status === 'fail' ? ' — record a corrective action.' : ''}`;
+  };
+  form.addEventListener('input', e => {
+    // Typing a cooling reading stamps its time with now, if blank — no fiddling with date pickers mid-service.
+    const m = e.target.name?.match(/^(start|stage1|stage2)Temp$/);
+    const at = m && form.querySelector(`[name=${m[1]}At]`);
+    if (at && !at.value && e.target.value !== '') at.value = nowLocal();
+    refresh();
+  });
+  form.addEventListener('change', refresh);
+  refresh();
+
+  form.onsubmit = async ev => {
+    ev.preventDefault();
+    const e = read();
+    if (tempStatus(e).status === 'fail' && !e.action && !confirm('This check failed and has no corrective action. Save anyway?')) return;
+    await db.put('temps', { ...e, createdAt: t.createdAt ?? Date.now(), updatedAt: Date.now() });
+    go('#/temps');
+  };
+  document.getElementById('del')?.addEventListener('click', async () => {
+    if (confirm('Delete this temperature record?')) { await db.del('temps', t.id); go('#/temps'); }
   });
 }
 
@@ -695,6 +793,8 @@ const routes = [
   [/^#\/log$/, logList],
   [/^#\/log\/([^/]+)\/edit$/, logEdit],
   [/^#\/portfolio$/, portfolioView],
+  [/^#\/temps$/, tempList],
+  [/^#\/temp\/([^/]+)\/edit$/, tempEdit],
   [/^#\/settings$/, settingsView],
 ];
 

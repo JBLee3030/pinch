@@ -14,6 +14,7 @@ Installable web app (PWA), works offline, data stays on your phone.
 - **Service log** — school service periods and work shifts with station, hours, dishes and chef feedback
 - **Order list** — pick recipes and portions; sub-recipes expand to raw ingredients, grossed up for trim yield, minus stock on hand, with estimated cost; share or print
 - **Recipe card** — costed standard recipe card, scalable, print or save as A4 PDF
+- **Temp log** — fridge, freezer, delivery, hot-holding, cooking and 2-stage cooling checks marked PASS / FAIL against food safety limits, with corrective actions
 - **Portfolio** — headline, bio, kitchen experience and stats from the log, featured dish photos; print or save as PDF
 - **Backup** — export / import a JSON file
 

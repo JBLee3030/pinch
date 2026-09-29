@@ -166,3 +166,16 @@ details.card[open] summary { margin-bottom: 12px; }
 .sheet .dish figcaption { padding-top: 6px; }
 .sheet .dish small { display: block; }
 @media print { .sheet h2 { break-after: avoid; } }
+
+/* Temp log */
+.links { display: flex; gap: 20px; margin: 0 0 14px; }
+.list .grow { flex: 1; min-width: 0; }
+h2.day { margin: 18px 0 8px; font-size: 14px; color: var(--muted); }
+.badge { flex: none; border: 1px solid currentColor; border-radius: 999px; padding: 2px 8px; font-size: 12px; font-weight: 700; letter-spacing: .03em; }
+.badge.pass { color: var(--accent); }
+.badge.fail { color: var(--danger); }
+.badge.pending { color: var(--warn); }
+fieldset.reading { border: 1px solid var(--line); border-radius: 10px; padding: 6px 10px 0; margin: 0 0 12px; }
+fieldset.reading legend { font-size: 14px; padding: 0 4px; }
+#status { min-height: 24px; }
+[hidden] { display: none !important; }

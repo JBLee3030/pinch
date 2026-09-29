@@ -137,3 +137,40 @@ export function fmtAmount(q, unit) {
   if (unit === 'L' && q < 1) return `${Math.round(q * 1000)} ml`;
   return `${r(q)} ${unit}`;
 }
+
+// Food safety temperature checks (FSANZ Standard 3.2.2; 75 °C core is common guidance).
+export const TEMP_CHECKS = {
+  fridge: { label: 'Fridge / cool room', max: 5 },
+  freezer: { label: 'Freezer', max: -15 },
+  delivery_chilled: { label: 'Delivery – chilled', max: 5 },
+  delivery_frozen: { label: 'Delivery – frozen', max: -15 },
+  hot_hold: { label: 'Hot holding', min: 60 },
+  cooking: { label: 'Cooking (core)', min: 75 },
+  reheat: { label: 'Reheating (core)', min: 75 },
+  cooling: { label: 'Cooling (2-stage)' },
+};
+
+export const limitText = type => {
+  const c = TEMP_CHECKS[type] ?? {};
+  return c.max != null ? `≤ ${c.max} °C` : c.min != null ? `≥ ${c.min} °C` : '60 → 21 °C within 2 h → 5 °C within 6 h';
+};
+
+const minutesBetween = (a, b) => (new Date(b) - new Date(a)) / 60000;
+const hasReading = r => r?.at && r.temp != null && r.temp !== '';
+
+// -> { status: 'pass' | 'fail' | 'pending', note }
+export function tempStatus(e) {
+  const c = TEMP_CHECKS[e.type];
+  if (!c) return { status: 'fail', note: 'Unknown check type' };
+  if (e.type === 'cooling') {
+    if (!hasReading(e.start)) return { status: 'pending', note: 'Add start time and temperature' };
+    if (!hasReading(e.stage1)) return { status: 'pending', note: 'Check again within 2 h of start (≤ 21 °C)' };
+    if (e.stage1.temp > 21 || minutesBetween(e.start.at, e.stage1.at) > 120) return { status: 'fail', note: 'Stage 1: must be ≤ 21 °C within 2 h of start' };
+    if (!hasReading(e.stage2)) return { status: 'pending', note: 'Check again within 6 h of start (≤ 5 °C)' };
+    if (e.stage2.temp > 5 || minutesBetween(e.start.at, e.stage2.at) > 360) return { status: 'fail', note: 'Stage 2: must be ≤ 5 °C within 6 h of start' };
+    return { status: 'pass', note: 'Cooled within limits' };
+  }
+  if (e.temp == null || e.temp === '') return { status: 'pending', note: 'Enter temperature' };
+  if ((c.max != null && e.temp > c.max) || (c.min != null && e.temp < c.min)) return { status: 'fail', note: `Must be ${limitText(e.type)}` };
+  return { status: 'pass', note: limitText(e.type) };
+}

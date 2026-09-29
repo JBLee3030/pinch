@@ -1,6 +1,6 @@
 // Run: node calc.test.js
 import assert from 'node:assert/strict';
-import { convert, recipeCost, suggestedPrice, actualCostPct, recipeAllergens, orderList, fmtAmount } from './calc.js';
+import { convert, recipeCost, suggestedPrice, actualCostPct, recipeAllergens, orderList, fmtAmount, tempStatus } from './calc.js';
 
 const close = (a, b) => assert.ok(Math.abs(a - b) < 1e-9, `${a} != ${b}`);
 
@@ -97,6 +97,27 @@ assert.deepEqual(recipeAllergens(a, ings, cyc), ['Gluten', 'Wheat']);
   assert.equal(fmtAmount(0.04, 'kg'), '40 g');
   assert.equal(fmtAmount(3.333, 'kg'), '3.33 kg');
   assert.equal(fmtAmount(6, 'each'), '6 each');
+}
+
+// Temperature checks
+{
+  const st = e => tempStatus(e).status;
+  assert.equal(st({ type: 'fridge', temp: 5 }), 'pass');
+  assert.equal(st({ type: 'fridge', temp: 5.1 }), 'fail');
+  assert.equal(st({ type: 'freezer', temp: -18 }), 'pass');
+  assert.equal(st({ type: 'freezer', temp: -10 }), 'fail');
+  assert.equal(st({ type: 'hot_hold', temp: 59 }), 'fail');
+  assert.equal(st({ type: 'cooking', temp: 75 }), 'pass');
+  assert.equal(st({ type: 'fridge', temp: '' }), 'pending');
+  assert.equal(st({ type: 'fridge', temp: 0 }), 'pass'); // 0 °C is a reading, not blank
+  const R = (at, temp) => ({ at: '2026-09-29T' + at, temp });
+  assert.equal(st({ type: 'cooling', start: R('14:00', 62) }), 'pending');
+  assert.equal(st({ type: 'cooling', start: R('14:00', 62), stage1: R('15:55', 20) }), 'pending');
+  assert.equal(st({ type: 'cooling', start: R('14:00', 62), stage1: R('16:05', 20) }), 'fail'); // over 2 h
+  assert.equal(st({ type: 'cooling', start: R('14:00', 62), stage1: R('15:30', 24) }), 'fail'); // too warm
+  assert.equal(st({ type: 'cooling', start: R('14:00', 62), stage1: R('15:30', 20), stage2: R('19:50', 4) }), 'pass');
+  assert.equal(st({ type: 'cooling', start: R('14:00', 62), stage1: R('15:30', 20), stage2: R('20:10', 4) }), 'fail'); // over 6 h
+  assert.equal(st({ type: 'cooling', start: R('14:00', 62), stage1: R('15:30', 20), stage2: R('19:00', 7) }), 'fail');
 }
 
 console.log('calc ok');
