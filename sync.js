@@ -21,7 +21,8 @@ export const status = () => ({ email: state.session?.email, lastSync: state.last
 
 async function api(path, { method = 'GET', body, auth = true, headers = {} } = {}) {
   const h = { apikey: KEY, 'Content-Type': 'application/json', ...headers };
-  if (auth) h.Authorization = 'Bearer ' + await accessToken();
+  // auth: true = current session, a string = that access token (password recovery), false = anonymous
+  if (auth) h.Authorization = 'Bearer ' + (typeof auth === 'string' ? auth : await accessToken());
   const res = await fetch(BASE + path, { method, headers: h, body: body && JSON.stringify(body) });
   const text = await res.text();
   let json = null;
@@ -73,6 +74,32 @@ export async function signUp(email, password) {
   if (!s?.access_token) throw new Error('Account created, but email confirmation is on. Turn off "Confirm email" in Supabase.');
   await startSession(s);
 }
+
+// ---- Password reset
+// Supabase emails a link back to this page with #access_token=…&type=recovery,
+// or #error_description=… if the link expired or was already used.
+export const sendReset = email =>
+  api('/auth/v1/recover', { method: 'POST', auth: false, body: { email, redirect_to: location.origin + location.pathname } });
+
+export function readRecoveryHash() {
+  const p = new URLSearchParams(location.hash.slice(1));
+  if (p.get('type') === 'recovery' && p.get('access_token')) return Object.fromEntries(p);
+  if (p.get('error_description')) return { error: p.get('error_description') };
+  return null;
+}
+
+// Sets the new password; with `signInHere` the recovery session becomes this device's session.
+export async function finishReset(recovery, password, signInHere) {
+  const token = recovery.access_token;
+  await api('/auth/v1/user', { method: 'PUT', auth: token, body: { password } });
+  if (!signInHere) return;
+  const user = await api('/auth/v1/user', { auth: token });
+  await startSession({ access_token: token, refresh_token: recovery.refresh_token, expires_in: Number(recovery.expires_in) || 3600, user });
+}
+
+// ---- Feedback (table `feedback`, insert-only; see supabase.sql)
+export const sendFeedback = async (message, context) =>
+  api('/rest/v1/feedback', { method: 'POST', auth: state.session ? true : false, headers: { Prefer: 'return=minimal' }, body: { message, context } });
 
 export async function signOut() {
   try { await api('/auth/v1/logout', { method: 'POST' }); } catch {}

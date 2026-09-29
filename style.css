@@ -183,3 +183,9 @@ fieldset.reading legend { font-size: 14px; padding: 0 4px; }
 .demo-bar { background: var(--accent); color: var(--accent-ink); text-align: center; font-size: 13px; padding: calc(4px + env(safe-area-inset-top)) 12px 4px; }
 .demo-bar a { color: inherit; font-weight: 700; }
 @media print { .demo-bar { display: none; } }
+
+/* Onboarding & settings extras */
+.welcome .steps { margin: 0 0 8px; padding-left: 20px; }
+.welcome .steps li { margin-bottom: 8px; }
+.center { text-align: center; }
+button.link { background: none; color: var(--accent); padding: 0; min-height: 0; font-weight: 600; text-decoration: underline; }

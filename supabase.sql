@@ -37,3 +37,21 @@ end $$;
 
 create trigger items_stamp before insert or update on public.items
   for each row execute function public.items_stamp();
+
+-- ---------------------------------------------------------------------------
+-- Feedback from the app (Settings → Feedback). Read it in Table Editor → feedback.
+-- Anyone can send; nobody can read through the API. Sender id/email come from the
+-- login token, not from the client, so they can't be faked.
+create table public.feedback (
+  id         bigint generated always as identity primary key,
+  created_at timestamptz not null default now(),
+  user_id    uuid default auth.uid(),
+  email      text default (auth.jwt() ->> 'email'),
+  message    text not null check (char_length(message) between 1 and 2000),
+  context    text check (char_length(context) <= 500)
+);
+
+alter table public.feedback enable row level security;
+create policy "anyone can send feedback" on public.feedback for insert to anon, authenticated with check (true);
+revoke all on public.feedback from anon, authenticated; -- Supabase grants everything by default
+grant insert (message, context) on public.feedback to anon, authenticated;

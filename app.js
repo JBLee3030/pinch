@@ -12,6 +12,8 @@ const opts = (list, sel) => list.map(v => `<option ${v === sel ? 'selected' : ''
 const datalist = (id, list) => `<datalist id="${id}">${[...new Set(list.filter(Boolean))].sort().map(v => `<option value="${esc(v)}">`).join('')}</datalist>`;
 const byName = (a, b) => a.name.localeCompare(b.name);
 const go = h => { location.hash = h; };
+const standalone = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+const APP_URL = 'https://jblee3030.github.io/pinch/';
 const portionsLabel = n => `${n} portion${Number(n) === 1 ? '' : 's'}`;
 
 async function settings() {
@@ -58,8 +60,17 @@ async function recipeList() {
     <ul class="list">${recipes.map(r => `<li data-q="${esc(r.name.toLowerCase())}" data-cat="${esc(r.category)}"><a href="#/recipe/${esc(r.id)}">
       ${r.photo ? `<img src="${esc(r.photo)}" alt="">` : '<span class="ph"></span>'}
       <div><b>${esc(r.name)}</b><small>${esc(r.category || 'Uncategorised')} · ${costLine(recipeCost(r, ings, recs))}</small></div></a></li>`).join('')}</ul>`
-    : `<div class="empty"><p>No recipes yet.</p><p>Add ingredients with prices in <a href="#/pantry">Pantry</a>, then create a recipe.</p>
-       <button class="ghost" id="sample">Load sample Italian recipes</button></div>`,
+    : `<div class="card welcome"><h2>Welcome to Pinch</h2>
+        <ol class="steps">
+          <li><b>Write a recipe.</b> Type ingredients as you go — cost per portion, allergens and a recipe card are worked out for you.</li>
+          <li><b>Add prices</b> in <a href="#/pantry">Pantry</a> whenever you have them.</li>
+          <li><b>Log your services</b> in <a href="#/log">Log</a> — it builds your portfolio.</li>
+        </ol>
+        <div class="actions"><a class="btn" href="#/recipe/new/edit">Write your first recipe</a><button class="ghost" id="sample">Load sample recipes</button></div></div>
+      ${standalone() ? '' : `<div class="card"><h2>Install on your phone</h2><p class="muted">${/iPhone|iPad|iPod/.test(navigator.userAgent)
+        ? 'In Safari, tap <b>Share</b> → <b>Add to Home Screen</b>. Then always open Pinch from its icon.'
+        : 'In Chrome, tap <b>⋮</b> → <b>Install app</b> (or Add to Home screen).'}</p></div>`}
+      <p class="muted center">Already use Pinch on another device? <a href="#/settings">Sign in</a> to bring your recipes over.</p>`,
     { action: '<a class="btn" href="#/recipe/new/edit">+ New</a>' });
 
   const q = document.getElementById('q'), cat = document.getElementById('cat');
@@ -698,6 +709,43 @@ async function portfolioView() {
   draw();
 }
 
+// ---------- Password reset (from the emailed link) ----------
+
+let recovery = null;
+
+async function resetView() {
+  if (!recovery) return go('#/settings');
+  if (recovery.error) {
+    page('settings', 'Reset password', `<div class="card"><p class="warn">⚠ ${esc(recovery.error)}</p>
+      <p>Reset links work once and expire after a while. Request a new one from <a href="#/settings">Settings → Forgot password?</a></p></div>`);
+    return;
+  }
+  page('settings', 'Reset password', `<form class="card" id="rp">
+    <label>New password <small>(8+ characters)</small><input name="p1" type="password" autocomplete="new-password" minlength="8" required></label>
+    <label>Repeat new password<input name="p2" type="password" autocomplete="new-password" minlength="8" required></label>
+    <button type="submit">Set new password</button> <p id="rpMsg" class="muted"></p></form>`);
+  const f = document.getElementById('rp'), msg = document.getElementById('rpMsg');
+  f.onsubmit = async e => {
+    e.preventDefault();
+    if (f.p1.value !== f.p2.value) { msg.textContent = 'The passwords don’t match.'; return; }
+    f.querySelector('button').disabled = true;
+    msg.textContent = 'Saving…';
+    try {
+      // In the installed app, sign straight in. In a browser tab (e.g. iPhone opens email links in Safari),
+      // only change the password: the recipes live in the installed app.
+      await sync.finishReset(recovery, f.p1.value, standalone());
+      recovery = null;
+      f.outerHTML = standalone()
+        ? '<div class="card"><p>Password updated — you’re signed in.</p><p><a class="btn" href="#/recipes">Go to my recipes</a></p></div>'
+        : '<div class="card"><p><b>Password updated.</b></p><p>Now open Pinch from your home screen and sign in with the new password.</p></div>';
+    } catch (err) {
+      msg.textContent = err.status === 401 || err.status === 403
+        ? 'This reset link is no longer valid. Request a new one from Settings → Forgot password?' : err.message;
+      f.querySelector('button').disabled = false;
+    }
+  };
+}
+
 // ---------- Settings ----------
 
 // Account card; redrawn on sync status changes while Settings is open.
@@ -708,6 +756,13 @@ async function settingsView() {
   const est = await navigator.storage?.estimate?.().catch(() => null);
   page('settings', 'Settings', `
     <div class="card" id="acct"></div>
+    <form class="card" id="fb">
+      <h2>Feedback</h2>
+      <label>What's missing, confusing or broken?<textarea name="message" maxlength="2000" required placeholder="e.g. I'd like to…"></textarea></label>
+      <button type="submit">Send feedback</button> <span id="fbMsg" class="muted"></span>
+    </form>
+    <div class="card"><h2>Invite classmates</h2><p class="muted">Pinch is free. Share the link — everyone gets their own private recipe book.</p>
+      <button type="button" class="ghost" id="invite">Share Pinch</button> <span id="inviteMsg" class="muted"></span></div>
     <form id="f" class="card">
       <label>Your name <small>(shown on recipe cards)</small><input name="cookName" autocomplete="name" value="${esc(s.cookName)}"></label>
       <label>Default target food cost %<input name="targetCostPct" type="number" min="1" max="100" step="any" inputmode="decimal" required value="${esc(s.targetCostPct)}"></label>
@@ -737,8 +792,10 @@ async function settingsView() {
         <label>Email<input name="email" type="email" autocomplete="username" required></label>
         <label>Password <small>(8+ characters)</small><input name="password" type="password" autocomplete="current-password" minlength="8" required></label>
         <div class="actions"><button type="submit" value="in">Sign in</button><button type="submit" class="ghost" value="up">Create account</button></div>
+        <p><button type="button" class="link" id="forgot">Forgot password?</button></p>
         <p id="authMsg" class="muted"></p>
-      </form>`;
+      </form>
+      <p><small>Synced data is stored with Supabase in Sydney. Only you can read it.</small></p>`;
   };
   acct.addEventListener('submit', async e => {
     e.preventDefault();
@@ -756,9 +813,40 @@ async function settingsView() {
   });
   acct.addEventListener('click', async e => {
     if (e.target.id === 'syncNow') sync.sync();
+    if (e.target.id === 'forgot') {
+      const email = acct.querySelector('[name=email]'), msg = acct.querySelector('#authMsg');
+      if (!email.value.trim()) { msg.textContent = 'Enter your email first, then tap Forgot password.'; email.focus(); return; }
+      msg.textContent = 'Sending…';
+      try {
+        await sync.sendReset(email.value.trim());
+        msg.textContent = 'If there is an account for that email, a reset link is on its way. Open it on this phone.';
+      } catch (err) { msg.textContent = err.message; }
+    }
     if (e.target.id === 'signOut' && confirm('Sign out? Your data stays on this phone.')) await sync.signOut();
   });
   drawAccount();
+
+  const fb = document.getElementById('fb');
+  fb.addEventListener('submit', async e => {
+    e.preventDefault();
+    const msg = document.getElementById('fbMsg'), button = fb.querySelector('button');
+    button.disabled = true;
+    msg.textContent = 'Sending…';
+    try {
+      await sync.sendFeedback(fb.message.value.trim(), `${standalone() ? 'installed' : 'browser'} · ${navigator.userAgent}`.slice(0, 500));
+      fb.reset();
+      msg.textContent = 'Thanks — got it!';
+    } catch (err) {
+      msg.textContent = navigator.onLine ? 'Could not send: ' + err.message : 'You are offline — try again later.';
+    } finally { button.disabled = false; }
+  });
+  document.getElementById('invite').onclick = async () => {
+    const text = 'Pinch — free recipe costing, order lists and a service log for cooks. Open on your phone and add it to your home screen:';
+    try {
+      if (navigator.share) await navigator.share({ title: 'Pinch', text, url: APP_URL });
+      else { await navigator.clipboard.writeText(`${text} ${APP_URL}`); document.getElementById('inviteMsg').textContent = 'Link copied'; }
+    } catch (err) { if (err.name !== 'AbortError') throw err; }
+  };
 
   const form = document.getElementById('f');
   form.onsubmit = async e => {
@@ -890,6 +978,7 @@ const routes = [
   [/^#\/temps$/, tempList],
   [/^#\/temp\/([^/]+)\/edit$/, tempEdit],
   [/^#\/settings$/, settingsView],
+  [/^#\/reset$/, resetView],
 ];
 
 async function render() {
@@ -910,6 +999,8 @@ sync.onStatus(st => {
   drawAccount();
   if (st.changed && !/\/edit|order|portfolio|card|settings/.test(location.hash)) render();
 });
+recovery = sync.readRecoveryHash();
+if (recovery) history.replaceState(null, '', location.pathname + location.search + '#/reset'); // drop tokens from the URL
 if (db.DEMO && !(await db.all('recipes')).length) await loadDemo();
 render();
 sync.sync();

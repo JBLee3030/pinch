@@ -51,7 +51,8 @@ I built Pinch while studying Commercial Cookery and Kitchen Management in Melbou
 
 **Data**
 - Works offline; data lives on the device
-- Optional account: email + password sign-in syncs across devices
+- Optional account: email + password sign-in syncs across devices, with in-app password reset
+- First-run guide, in-app feedback and a share link for inviting classmates
 - JSON backup export / import
 
 ## How it's built
@@ -88,6 +89,6 @@ Add `?demo` to the URL to open a separate database filled with sample data.
 
 ## Roadmap
 
-- Password reset and email delivery for more users
+- Custom email delivery (SMTP) so reset emails reach every user
 - Sharing with classmates and a teacher view of service logs
 - App Store / Play Store packaging
