@@ -33,7 +33,7 @@ const UNIT_WORDS = [
 const unitOf = w => { const u = UNIT_WORDS.find(([re]) => re.test(w.toLowerCase())); return u && [u[1], u[2]]; };
 
 const cleanName = s => {
-  const n = s.replace(/\([^)]*\)/g, ' ').split(',')[0]
+  const n = s.replace(/\([^)]*\)/g, ' ').replace(/[()]/g, ' ').split(',')[0]
     .replace(/^\s*(?:of|x)\s+/i, '')
     .replace(/^(?:cans?|tins?|packets?|jars?|bottles?|bags?)\s+(?:of\s+)?/i, '')
     .replace(/\s+/g, ' ').trim();
@@ -46,13 +46,26 @@ export function parseIngredientLine(raw) {
   let s = raw.replace(/^\s*(?:[-•*·–]|\d+[.)](?=\s))\s*/, '').trim();
   if (!s) return null;
   let qty = null, unit = 'each', m;
+  // Web recipes give both systems; keep the metric one.
+  // "175g/6 oz guanciale" -> "175g guanciale"
+  s = s.replace(new RegExp(`^(${NUM}\\s*(?:kg|g|ml|l)\\b)\\s*\\/\\s*(?:${NUM})\\s*(?:fl\\.?\\s*)?(?:oz|ounces?|lbs?|pounds?|cups?|pints?)\\b\\.?`, 'i'), '$1');
+  // "1 quart (1L) stock" -> 1 L; "1 (28-ounce; 800g) can tomatoes" / "2 (400g) cans" -> count × metric
+  if ((m = s.match(new RegExp(`^(${NUM})\\s*([a-zA-Z]*)\\s*\\([^)]*?(${NUM})\\s*(kg|g|ml|l)\\b[^)]*\\)\\s*(.*)$`, 'i')))) {
+    const lead = unitOf(m[2] || 'x');
+    if (!lead || lead[0] === 'each' || !['g', 'kg', 'ml', 'L'].includes(lead[0])) {
+      const u = unitOf(m[4]);
+      qty = toNumber(m[3]) * u[1] * (m[2] && !lead ? 1 : toNumber(m[1]));
+      unit = u[0];
+      s = m[5];
+    }
+  }
   // "2 x 400g tins tomatoes"
-  if ((m = s.match(new RegExp(`^(${NUM})\\s*[x×]\\s*(${NUM})\\s*([a-zA-Z]+)\\.?\\s+(.*)$`)))) {
+  if (qty == null && (m = s.match(new RegExp(`^(${NUM})\\s*[x×]\\s*(${NUM})\\s*([a-zA-Z]+)\\.?\\s+(.*)$`)))) {
     const u = unitOf(m[3]);
     if (u) { qty = toNumber(m[1]) * toNumber(m[2]) * u[1]; unit = u[0]; s = m[4]; }
   }
   // "500g flour", "1 1/2 cups milk", "2-3 carrots" (takes the first number)
-  if (qty == null && (m = s.match(new RegExp(`^(${NUM})(?:\\s*[-–]\\s*${NUM})?\\s*(.*)$`)))) {
+  if (qty == null && (m = s.match(new RegExp(`^(${NUM})(?:\\s*(?:[-–]|to)\\s*${NUM})?\\s*(.*)$`)))) {
     qty = toNumber(m[1]);
     s = m[2];
     const w = s.match(/^([a-zA-Z]+)\.?(?:\s+|$)(.*)$/);

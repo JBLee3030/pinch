@@ -97,6 +97,25 @@ export async function finishReset(recovery, password, signInHere) {
   await startSession({ access_token: token, refresh_token: recovery.refresh_token, expires_in: Number(recovery.expires_in) || 3600, user });
 }
 
+// ---- Recipe import (Edge Function supabase/functions/recipe-import)
+// Edge Functions check for a JWT; the legacy anon key is one, and like the publishable key it is public.
+const ANON_JWT = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh4Z2h6dWh0c3RteGl6Znd2eXB2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA2MzAzMzAsImV4cCI6MjEwNjIwNjMzMH0.jxEgQTW-zo3sfT9FYyxhF4RzF-8Dql7lpV7qISpHkK0';
+
+export async function importRecipe(url) {
+  let res;
+  try {
+    res = await fetch(`${BASE}/functions/v1/recipe-import`, {
+      method: 'POST', body: JSON.stringify({ url }),
+      headers: { 'Content-Type': 'application/json', apikey: KEY, Authorization: `Bearer ${ANON_JWT}` },
+    });
+  } catch {
+    throw new Error('You’re offline. Connect to the internet to import a recipe.');
+  }
+  const data = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(data?.error || (res.status === 404 ? 'Recipe import isn’t set up yet.' : `Import failed (${res.status}).`));
+  return data;
+}
+
 // ---- Feedback (table `feedback`, insert-only; see supabase.sql)
 export const sendFeedback = async (message, context) =>
   api('/rest/v1/feedback', { method: 'POST', auth: state.session ? true : false, headers: { Prefer: 'return=minimal' }, body: { message, context } });

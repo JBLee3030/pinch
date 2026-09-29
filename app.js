@@ -114,7 +114,7 @@ async function recipeView(id) {
 
   page('recipes', r.name, `
     ${r.photo ? `<img class="hero" src="${esc(r.photo)}" alt="">` : ''}
-    <p class="muted">${esc(r.category || 'Uncategorised')} · ${esc({ school: 'From school', work: 'From work', own: 'My own' }[r.source] || '')}${r.yieldQty ? ` · Yields ${esc(r.yieldQty)} ${esc(r.yieldUnit)}` : ''}</p>
+    <p class="muted">${esc(r.category || 'Uncategorised')} · ${/^https?:\/\//.test(r.sourceUrl ?? '') ? `From <a href="${esc(r.sourceUrl)}" target="_blank" rel="noopener">${esc(new URL(r.sourceUrl).hostname.replace(/^www\./, ''))}</a>` : esc({ school: 'From school', work: 'From work', own: 'My own', web: 'From the web' }[r.source] || '')}${r.yieldQty ? ` · Yields ${esc(r.yieldQty)} ${esc(r.yieldUnit)}` : ''}</p>
     ${usedIn.length ? `<p class="muted">Used in: ${usedIn.map(x => `<a href="#/recipe/${esc(x.id)}">${esc(x.name)}</a>`).join(', ')}</p>` : ''}
     <div class="card stat-card">
       <p class="stat-label">Cost per portion</p>
@@ -167,7 +167,7 @@ async function recipeCard(id) {
   const [ings, s, recipes] = await Promise.all([ingMap(), settings(), db.all('recipes')]);
   const recs = toMap(recipes);
   const target = r.targetCostPct || s.targetCostPct;
-  const sourceLabel = { school: 'School', work: 'Work', own: 'Own recipe' }[r.source] || '';
+  const sourceLabel = r.source === 'web' && r.sourceUrl ? `Source: ${r.sourceUrl}` : { school: 'School', work: 'Work', own: 'Own recipe', web: 'Web' }[r.source] || '';
 
   page('recipes', 'Recipe card', `
     <div class="no-print bar"><label class="inline">Portions <input type="number" id="cp" min="1" step="1" inputmode="numeric" value="${esc(r.portions)}"></label>
@@ -271,6 +271,12 @@ async function recipeEdit(id) {
   // Quick capture: name, ingredients as plain lines, save. Everything else is optional and folded away.
   const typing = !r.items.length; // no rows yet: ingredients start as a text box
   page('recipes', isNew ? 'New recipe' : 'Edit recipe', `<form id="f">
+    ${isNew ? `<div class="card import-card">
+      <h2>Import from a website</h2>
+      <div class="bar"><input type="url" id="importUrl" inputmode="url" autocomplete="off" placeholder="Paste a recipe link" aria-label="Recipe link"><button type="button" id="importBtn">Import</button></div>
+      <p id="importMsg"><small>Find a recipe on Google, copy its link and paste it here. Works with most recipe sites.</small></p>
+    </div>` : ''}
+    <input type="hidden" name="sourceUrl" value="${esc(r.sourceUrl)}">
     <label>Name<input name="name" required placeholder="e.g. Pomodoro sauce" value="${esc(r.name)}"></label>
     <h2>Ingredients</h2>
     <datalist id="ingOpts">${ingList.map(i => `<option value="${esc(i.name)}">`).join('')}${subs.map(x => `<option value="${esc(x.name + SUB)}">`).join('')}</datalist>
@@ -295,7 +301,7 @@ async function recipeEdit(id) {
       <summary>More details <small>category, pricing, batch yield</small></summary>
       <div class="row2">
         <label>Category<input name="category" list="cats" placeholder="Pasta, Sauce…" value="${esc(r.category)}"></label>
-        <label>Source<select name="source">${[['school', 'School'], ['work', 'Work'], ['own', 'My own']].map(([v, l]) => `<option value="${v}" ${v === r.source ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
+        <label>Source<select name="source">${[['school', 'School'], ['work', 'Work'], ['own', 'My own'], ['web', 'Web']].map(([v, l]) => `<option value="${v}" ${v === r.source ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
       </div>
       ${datalist('cats', recipes.map(x => x.category))}
       <div class="row2">
@@ -313,6 +319,28 @@ async function recipeEdit(id) {
   const rows = document.getElementById('rows');
   document.getElementById('add').addEventListener('click', () => { rows.insertAdjacentHTML('beforeend', row()); rows.lastElementChild.querySelector('input').focus(); });
   const paste = document.getElementById('paste');
+  // Import from a link: fills the form, you check it and Save
+  let importedPhoto = null;
+  document.getElementById('importBtn')?.addEventListener('click', async e => {
+    const url = document.getElementById('importUrl').value.trim(), msg = document.getElementById('importMsg');
+    if (!url) { msg.innerHTML = '<small class="warn-text">Paste a link first.</small>'; return; }
+    e.target.disabled = true;
+    msg.innerHTML = '<small>Reading the recipe…</small>';
+    try {
+      const rec = await sync.importRecipe(url);
+      const f = document.getElementById('f');
+      f.elements.name.value = rec.name;
+      document.getElementById('pasteText').value = rec.ingredients.join('\n');
+      f.elements.method.value = rec.steps.map((st, i) => `${i + 1}. ${st}`).join('\n');
+      if (rec.servings) f.elements.portions.value = rec.servings;
+      f.elements.source.value = 'web';
+      f.elements.sourceUrl.value = rec.url;
+      if (rec.imageData) importedPhoto = await readPhoto(await (await fetch(rec.imageData)).blob()).catch(() => null);
+      msg.innerHTML = `<small class="ok-text">Imported from ${esc(rec.site)}: ${rec.ingredients.length} ingredients, ${rec.steps.length} steps${importedPhoto ? ', photo' : ''}. Check it, then Save.</small>`;
+    } catch (err) {
+      msg.innerHTML = `<small class="warn-text">${esc(err.message)}</small>`;
+    } finally { e.target.disabled = false; }
+  });
   const pasteOpen = document.getElementById('pasteOpen');
   if (pasteOpen) pasteOpen.onclick = () => { paste.hidden = !paste.hidden; if (!paste.hidden) document.getElementById('pasteText').focus(); };
   // Turns the text box lines into ingredient rows. Runs from "Add to recipe", and on Save for anything still typed.
@@ -379,7 +407,7 @@ async function recipeEdit(id) {
       name: fd.get('name').trim(), category: fd.get('category').trim(), source: fd.get('source'),
       portions: num(fd.get('portions')), targetCostPct: num(fd.get('targetCostPct')), menuPrice: num(fd.get('menuPrice')),
       yieldQty: num(fd.get('yieldQty')), yieldUnit: fd.get('yieldUnit'),
-      items, method: fd.get('method'), photo: await photoValue(fd, r.photo),
+      items, method: fd.get('method'), photo: await photoValue(fd, importedPhoto ?? r.photo), sourceUrl: fd.get('sourceUrl') || null,
       createdAt: r.createdAt ?? Date.now(), updatedAt: Date.now(),
     });
     go(`#/recipe/${r.id}`);
@@ -956,7 +984,7 @@ async function portfolioView() {
   recipes.sort(byName);
   const recs = toMap(recipes);
   let pf = { headline: '', contact: '', bio: '', recipeIds: [], showCosting: false, ...saved, id: 'portfolio' };
-  const srcLabel = { school: 'Training', work: 'Work', own: 'Original' };
+  const srcLabel = { school: 'Training', work: 'Work', own: 'Original', web: 'Web recipe' };
 
   page('log', 'Portfolio', `
     <details class="card no-print" ${pf.recipeIds.length ? '' : 'open'}><summary>Your details</summary>
@@ -1077,7 +1105,7 @@ async function settingsView() {
     </form>
     <div class="card"><h2>Invite classmates</h2><p class="muted">Pinch is free. Share the link. Everyone gets their own private recipe book.</p>
       <button type="button" class="ghost" id="invite">Share Pinch</button> <span id="inviteMsg" class="muted"></span></div>
-    <p class="muted center"><small>Pinch v4</small></p>`);
+    <p class="muted center"><small>Pinch v5</small></p>`);
 
   const acct = document.getElementById('acct');
   drawAccount = () => {

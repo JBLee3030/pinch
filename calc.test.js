@@ -1,6 +1,7 @@
 // Run: node calc.test.js
 import assert from 'node:assert/strict';
 import { remoteWins } from './db.js';
+import { extractRecipe, safeUrl } from './supabase/functions/recipe-import/index.js';
 import { parseIngredientLine as P, matchIngredient, parsePriceList, packUnit, splitSteps, findDurations, fmtDuration } from './parse.js';
 import { convert, recipeCost, suggestedPrice, actualCostPct, recipeAllergens, orderList, fmtAmount, tempStatus } from './calc.js';
 
@@ -151,6 +152,14 @@ assert.equal(remoteWins({}, 1), true);
   assert.deepEqual(q('3. 100g parmesan'), [100, 'g', 'Parmesan', true]);
   assert.deepEqual(q('2 limes'), [2, 'each', 'Limes', true]);          // 'limes' is not litres
   assert.deepEqual(q('Salt and pepper, to taste'), [null, 'each', 'Salt and pepper', false]);
+  // Web recipe notations: keep the metric amount
+  assert.deepEqual(q('175g/6 oz guanciale (pancetta or block bacon), ( weight after skin removed (Note 1))'), [175, 'g', 'Guanciale', true]);
+  assert.deepEqual(q('1 quart (1L) homemade chicken stock'), [1, 'L', 'Homemade chicken stock', true]);
+  assert.deepEqual(q('1 (28-ounce; 800g) can peeled whole tomatoes'), [800, 'g', 'Peeled whole tomatoes', true]);
+  assert.deepEqual(q('2 (400g) cans chickpeas'), [800, 'g', 'Chickpeas', true]);
+  assert.deepEqual(q('1 to 1 1/2 ounces powdered gelatin'), [28.35, 'g', 'Powdered gelatin', true]);
+  assert.deepEqual(q('2 large eggs ((Note 2))'), [2, 'each', 'Large eggs', true]);
+  assert.deepEqual(q('1 cup (250ml) milk'), [250, 'ml', 'Milk', true]);
   assert.equal(P('   '), null);
 }
 
@@ -217,6 +226,39 @@ assert.equal(remoteWins({}, 1), true);
   assert.equal(fmtDuration(2700), '45 min');
   assert.equal(fmtDuration(5400), '1 h 30 min');
   assert.equal(fmtDuration(30), '30 s');
+}
+
+// Recipe import (JSON-LD on recipe sites)
+{
+  const page = ld => `<html><head><script type="application/ld+json">${JSON.stringify(ld)}</script></head></html>`;
+  // WordPress / Yoast style: @graph with sections of HowToSteps, entities, yield as a list
+  const r = extractRecipe(page({ '@context': 'https://schema.org', '@graph': [
+    { '@type': 'WebPage', name: 'x' },
+    { '@type': ['Recipe', 'NewsArticle'], name: 'Spaghetti Carbonara &amp; Guanciale',
+      recipeYield: ['4', '4 serves'],
+      image: [{ '@type': 'ImageObject', url: '/img/carbonara.jpg' }],
+      recipeIngredient: ['400 g spaghetti', '150&nbsp;g guanciale, diced', '<b>4</b> egg yolks', ''],
+      recipeInstructions: [
+        { '@type': 'HowToSection', name: 'Pasta', itemListElement: [{ '@type': 'HowToStep', text: 'Boil the spaghetti 9 min.' }] },
+        { '@type': 'HowToStep', text: 'Render the guanciale.' },
+        'Toss off the heat with yolks.' ] },
+  ] }), 'https://www.example.com.au/recipes/carbonara');
+  assert.equal(r.name, 'Spaghetti Carbonara & Guanciale');
+  assert.deepEqual(r.ingredients, ['400 g spaghetti', '150 g guanciale, diced', '4 egg yolks']);
+  assert.deepEqual(r.steps, ['Boil the spaghetti 9 min.', 'Render the guanciale.', 'Toss off the heat with yolks.']);
+  assert.equal(r.servings, 4);
+  assert.equal(r.image, 'https://www.example.com.au/img/carbonara.jpg');
+  assert.equal(r.site, 'example.com.au');
+  // Instructions as one HTML string; recipe as a top-level array; broken JSON block skipped
+  const r2 = extractRecipe('<script type="application/ld+json">{ not json</script>' + page([{ '@type': 'Recipe', name: 'Soup', recipeYield: 'Serves 6',
+    recipeIngredient: ['1 onion'], recipeInstructions: '<p>Chop.</p><p>Simmer 20 min.</p>' }]), 'https://soup.test/x');
+  assert.deepEqual([r2.name, r2.servings, r2.steps], ['Soup', 6, ['Chop.', 'Simmer 20 min.']]);
+  assert.equal(extractRecipe(page({ '@type': 'Article', name: 'Not a recipe' })), null);
+  assert.equal(extractRecipe('<html>no data</html>'), null);
+  // Only public web pages
+  assert.ok(safeUrl('https://www.taste.com.au/recipes/x'));
+  for (const bad of ['javascript:alert(1)', 'file:///etc/passwd', 'http://localhost:3000', 'http://192.168.0.1/', 'http://[::1]/', 'http://printer.local/', 'https://x.com:8443/', 'not a url'])
+    assert.equal(safeUrl(bad), null, bad);
 }
 
 console.log('calc ok');

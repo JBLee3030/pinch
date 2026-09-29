@@ -419,3 +419,7 @@ body.sub .timer-pill { bottom: calc(env(safe-area-inset-bottom) + 88px); }
 .checklist label { display: flex; align-items: center; gap: var(--s3); margin: 0; min-height: 56px; color: var(--text); font: 500 17px/1.4 var(--font); cursor: pointer; }
 .checklist label b { font-weight: 700; white-space: nowrap; }
 .checklist label.got span, .checklist label.got b { color: var(--text-3); text-decoration: line-through; }
+.import-card .bar { margin-bottom: var(--s2); }
+.import-card .bar input { background-color: var(--fill); }
+.import-card .bar button { flex: none; }
+.import-card p { margin: 0; }
