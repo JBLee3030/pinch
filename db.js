@@ -2,12 +2,15 @@
 // Every local write stamps `_ts` (edit time, last write wins) and `_dirty` (not yet pushed).
 // Deletes keep a tombstone `{ id, _deleted }` so other devices learn about them; reads hide tombstones.
 export const STORES = ['ingredients', 'recipes', 'logs', 'settings', 'temps'];
+// ?demo opens a separate database filled with sample data, so a visitor (or you) can explore
+// without touching real data. Sync is off in demo mode.
+export const DEMO = new URLSearchParams(globalThis.location?.search ?? '').has('demo');
 let dbp;
 
 function open() {
   return dbp ??= new Promise((res, rej) => {
     // v2 added 'temps'. Upgrades only create missing stores, so existing data is untouched.
-    const r = indexedDB.open('pinch', 2);
+    const r = indexedDB.open(DEMO ? 'pinch-demo' : 'pinch', 2);
     r.onupgradeneeded = () => STORES.forEach(s => r.result.objectStoreNames.contains(s) || r.result.createObjectStore(s, { keyPath: 'id' }));
     r.onsuccess = () => {
       r.result.onversionchange = () => r.result.close(); // let a newer version in another tab upgrade

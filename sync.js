@@ -132,7 +132,7 @@ async function pull() {
 }
 
 export async function sync() {
-  if (!state.session) return;
+  if (!state.session || db.DEMO) return;
   if (syncing) { again = true; return; }
   syncing = true;
   notify(false);

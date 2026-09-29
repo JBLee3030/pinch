@@ -12,6 +12,7 @@ const opts = (list, sel) => list.map(v => `<option ${v === sel ? 'selected' : ''
 const datalist = (id, list) => `<datalist id="${id}">${[...new Set(list.filter(Boolean))].sort().map(v => `<option value="${esc(v)}">`).join('')}</datalist>`;
 const byName = (a, b) => a.name.localeCompare(b.name);
 const go = h => { location.hash = h; };
+const portionsLabel = n => `${n} portion${Number(n) === 1 ? '' : 's'}`;
 
 async function settings() {
   return { targetCostPct: 30, logTarget: 48, lastBackup: null, cookName: '', ...(await db.get('settings', 'settings')) };
@@ -23,7 +24,7 @@ const toMap = list => new Map(list.map(x => [x.id, x]));
 
 function page(tab, title, body, { back, action = '' } = {}) {
   document.querySelectorAll('nav a').forEach(a => a.classList.toggle('on', a.dataset.tab === tab));
-  view.innerHTML = `<header>${back ? `<a class="back" href="${back}" aria-label="Back">‹</a>` : ''}<h1>${esc(title)}</h1>${action}</header><main>${body}</main>`;
+  view.innerHTML = `${db.DEMO ? '<div class="demo-bar">Demo with sample data · <a href="./">Open Pinch</a></div>' : ''}<header>${back ? `<a class="back" href="${back}" aria-label="Back">‹</a>` : ''}<h1>${esc(title)}</h1>${action}</header><main>${body}</main>`;
   window.scrollTo(0, 0);
 }
 
@@ -90,7 +91,7 @@ async function recipeView(id) {
       : '<p class="muted">None declared in Pantry.</p>'}
       <small>Based on Pantry data. Always check supplier labels.</small></div>
     <div class="card"><h2>Costing</h2><dl class="kv">
-      <dt>Batch cost (${esc(r.portions)} portions)</dt><dd>${money(c.total)}</dd>
+      <dt>Batch cost (${esc(portionsLabel(r.portions))})</dt><dd>${money(c.total)}</dd>
       <dt>Cost per portion</dt><dd class="big">${money(c.perPortion)}</dd>
       <dt>Target food cost</dt><dd>${pct(target)}</dd>
       <dt>Suggested price ex GST</dt><dd>${money(price.ex)}</dd>
@@ -166,7 +167,7 @@ async function recipeCard(id) {
       <table class="costing">
         <thead><tr><th>Ingredient</th><th class="n">Qty</th><th>Unit</th><th class="n">Price</th><th class="n">Yield</th><th class="n">Cost</th></tr></thead>
         <tbody>${rows}</tbody>
-        <tfoot><tr><th colspan="5">Total cost (${portions} portions)</th><td class="n"><b>${money(c.total * f)}</b></td></tr></tfoot>
+        <tfoot><tr><th colspan="5">Total cost (${portionsLabel(portions)})</th><td class="n"><b>${money(c.total * f)}</b></td></tr></tfoot>
       </table>
       ${c.problems.map(p => `<p class="warn">⚠ ${esc(p)}</p>`).join('')}
       <div class="sheet-grid">
@@ -723,6 +724,7 @@ async function settingsView() {
   const acct = document.getElementById('acct');
   drawAccount = () => {
     if (!acct.isConnected) return;
+    if (db.DEMO) { acct.innerHTML = '<h2>Account &amp; sync</h2><p class="muted">Turned off in the demo. <a href="./">Open Pinch</a> to use your own data.</p>'; return; }
     const st = sync.status();
     const err = st.error ? `<p class="warn">⚠ ${esc(st.error)}</p>` : '';
     acct.innerHTML = st.email ? `<h2>Account &amp; sync</h2>
@@ -822,6 +824,55 @@ async function loadSample() {
     method: '1. Cook tagliatelle 2 min in salted boiling water.\n2. Toss with hot pomodoro and a splash of pasta water.\n3. Plate, finish with parmigiano and olive oil.', createdAt: t, updatedAt: t });
 }
 
+// Demo (?demo): sample recipes plus log, temps, order plan and portfolio, dated relative to today.
+// Dish "photos" are simple drawn SVG plates, so the demo ships no third-party images.
+const plate = inner => 'data:image/svg+xml,' + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300">
+  <rect width="400" height="300" fill="#e6d8c1"/><circle cx="200" cy="150" r="128" fill="#d9cbb3"/>
+  <circle cx="200" cy="146" r="124" fill="#fbf8f2"/><circle cx="200" cy="146" r="96" fill="#fffdf9" stroke="#ece5d8" stroke-width="3"/>${inner}</svg>`);
+const strands = (color, n = 7) => `<g fill="none" stroke="${color}" stroke-width="9" stroke-linecap="round">${Array.from({ length: n }, (_, i) =>
+  `<ellipse cx="${196 + (i % 3) * 4}" cy="${144 + (i % 2) * 5}" rx="${30 + i * 7}" ry="${22 + i * 5}" transform="rotate(${i * 26} 200 146)" stroke-dasharray="${60 + i * 9} 24"/>`).join('')}</g>`;
+const DEMO_ART = {
+  pomo: plate(`<circle cx="200" cy="146" r="78" fill="#b3321d"/><circle cx="188" cy="136" r="52" fill="#cc4a2c"/>
+    <ellipse cx="226" cy="118" rx="16" ry="8" fill="#3f7d3a" transform="rotate(-30 226 118)"/><ellipse cx="244" cy="130" rx="14" ry="7" fill="#4c8f45" transform="rotate(20 244 130)"/>`),
+  pasta: plate(`${strands('#eed27a', 8)}<g fill="#fff"><circle cx="160" cy="110" r="3"/><circle cx="240" cy="180" r="3"/><circle cx="250" cy="105" r="2.5"/><circle cx="150" cy="185" r="2.5"/></g>`),
+  tag: plate(`${strands('#efcf6e', 7)}<path d="M160 130 q40 -40 80 0 q10 40 -40 45 q-50 -5 -40 -45z" fill="#c23d24"/>
+    <g fill="#fff6dc"><rect x="186" y="128" width="8" height="5" rx="1"/><rect x="210" y="140" width="7" height="5" rx="1"/><rect x="196" y="152" width="8" height="4" rx="1"/><rect x="222" y="126" width="6" height="4" rx="1"/></g>
+    <ellipse cx="236" cy="112" rx="13" ry="7" fill="#3f7d3a" transform="rotate(-25 236 112)"/>`),
+};
+
+async function loadDemo() {
+  await loadSample();
+  for (const [id, art] of [['s-pomo', DEMO_ART.pomo], ['s-pasta', DEMO_ART.pasta], ['s-tag', DEMO_ART.tag]]) {
+    await db.put('recipes', { ...(await db.get('recipes', id)), photo: art });
+  }
+  const day = n => { const d = new Date(); d.setDate(d.getDate() - n); return d.toLocaleDateString('en-CA'); };
+  const at = hoursAgo => { const d = new Date(Date.now() - hoursAgo * 3600e3); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 16); };
+  const t = Date.now();
+  const L = (n, type, venue, period, station, hours, dishes, feedback) =>
+    db.put('logs', { id: `d-log-${n}`, date: day(n), type, venue, period, station, hours, dishes, feedback, createdAt: t - n });
+  await L(40, 'school', 'AMCA training kitchen', 'Lunch', 'Pasta', 4, 'Tagliatelle al pomodoro ×18', 'Good pasta texture. Season the water more.');
+  await L(33, 'school', 'AMCA training kitchen', 'Dinner', 'Sauce', 4, 'Pomodoro, ragù', 'Reduce the sauce further before service.');
+  await L(26, 'school', 'AMCA training kitchen', 'Lunch', 'Larder / Garde manger', 4, 'Caprese, bruschetta ×24', 'Clean station, good speed.');
+  await L(19, 'work', 'Trattoria Nonna (casual)', 'Dinner', 'Pasta', 5.5, 'Tagliatelle, gnocchi ×60', 'Keep the pass wiped between plates.');
+  await L(12, 'school', 'AMCA training kitchen', 'Dinner', 'Pastry', 4, 'Tiramisu ×20', 'Mascarpone mix was perfect.');
+  await L(9, 'work', 'Trattoria Nonna (casual)', 'Dinner', 'Larder / Garde manger', 6, 'Antipasti boards ×35', 'Faster plating this week.');
+  await L(5, 'school', 'AMCA training kitchen', 'Lunch', 'Pass', 4, 'Expo for 40 covers', 'Called tickets clearly.');
+  await L(2, 'work', 'Trattoria Nonna (casual)', 'Dinner', 'Pasta', 6, 'Tagliatelle al pomodoro ×42', '');
+  const T = (id, hoursAgo, type, item, temp, action = '') => db.put('temps', { id, at: at(hoursAgo), type, item, temp, action, note: '', createdAt: t });
+  await T('d-t1', 5, 'fridge', 'Walk-in cool room', 3.2);
+  await T('d-t2', 5, 'freezer', 'Chest freezer', -18);
+  await T('d-t3', 4.5, 'delivery_chilled', 'Dairy delivery', 4);
+  await T('d-t4', 3, 'fridge', 'Dessert fridge', 6.5, 'Moved food to another fridge; reported to chef');
+  await T('d-t5', 1, 'hot_hold', 'Bain-marie — ragù', 67);
+  await db.put('temps', { id: 'd-t6', type: 'cooling', item: 'Beef ragù (10 L)', at: at(2.5), temp: null, action: '', note: '',
+    start: { at: at(2.5), temp: 63 }, stage1: { at: at(0.8), temp: 19 }, stage2: { at: '', temp: null }, createdAt: t });
+  await db.put('settings', { ...(await settings()), id: 'settings', cookName: 'Demo Cook' });
+  await db.put('settings', { id: 'orderPlan', rows: [{ recipeId: 's-tag', portions: 40 }, { recipeId: 's-pomo', portions: 10 }], onHand: { 's-tom': 5.5, 's-oni': 10 } });
+  await db.put('settings', { id: 'portfolio', headline: 'Commis chef · Cert IV Kitchen Management', contact: 'demo@example.com',
+    bio: 'Italian-trained cook focused on fresh pasta and sauces. I cost my recipes, plan prep and keep food safety records.',
+    recipeIds: ['s-pasta', 's-pomo', 's-tag'], showCosting: true });
+}
+
 // ---------- Router ----------
 
 const routes = [
@@ -859,5 +910,6 @@ sync.onStatus(st => {
   drawAccount();
   if (st.changed && !/\/edit|order|portfolio|card|settings/.test(location.hash)) render();
 });
+if (db.DEMO && !(await db.all('recipes')).length) await loadDemo();
 render();
 sync.sync();

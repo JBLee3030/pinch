@@ -179,3 +179,7 @@ fieldset.reading { border: 1px solid var(--line); border-radius: 10px; padding: 
 fieldset.reading legend { font-size: 14px; padding: 0 4px; }
 #status { min-height: 24px; }
 [hidden] { display: none !important; }
+
+.demo-bar { background: var(--accent); color: var(--accent-ink); text-align: center; font-size: 13px; padding: calc(4px + env(safe-area-inset-top)) 12px 4px; }
+.demo-bar a { color: inherit; font-weight: 700; }
+@media print { .demo-bar { display: none; } }
