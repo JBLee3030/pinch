@@ -349,7 +349,7 @@ table.order td.n small { display: block; margin-top: 2px; }
 
 /* ---------- Refinements after first review ---------- */
 /* Forms sitting straight on the grey canvas use white fields (grey-on-grey disappears) */
-form:not(.card) :is(input, select, textarea):not([type=checkbox]):not([type=file]) { background-color: var(--surface); }
+form:not(.card) :is(input, select, textarea):not([type=checkbox]):not([type=file]):not(.card *, details *) { background-color: var(--surface); }
 form:not(.card) :is(input, select, textarea):focus { background-color: var(--surface); }
 /* Recipe ingredient rows: name on its own line, amount below */
 .item { grid-template-columns: 1fr 104px 44px; padding-bottom: var(--s3); margin-bottom: var(--s3); border-bottom: 1px solid var(--line); }
@@ -367,3 +367,14 @@ form:not(.card) :is(input, select, textarea):focus { background-color: var(--sur
 .total-row { display: flex; justify-content: space-between; align-items: baseline; padding: var(--s4) 0 0; border-top: 1px solid var(--line); font-weight: 600; }
 .total-row b { font: 700 20px/1.2 var(--font); }
 form:not(.card) .checks label:not(:has(input:checked)) { background: var(--surface); }
+
+/* Recipe editor: quick capture */
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+#paste textarea { min-height: 180px; font: 400 17px/1.6 var(--font); }
+details.more { background: var(--surface); border-radius: var(--r-card); padding: var(--s4) var(--s5); margin-top: var(--s4); }
+details.more summary { cursor: pointer; list-style: none; min-height: 28px; display: flex; align-items: baseline; gap: var(--s2); font: 600 16px/1.4 var(--font); }
+details.more summary::-webkit-details-marker { display: none; }
+details.more summary::after { content: "+"; margin-left: auto; font-size: 20px; color: var(--text-3); }
+details.more[open] summary::after { content: "−"; }
+details.more[open] summary { margin-bottom: var(--s4); }
+details.more :is(input, select) { background-color: var(--fill); }

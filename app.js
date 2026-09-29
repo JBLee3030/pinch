@@ -266,45 +266,57 @@ async function recipeEdit(id) {
       <button type="button" class="x" aria-label="Remove">×</button></div>`;
   };
 
+  // Quick capture: name, ingredients as plain lines, save. Everything else is optional and folded away.
+  const typing = !r.items.length; // no rows yet: ingredients start as a text box
   page('recipes', isNew ? 'New recipe' : 'Edit recipe', `<form id="f">
-    <label>Name<input name="name" required value="${esc(r.name)}"></label>
-    <div class="row2">
-      <label>Category<input name="category" list="cats" placeholder="Pasta, Sauce…" value="${esc(r.category)}"></label>
-      <label>Source<select name="source">${[['school', 'School'], ['work', 'Work'], ['own', 'My own']].map(([v, l]) => `<option value="${v}" ${v === r.source ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
-    </div>
-    ${datalist('cats', recipes.map(x => x.category))}
-    <div class="row2">
-      <label>Portions<input name="portions" type="number" min="1" step="1" inputmode="numeric" required value="${esc(r.portions)}"></label>
-      <label>Target food cost %<input name="targetCostPct" type="number" min="1" max="100" step="any" inputmode="decimal" placeholder="${s.targetCostPct}" value="${esc(r.targetCostPct)}"></label>
-    </div>
-    <label>Menu price inc GST (optional)<input name="menuPrice" type="number" min="0" step="0.01" inputmode="decimal" value="${esc(r.menuPrice)}"></label>
-    <div class="row2">
-      <label>Batch yield <small>(to use as sub-recipe by weight/volume)</small><input name="yieldQty" type="number" min="0" step="any" inputmode="decimal" placeholder="e.g. 2.2" value="${esc(r.yieldQty)}"></label>
-      <label>Yield unit<select name="yieldUnit">${opts(['L', 'ml', 'kg', 'g'], r.yieldUnit ?? 'L')}</select></label>
-    </div>
+    <label>Name<input name="name" required placeholder="e.g. Pomodoro sauce" value="${esc(r.name)}"></label>
     <h2>Ingredients</h2>
     <datalist id="ingOpts">${ingList.map(i => `<option value="${esc(i.name)}">`).join('')}${subs.map(x => `<option value="${esc(x.name + SUB)}">`).join('')}</datalist>
-    <div id="rows">${(r.items.length ? r.items : [{}]).map(row).join('')}</div>
-    <p><small>Type any ingredient. New ones are added to Pantry when you save, and you can price them later.</small></p>
-    <div class="actions"><button type="button" class="ghost" id="add">+ Add ingredient</button><button type="button" class="ghost" id="pasteOpen">Paste a list</button></div>
-    <div class="card paste" id="paste" hidden>
-      <label>Paste ingredients, one per line<textarea id="pasteText" placeholder="500 g tipo 00 flour&#10;5 eggs&#10;2 cloves garlic&#10;1/2 cup olive oil"></textarea></label>
-      <p><small>Cups, tbsp and tsp use Australian sizes (250 / 20 / 5 ml). Names are matched to your Pantry; anything new is added when you save.</small></p>
-      <button type="button" id="pasteAdd">Add to recipe</button> <span id="pasteMsg" class="muted"></span>
+    <div class="paste" id="paste" ${typing ? '' : 'hidden'}>
+      <label class="sr-only" for="pasteText">Ingredients, one per line</label>
+      <textarea id="pasteText" placeholder="One per line, e.g.&#10;500 g tipo 00 flour&#10;5 eggs&#10;2 cloves garlic&#10;1/2 cup olive oil"></textarea>
+      <p><small>Type or paste. Amounts and units are read for you, and names are matched to your Pantry.</small></p>
+      ${typing ? '' : '<button type="button" id="pasteAdd">Add to recipe</button> <span id="pasteMsg" class="muted"></span>'}
     </div>
-    <label style="margin-top:16px">Method<textarea name="method" placeholder="1. …">${esc(r.method)}</textarea></label>
+    <div id="rows">${r.items.map(row).join('')}</div>
+    <div class="actions">
+      <button type="button" class="ghost" id="add">${typing ? 'Add one at a time' : '+ Add ingredient'}</button>
+      ${typing ? '' : '<button type="button" class="ghost" id="pasteOpen">Paste a list</button>'}
+    </div>
+    <div class="row2" style="margin-top:16px">
+      <label>Portions<input name="portions" type="number" min="1" step="1" inputmode="numeric" required value="${esc(r.portions)}"></label>
+    </div>
+    <label>Method <small>(optional)</small><textarea name="method" placeholder="1. …">${esc(r.method)}</textarea></label>
     ${photoField(r.photo)}
+    <details class="more">
+      <summary>More details <small>category, pricing, batch yield</small></summary>
+      <div class="row2">
+        <label>Category<input name="category" list="cats" placeholder="Pasta, Sauce…" value="${esc(r.category)}"></label>
+        <label>Source<select name="source">${[['school', 'School'], ['work', 'Work'], ['own', 'My own']].map(([v, l]) => `<option value="${v}" ${v === r.source ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
+      </div>
+      ${datalist('cats', recipes.map(x => x.category))}
+      <div class="row2">
+        <label>Target food cost %<input name="targetCostPct" type="number" min="1" max="100" step="any" inputmode="decimal" placeholder="${s.targetCostPct}" value="${esc(r.targetCostPct)}"></label>
+        <label>Menu price inc GST<input name="menuPrice" type="number" min="0" step="0.01" inputmode="decimal" value="${esc(r.menuPrice)}"></label>
+      </div>
+      <div class="row2">
+        <label>Batch yield <small>(for sub-recipes)</small><input name="yieldQty" type="number" min="0" step="any" inputmode="decimal" placeholder="e.g. 2.2" value="${esc(r.yieldQty)}"></label>
+        <label>Yield unit<select name="yieldUnit">${opts(['L', 'ml', 'kg', 'g'], r.yieldUnit ?? 'L')}</select></label>
+      </div>
+    </details>
     <div class="actions"><button type="submit">Save</button>${isNew ? '' : '<button type="button" class="danger" id="del">Delete</button>'}</div>
   </form>`, { back: isNew ? '#/recipes' : `#/recipe/${esc(r.id)}` });
 
   const rows = document.getElementById('rows');
   document.getElementById('add').addEventListener('click', () => { rows.insertAdjacentHTML('beforeend', row()); rows.lastElementChild.querySelector('input').focus(); });
   const paste = document.getElementById('paste');
-  document.getElementById('pasteOpen').onclick = () => { paste.hidden = !paste.hidden; if (!paste.hidden) document.getElementById('pasteText').focus(); };
-  document.getElementById('pasteAdd').onclick = () => {
+  const pasteOpen = document.getElementById('pasteOpen');
+  if (pasteOpen) pasteOpen.onclick = () => { paste.hidden = !paste.hidden; if (!paste.hidden) document.getElementById('pasteText').focus(); };
+  // Turns the text box lines into ingredient rows. Runs from "Add to recipe", and on Save for anything still typed.
+  const addPasted = () => {
     const text = document.getElementById('pasteText'), msg = document.getElementById('pasteMsg');
     const lines = text.value.split(/\r?\n/).map(parseIngredientLine).filter(Boolean);
-    if (!lines.length) { msg.textContent = 'Paste at least one line.'; return; }
+    if (!lines.length) { if (msg) msg.textContent = 'Paste at least one line.'; return; }
     // Replace the empty starter row rather than leaving it above the pasted list
     rows.querySelectorAll('.item').forEach(el => { if (!el.querySelector('[name=ing]').value && !el.querySelector('[name=qty]').value) el.remove(); });
     let matched = 0, unsure = 0;
@@ -320,10 +332,11 @@ async function recipeEdit(id) {
     }
     text.value = '';
     paste.hidden = true;
-    msg.textContent = '';
+    if (msg) msg.textContent = '';
     document.querySelector('.paste-note')?.remove();
     rows.insertAdjacentHTML('afterend', `<p class="paste-note muted"><small>Added ${lines.length} ingredients: ${matched} from Pantry, ${lines.length - matched} new.${unsure ? ` ${unsure} highlighted row(s) need a quantity.` : ''}</small></p>`);
   };
+  document.getElementById('pasteAdd')?.addEventListener('click', addPasted);
   rows.addEventListener('click', e => e.target.matches('.x') && e.target.closest('.item').remove());
   rows.addEventListener('change', e => {
     if (e.target.name !== 'ing') return;
@@ -336,6 +349,16 @@ async function recipeEdit(id) {
   form.onsubmit = async e => {
     e.preventDefault();
     const fd = new FormData(form);
+    if (document.getElementById('pasteText').value.trim()) addPasted();
+    // Never drop a typed ingredient silently: a line without an amount stops the save.
+    const missing = [...form.querySelectorAll('.item')].filter(el => el.querySelector('[name=ing]').value.trim() && !(num(el.querySelector('[name=qty]').value) > 0));
+    if (missing.length) {
+      missing.forEach(el => el.classList.add('uncertain'));
+      document.querySelector('.paste-note')?.remove();
+      rows.insertAdjacentHTML('afterend', `<p class="paste-note warn">Add an amount for ${missing.length === 1 ? 'the highlighted ingredient' : `the ${missing.length} highlighted ingredients`}, or remove ${missing.length === 1 ? 'it' : 'them'} with ×.</p>`);
+      missing[0].querySelector('[name=qty]').focus();
+      return;
+    }
     const created = new Map(); // new Pantry items by lowercased name, so repeats share one
     const items = [];
     for (const el of form.querySelectorAll('.item')) {
@@ -891,7 +914,7 @@ async function settingsView() {
     </form>
     <div class="card"><h2>Invite classmates</h2><p class="muted">Pinch is free. Share the link. Everyone gets their own private recipe book.</p>
       <button type="button" class="ghost" id="invite">Share Pinch</button> <span id="inviteMsg" class="muted"></span></div>
-    <p class="muted center"><small>Pinch v2</small></p>`);
+    <p class="muted center"><small>Pinch v3</small></p>`);
 
   const acct = document.getElementById('acct');
   drawAccount = () => {
