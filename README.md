@@ -39,6 +39,8 @@ I built Pinch while studying Commercial Cookery and Kitchen Management in Melbou
 - Cost per portion, suggested menu price from a target food cost %, actual food cost % against the menu price (GST-aware)
 - Pantry of ingredient prices per kg / L / each with trim yield %; type a new ingredient straight into a recipe and price it later — missing prices are flagged, never counted as $0
 - Costed standard recipe card, printable to A4 / PDF
+- Paste a whole ingredient list: quantities, fractions and units are read (Australian cup / tbsp / tsp), names are matched to the Pantry
+- Import supplier price lists from CSV or a spreadsheet; pack prices (5kg bag, dozen, 500g) become price per kg / L / each
 
 **Kitchen operations**
 - Order list: choose recipes and portions → sub-recipes expand to raw ingredients, grossed up for trim yield, minus stock on hand, with estimated cost; share as text or print
@@ -64,13 +66,15 @@ I built Pinch while studying Commercial Cookery and Kitchen Management in Melbou
 | **Storage** | IndexedDB is the source of truth (local-first). Schema upgrades only add stores, so existing data is never touched. |
 | **Sync** | Supabase (Postgres) through its REST API. One `items` table protected by row-level security. Each device pushes changed rows and pulls rows past its own cursor; deletes are tombstones; conflicts resolve last-edit-wins on both client and server (a Postgres trigger rejects older writes). Schema: [`supabase.sql`](supabase.sql). |
 | **Costing engine** | Pure functions in [`calc.js`](calc.js): unit conversion, recursive sub-recipe costing with cycle detection, order quantities, food safety rules. |
-| **Tests** | `node calc.test.js` — assertion-based checks for costing, sub-recipes, circular references, order lists, stock on hand, temperature limits and sync conflict rules. |
+| **Parsing** | [`parse.js`](parse.js): ingredient-line parser (fractions, ranges, `2 x 400g`, AU measures), word-based matching to the Pantry, CSV/TSV price lists with pack-size conversion. |
+| **Tests** | `node calc.test.js` — assertion-based checks for costing, sub-recipes, circular references, order lists, stock on hand, temperature limits, sync conflict rules, and recipe / price-list parsing. |
 | **Hosting** | GitHub Pages; every push to `main` deploys. |
 
 ```
 index.html   app shell and tab bar
 app.js       screens and routing
 calc.js      costing, ordering and food safety rules (pure, tested)
+parse.js     pasted recipes and supplier price lists (pure, tested)
 db.js        IndexedDB storage, change tracking, backup
 sync.js      optional Supabase auth and sync
 sw.js        offline support

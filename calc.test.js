@@ -1,6 +1,7 @@
 // Run: node calc.test.js
 import assert from 'node:assert/strict';
 import { remoteWins } from './db.js';
+import { parseIngredientLine as P, matchIngredient, parsePriceList, packUnit } from './parse.js';
 import { convert, recipeCost, suggestedPrice, actualCostPct, recipeAllergens, orderList, fmtAmount, tempStatus } from './calc.js';
 
 const close = (a, b) => assert.ok(Math.abs(a - b) < 1e-9, `${a} != ${b}`);
@@ -127,5 +128,75 @@ assert.equal(remoteWins({ _ts: 10 }, 11), true);
 assert.equal(remoteWins({ _ts: 10 }, 10), false); // our own push echoing back
 assert.equal(remoteWins({ _ts: 10 }, 9), false);
 assert.equal(remoteWins({}, 1), true);
+
+// Pasted recipe lines
+{
+  const q = l => { const r = P(l); return r && [r.qty, r.unit, r.name, r.ok]; };
+  assert.deepEqual(q('500 g tipo 00 flour'), [500, 'g', 'Tipo 00 flour', true]);
+  assert.deepEqual(q('500g flour'), [500, 'g', 'Flour', true]);
+  assert.deepEqual(q('5 eggs'), [5, 'each', 'Eggs', true]);
+  assert.deepEqual(q('50ml olive oil'), [50, 'ml', 'Olive oil', true]);
+  assert.deepEqual(q('1.5kg beef chuck, diced'), [1.5, 'kg', 'Beef chuck', true]);
+  assert.deepEqual(q('1,5 kg beef'), [1.5, 'kg', 'Beef', true]);
+  assert.deepEqual(q('1 bunch basil'), [1, 'each', 'Basil', true]);
+  assert.deepEqual(q('2 cloves garlic'), [10, 'g', 'Garlic', true]);
+  assert.deepEqual(q('½ cup (125ml) milk'), [125, 'ml', 'Milk', true]);
+  assert.deepEqual(q('1 1/2 cups of stock'), [375, 'ml', 'Stock', true]);
+  assert.deepEqual(q('1½ tbsp sugar'), [30, 'ml', 'Sugar', true]);   // AU tbsp = 20 ml
+  assert.deepEqual(q('2 tsp salt'), [10, 'ml', 'Salt', true]);
+  assert.deepEqual(q('2 x 400g tins tomatoes'), [800, 'g', 'Tomatoes', true]);
+  assert.deepEqual(q('1 lb butter'), [453.6, 'g', 'Butter', true]);
+  assert.deepEqual(q('2-3 carrots'), [2, 'each', 'Carrots', true]);
+  assert.deepEqual(q('- 200 g pancetta'), [200, 'g', 'Pancetta', true]);
+  assert.deepEqual(q('3. 100g parmesan'), [100, 'g', 'Parmesan', true]);
+  assert.deepEqual(q('2 limes'), [2, 'each', 'Limes', true]);          // 'limes' is not litres
+  assert.deepEqual(q('Salt and pepper, to taste'), [null, 'each', 'Salt and pepper', false]);
+  assert.equal(P('   '), null);
+}
+
+// Matching to Pantry
+{
+  const pantry = [{ name: 'Olive oil, extra virgin' }, { name: 'Basil, bunch' }, { name: 'Tomatoes, canned whole' }, { name: 'Onion, brown' }, { name: 'Flour, tipo 00' }, { name: 'Eggs, free range' }, { name: 'Oil' }];
+  const m = n => matchIngredient(n, pantry)?.name ?? null;
+  assert.equal(m('olive oil'), 'Olive oil, extra virgin');
+  assert.equal(m('Extra virgin olive oil'), 'Olive oil, extra virgin');
+  assert.equal(m('fresh basil'), 'Basil, bunch');
+  assert.equal(m('Canned tomatoes'), 'Tomatoes, canned whole');
+  assert.equal(m('brown onion'), 'Onion, brown');
+  assert.equal(m('Tipo 00 flour'), 'Flour, tipo 00');
+  assert.equal(m('egg'), 'Eggs, free range');
+  assert.equal(m('oil'), 'Oil');                 // exact beats partial
+  assert.equal(m('red onion'), null);            // different ingredient: new
+  assert.equal(m('San Marzano tomatoes'), null);
+}
+
+// Supplier price lists
+{
+  assert.deepEqual(packUnit('5kg'), ['kg', 5]);
+  assert.deepEqual(packUnit('500g'), ['kg', 0.5]);
+  assert.deepEqual(packUnit('per kg'), ['kg', 1]);
+  assert.deepEqual(packUnit('dozen'), ['each', 12]);
+  assert.deepEqual(packUnit('bunch'), ['each', 1]);
+  assert.deepEqual(packUnit('box'), ['each', 1]);
+  assert.equal(packUnit('mystery'), null);
+  const csv = 'Product,Pack,Price,Yield %\n"Tomatoes, canned whole",2.5kg,"$10.50",\nFlour tipo 00,12.5 kg bag,$35.00,\nEggs free range,dozen,7.20,\nBasil,bunch,3.50,70\nMystery,???,4\n';
+  const rows = parsePriceList(csv);
+  assert.equal(rows.length, 5);
+  assert.deepEqual(rows.map(r => [r.name, r.price, r.unit, r.ok]), [
+    ['Tomatoes, canned whole', 4.2, 'kg', true],
+    ['Flour tipo 00', 2.8, 'kg', true],
+    ['Eggs free range', 0.6, 'each', true],
+    ['Basil', 3.5, 'each', true],
+    ['Mystery', null, 'kg', false],
+  ]);
+  assert.equal(rows[3].yieldPct, 70);
+  // Pasted from a spreadsheet (tabs), no header
+  assert.deepEqual(parsePriceList('Garlic\t18\tkg\nMilk\t1.80\tL').map(r => [r.name, r.price, r.unit]), [['Garlic', 18, 'kg'], ['Milk', 1.8, 'L']]);
+  // "Price per L" header gives the unit
+  assert.deepEqual(parsePriceList('Item,Price per L\nCream,6.40').map(r => [r.name, r.price, r.unit]), [['Cream', 6.4, 'L']]);
+  // Semicolon CSV (European Excel)
+  assert.deepEqual(parsePriceList('Name;Price;Unit\nButter;12,50;kg').map(r => [r.name, r.price, r.unit]), [['Butter', 12.5, 'kg']]);
+  assert.equal(parsePriceList('Name,Price\nWagyu,"$1,234.50"')[0].price, 1234.5); // thousands separator
+}
 
 console.log('calc ok');

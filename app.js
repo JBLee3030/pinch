@@ -1,5 +1,6 @@
 import * as db from './db.js';
 import * as sync from './sync.js';
+import { parseIngredientLine, matchIngredient, parsePriceList } from './parse.js';
 import { ALLERGENS, PURCHASE_UNITS, UNITS, recipeCost, itemCost, suggestedPrice, actualCostPct, recipeAllergens, usesRecipe, hasPrice, orderList, fmtAmount, TEMP_CHECKS, tempStatus, money, pct } from './calc.js';
 
 const view = document.getElementById('view');
@@ -261,7 +262,12 @@ async function recipeEdit(id) {
     <datalist id="ingOpts">${ingList.map(i => `<option value="${esc(i.name)}">`).join('')}${subs.map(x => `<option value="${esc(x.name + SUB)}">`).join('')}</datalist>
     <div id="rows">${(r.items.length ? r.items : [{}]).map(row).join('')}</div>
     <p><small>Type any ingredient. New ones are added to Pantry when you save — fill in prices later.</small></p>
-    <button type="button" class="ghost" id="add">+ Add ingredient</button>
+    <div class="actions"><button type="button" class="ghost" id="add">+ Add ingredient</button><button type="button" class="ghost" id="pasteOpen">Paste a list</button></div>
+    <div class="card paste" id="paste" hidden>
+      <label>Paste ingredients, one per line<textarea id="pasteText" placeholder="500 g tipo 00 flour&#10;5 eggs&#10;2 cloves garlic&#10;1/2 cup olive oil"></textarea></label>
+      <p><small>Cups, tbsp and tsp use Australian sizes (250 / 20 / 5 ml). Names are matched to your Pantry; anything new is added when you save.</small></p>
+      <button type="button" id="pasteAdd">Add to recipe</button> <span id="pasteMsg" class="muted"></span>
+    </div>
     <label style="margin-top:16px">Method<textarea name="method" placeholder="1. …">${esc(r.method)}</textarea></label>
     ${photoField(r.photo)}
     <div class="actions"><button type="submit">Save</button>${isNew ? '' : '<button type="button" class="danger" id="del">Delete</button>'}</div>
@@ -269,6 +275,31 @@ async function recipeEdit(id) {
 
   const rows = document.getElementById('rows');
   document.getElementById('add').addEventListener('click', () => { rows.insertAdjacentHTML('beforeend', row()); rows.lastElementChild.querySelector('input').focus(); });
+  const paste = document.getElementById('paste');
+  document.getElementById('pasteOpen').onclick = () => { paste.hidden = !paste.hidden; if (!paste.hidden) document.getElementById('pasteText').focus(); };
+  document.getElementById('pasteAdd').onclick = () => {
+    const text = document.getElementById('pasteText'), msg = document.getElementById('pasteMsg');
+    const lines = text.value.split(/\r?\n/).map(parseIngredientLine).filter(Boolean);
+    if (!lines.length) { msg.textContent = 'Paste at least one line.'; return; }
+    // Replace the empty starter row rather than leaving it above the pasted list
+    rows.querySelectorAll('.item').forEach(el => { if (!el.querySelector('[name=ing]').value && !el.querySelector('[name=qty]').value) el.remove(); });
+    let matched = 0, unsure = 0;
+    for (const p of lines) {
+      const match = p.name && matchIngredient(p.name, ingList);
+      rows.insertAdjacentHTML('beforeend', row(match ? { ingredientId: match.id } : {}));
+      const el = rows.lastElementChild, inp = el.querySelector('[name=ing]');
+      if (match) matched++; else inp.value = p.name;
+      inp.dispatchEvent(new Event('change', { bubbles: true })); // sets unit choices and the "new" outline
+      el.querySelector('[name=qty]').value = p.qty ?? '';
+      el.querySelector('[name=unit]').value = p.unit;
+      if (!p.ok) { el.classList.add('uncertain'); el.title = `Check this line: "${p.raw}"`; unsure++; }
+    }
+    text.value = '';
+    paste.hidden = true;
+    msg.textContent = '';
+    document.querySelector('.paste-note')?.remove();
+    rows.insertAdjacentHTML('afterend', `<p class="paste-note muted"><small>Added ${lines.length} ingredients — ${matched} matched to Pantry, ${lines.length - matched} new.${unsure ? ` ${unsure} highlighted row(s) need a quantity.` : ''}</small></p>`);
+  };
   rows.addEventListener('click', e => e.target.matches('.x') && e.target.closest('.item').remove());
   rows.addEventListener('change', e => {
     if (e.target.name !== 'ing') return;
@@ -333,7 +364,7 @@ async function pantryList() {
   const used = id => recipes.filter(r => r.items?.some(it => it.ingredientId === id)).length;
   const missing = ings.filter(i => !hasPrice(i));
   page('pantry', 'Pantry', ings.length ? `
-    <p><a href="#/order">Order list →</a></p>
+    <div class="links"><a href="#/order">Order list →</a><a href="#/pantry/import">Import prices →</a></div>
     ${missing.length ? `<div class="card"><h2>Needs price (${missing.length})</h2><div class="chips">${missing.map(i => `<a class="chip" href="#/ingredient/${esc(i.id)}/edit">${esc(i.name)}</a>`).join('')}</div></div>` : ''}
     <div class="bar"><input type="search" id="q" placeholder="Search ingredients" aria-label="Search ingredients"></div>
     <ul class="list">${ings.map(i => `<li data-q="${esc(i.name.toLowerCase())}"><a href="#/ingredient/${esc(i.id)}/edit"><div>
@@ -374,6 +405,64 @@ async function ingredientEdit(id) {
     if (confirm(n ? `"${i.name}" is used in ${n} recipe(s). Their costing will show a warning. Delete anyway?` : `Delete "${i.name}"?`)) {
       await db.del('ingredients', i.id); go('#/pantry');
     }
+  });
+}
+
+// ---------- Import supplier prices ----------
+
+async function importPrices() {
+  const ings = (await db.all('ingredients')).sort(byName);
+  page('pantry', 'Import prices', `
+    <div class="card">
+      <p>Paste rows from a supplier price list or spreadsheet, or pick a CSV file.</p>
+      <p class="muted"><small>Columns: <b>name</b>, <b>price</b>, <b>unit or pack</b> (kg, L, each, or a pack size like 5kg, 500g, dozen). Optional: <b>yield</b> %. Pack prices are converted to the price per kg / L / each.</small></p>
+      <label>Paste<textarea id="csvText" placeholder="Tomatoes, canned whole&#9;2.5kg&#9;$10.50&#10;Flour tipo 00&#9;12.5kg&#9;$35.00&#10;Eggs free range&#9;dozen&#9;$7.20"></textarea></label>
+      <label>…or choose a file<input type="file" id="csvFile" accept=".csv,.tsv,.txt,text/csv"></label>
+      <button type="button" id="preview">Preview</button>
+    </div>
+    <div id="out"></div>`, { back: '#/pantry' });
+
+  const out = document.getElementById('out');
+  let rows = [];
+  document.getElementById('csvFile').onchange = async e => {
+    const f = e.target.files[0];
+    if (f) { document.getElementById('csvText').value = await f.text(); document.getElementById('preview').click(); }
+  };
+  document.getElementById('preview').onclick = () => {
+    rows = parsePriceList(document.getElementById('csvText').value);
+    if (!rows.length) { out.innerHTML = '<p class="warn">Nothing to import — paste some rows first.</p>'; return; }
+    out.innerHTML = `<div class="card"><h2>Check before importing</h2>
+      <p class="muted"><small>Matched items get the new price. Pick “New ingredient” if a match is wrong.</small></p>
+      <div class="import-rows">${rows.map((r, i) => {
+        const m = r.ok && matchIngredient(r.name, ings, 1);
+        return `<div class="import-row ${r.ok ? '' : 'bad'}" data-i="${i}">
+          <label class="inline"><input type="checkbox" name="use" ${r.ok ? 'checked' : 'disabled'}> <b>${esc(r.name || '(no name)')}</b></label>
+          ${r.ok ? `<div class="row3">
+            <span class="big-ish">${money(r.price)}</span>
+            <select name="unit" aria-label="Unit">${opts(PURCHASE_UNITS, r.unit)}</select>
+            <select name="target" aria-label="Update which ingredient"><option value="">New ingredient</option>
+              ${ings.map(x => `<option value="${esc(x.id)}" ${m && m.id === x.id ? 'selected' : ''}>Update: ${esc(x.name)}${x.unit !== r.unit ? ` (${esc(x.unit)})` : ''}</option>`).join('')}</select>
+          </div>` : `<small class="warn">Couldn't read price or unit: ${esc(r.raw)}</small>`}</div>`;
+      }).join('')}</div>
+      <button type="button" id="doImport">Import</button> <span id="impMsg" class="muted"></span></div>`;
+  };
+  out.addEventListener('click', async e => {
+    if (e.target.id !== 'doImport') return;
+    let added = 0, updated = 0;
+    for (const el of out.querySelectorAll('.import-row')) {
+      if (!el.querySelector('[name=use]')?.checked) continue;
+      const r = rows[el.dataset.i], unit = el.querySelector('[name=unit]').value, target = el.querySelector('[name=target]').value;
+      const existing = target && ings.find(x => x.id === target);
+      if (existing) {
+        await db.put('ingredients', { ...existing, price: r.price, unit, ...(r.yieldPct ? { yieldPct: r.yieldPct } : {}), updatedAt: Date.now() });
+        updated++;
+      } else {
+        await db.put('ingredients', { id: uid(), name: r.name, price: r.price, unit, yieldPct: r.yieldPct ?? 100, allergens: [], updatedAt: Date.now() });
+        added++;
+      }
+    }
+    go('#/pantry');
+    setTimeout(() => document.querySelector('main')?.insertAdjacentHTML('afterbegin', `<p class="ok-text">Imported: ${updated} updated, ${added} added.</p>`), 150);
   });
 }
 
@@ -971,6 +1060,7 @@ const routes = [
   [/^#\/recipe\/([^/]+)\/card$/, recipeCard],
   [/^#\/pantry$/, pantryList],
   [/^#\/order$/, orderView],
+  [/^#\/pantry\/import$/, importPrices],
   [/^#\/ingredient\/([^/]+)\/edit$/, ingredientEdit],
   [/^#\/log$/, logList],
   [/^#\/log\/([^/]+)\/edit$/, logEdit],

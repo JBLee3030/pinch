@@ -189,3 +189,11 @@ fieldset.reading legend { font-size: 14px; padding: 0 4px; }
 .welcome .steps li { margin-bottom: 8px; }
 .center { text-align: center; }
 button.link { background: none; color: var(--accent); padding: 0; min-height: 0; font-weight: 600; text-decoration: underline; }
+
+/* Paste ingredients & price import */
+.item.uncertain [name=qty] { border-color: var(--warn); border-width: 2px; }
+.paste textarea, #csvText { min-height: 140px; font-family: ui-monospace, Menlo, monospace; font-size: 14px; }
+.import-row { padding: 10px 0; border-bottom: 1px solid var(--line); }
+.import-row.bad { opacity: .75; }
+.import-row .row3 { display: grid; grid-template-columns: auto 80px 1fr; gap: 8px; align-items: center; margin-top: 6px; }
+.big-ish { font-weight: 700; font-variant-numeric: tabular-nums; }
