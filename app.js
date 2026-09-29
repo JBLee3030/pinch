@@ -463,6 +463,7 @@ async function logList() {
   const work = logs.filter(l => l.type === 'work');
   const hours = work.reduce((n, l) => n + (l.hours || 0), 0);
   page('log', 'Service log', `
+    <p><a href="#/portfolio">Portfolio →</a></p>
     <div class="card"><div class="row2">
       <div><small>School service periods</small><div class="big">${school} / ${esc(s.logTarget)}</div>
         <div class="progress"><i style="width:${Math.min(100, school / s.logTarget * 100)}%"></i></div></div>
@@ -512,6 +513,89 @@ async function logEdit(id) {
   document.getElementById('del')?.addEventListener('click', async () => {
     if (confirm('Delete this service entry?')) { await db.del('logs', l.id); go('#/log'); }
   });
+}
+
+// ---------- Portfolio ----------
+
+const monthYear = d => new Date(d + 'T00:00').toLocaleDateString('en-AU', { month: 'short', year: 'numeric' });
+
+// Log entries grouped by kitchen, most recent first.
+function experience(logs) {
+  const m = new Map();
+  for (const l of logs) {
+    const venue = l.venue || 'Unnamed kitchen', key = venue + '\u0000' + l.type;
+    const v = m.get(key) ?? { venue, type: l.type, count: 0, hours: 0, first: l.date, last: l.date, stations: new Set() };
+    v.count++;
+    v.hours += l.hours || 0;
+    if (l.date < v.first) v.first = l.date;
+    if (l.date > v.last) v.last = l.date;
+    if (l.station) v.stations.add(l.station);
+    m.set(key, v);
+  }
+  return [...m.values()].sort((a, b) => b.last.localeCompare(a.last)).map(v => {
+    const a = monthYear(v.first), b = monthYear(v.last);
+    return { ...v, stations: [...v.stations], range: a === b ? a : `${a} – ${b}` };
+  });
+}
+
+async function portfolioView() {
+  const [recipes, logs, ings, s, saved] = await Promise.all([db.all('recipes'), db.all('logs'), ingMap(), settings(), db.get('settings', 'portfolio')]);
+  recipes.sort(byName);
+  const recs = toMap(recipes);
+  let pf = { headline: '', contact: '', bio: '', recipeIds: [], showCosting: false, ...saved, id: 'portfolio' };
+  const srcLabel = { school: 'Training', work: 'Work', own: 'Original' };
+
+  page('log', 'Portfolio', `
+    <details class="card no-print" ${pf.recipeIds.length ? '' : 'open'}><summary><b>Edit portfolio</b></summary>
+      <form id="pf">
+        <p class="muted">Name: ${s.cookName ? `<b>${esc(s.cookName)}</b> (from Settings)` : '<a href="#/settings">add your name in Settings</a>'}</p>
+        <label>Headline<input name="headline" placeholder="Commis chef · Cert IV Kitchen Management" value="${esc(pf.headline)}"></label>
+        <label>Contact<input name="contact" placeholder="email · phone · Instagram" value="${esc(pf.contact)}"></label>
+        <label>About me<textarea name="bio" placeholder="What you cook, what you're learning, what you're looking for.">${esc(pf.bio)}</textarea></label>
+        <h2>Featured dishes</h2>
+        ${recipes.length ? `<div class="checks">${recipes.map(r => `<label><input type="checkbox" name="recipeIds" value="${esc(r.id)}" ${pf.recipeIds.includes(r.id) ? 'checked' : ''}> ${esc(r.name)}${r.photo ? '' : ' <small>(no photo)</small>'}</label>`).join('')}</div>`
+          : '<p class="muted">No recipes yet.</p>'}
+        <label class="inline" style="margin-top:12px"><input type="checkbox" name="showCosting" ${pf.showCosting ? 'checked' : ''}> Show costing on dishes</label>
+      </form></details>
+    <div class="no-print bar"><button id="print">Print / Save PDF</button></div>
+    <div class="sheet-wrap"><article class="sheet portfolio" id="sheet"></article></div>`, { back: '#/log' });
+
+  const sheet = document.getElementById('sheet'), form = document.getElementById('pf');
+  const dish = r => {
+    const c = recipeCost(r, ings, recs);
+    const costing = pf.showCosting && !c.problems.length
+      ? (r.menuPrice ? `Food cost ${pct(actualCostPct(c.perPortion, r.menuPrice))}` : `${money(c.perPortion)} / portion`) : '';
+    return `<figure class="dish">${r.photo ? `<img src="${esc(r.photo)}" alt="${esc(r.name)}">` : ''}
+      <figcaption><b>${esc(r.name)}</b><small>${[r.category, srcLabel[r.source], costing].filter(Boolean).map(esc).join(' · ')}</small></figcaption></figure>`;
+  };
+  const draw = () => {
+    const featured = recipes.filter(r => pf.recipeIds.includes(r.id));
+    const school = logs.filter(l => l.type === 'school').length, work = logs.filter(l => l.type === 'work').length;
+    const hours = logs.reduce((n, l) => n + (l.hours || 0), 0);
+    const exp = experience(logs);
+    sheet.innerHTML = `
+      <div class="sheet-head"><div><p class="eyebrow">Culinary portfolio</p><h1>${esc(s.cookName || 'Your name')}</h1>
+        ${pf.headline ? `<p><b>${esc(pf.headline)}</b></p>` : ''}${pf.contact ? `<p class="muted">${esc(pf.contact)}</p>` : ''}</div></div>
+      ${pf.bio ? `<p class="bio">${esc(pf.bio)}</p>` : ''}
+      <div class="stats">
+        <div><b>${school}</b><small>school service periods</small></div><div><b>${work}</b><small>work shifts</small></div>
+        <div><b>${fmtQty(hours)}</b><small>hours logged</small></div><div><b>${recipes.length}</b><small>recipes in my book</small></div></div>
+      ${exp.length ? `<h2>Kitchen experience</h2><ul class="exp">${exp.map(v => `<li><b>${esc(v.venue)}</b> <small>· ${v.type === 'school' ? 'Training kitchen' : 'Work'}</small><br>
+        <small>${esc(v.range)} · ${v.count} services${v.hours ? ` · ${fmtQty(v.hours)} h` : ''}${v.stations.length ? ` · ${v.stations.map(esc).join(', ')}` : ''}</small></li>`).join('')}</ul>` : ''}
+      ${featured.length ? `<h2>Featured dishes</h2><div class="dishes">${featured.map(dish).join('')}</div>` : ''}
+      <p class="sheet-foot">Made with Pinch · ${new Date().toLocaleDateString('en-AU')}</p>`;
+    sheet.style.zoom = Math.min(1, sheet.parentElement.clientWidth / sheet.offsetWidth).toFixed(3);
+  };
+
+  form.addEventListener('input', () => {
+    const fd = new FormData(form);
+    pf = { ...pf, headline: fd.get('headline').trim(), contact: fd.get('contact').trim(), bio: fd.get('bio'),
+      recipeIds: fd.getAll('recipeIds'), showCosting: !!fd.get('showCosting') };
+    db.put('settings', pf);
+    draw();
+  });
+  document.getElementById('print').onclick = () => window.print();
+  draw();
 }
 
 // ---------- Settings ----------
@@ -610,6 +694,7 @@ const routes = [
   [/^#\/ingredient\/([^/]+)\/edit$/, ingredientEdit],
   [/^#\/log$/, logList],
   [/^#\/log\/([^/]+)\/edit$/, logEdit],
+  [/^#\/portfolio$/, portfolioView],
   [/^#\/settings$/, settingsView],
 ];
 

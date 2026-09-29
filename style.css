@@ -150,3 +150,19 @@ a.chip { color: var(--text); text-decoration: none; }
 table.order td { vertical-align: top; }
 table.order input.have { width: 64px; min-height: 36px; padding: 6px; text-align: right; }
 table.order td.n small { display: block; }
+
+/* Portfolio sheet */
+details.card summary { cursor: pointer; min-height: 28px; }
+details.card[open] summary { margin-bottom: 12px; }
+.sheet .bio { white-space: pre-wrap; margin: 10px 0; }
+.sheet .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 14px 0; }
+.sheet .stats div { border: 1px solid #e3dfd5; border-radius: 6px; padding: 8px 10px; }
+.sheet .stats b { display: block; font-size: 20px; }
+.sheet .exp { list-style: none; margin: 0; padding: 0; }
+.sheet .exp li { padding: 6px 0; border-bottom: 1px solid #e3dfd5; break-inside: avoid; }
+.sheet .dishes { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.sheet .dish { margin: 0; break-inside: avoid; }
+.sheet .dish img { display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 4px; }
+.sheet .dish figcaption { padding-top: 6px; }
+.sheet .dish small { display: block; }
+@media print { .sheet h2 { break-after: avoid; } }
