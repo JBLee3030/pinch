@@ -1,5 +1,5 @@
 import * as db from './db.js';
-import { ALLERGENS, PURCHASE_UNITS, UNITS, recipeCost, itemCost, suggestedPrice, actualCostPct, recipeAllergens, usesRecipe, hasPrice, money, pct } from './calc.js';
+import { ALLERGENS, PURCHASE_UNITS, UNITS, recipeCost, itemCost, suggestedPrice, actualCostPct, recipeAllergens, usesRecipe, hasPrice, orderList, fmtAmount, money, pct } from './calc.js';
 
 const view = document.getElementById('view');
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -320,6 +320,7 @@ async function pantryList() {
   const used = id => recipes.filter(r => r.items?.some(it => it.ingredientId === id)).length;
   const missing = ings.filter(i => !hasPrice(i));
   page('pantry', 'Pantry', ings.length ? `
+    <p><a href="#/order">Order list →</a></p>
     ${missing.length ? `<div class="card"><h2>Needs price (${missing.length})</h2><div class="chips">${missing.map(i => `<a class="chip" href="#/ingredient/${esc(i.id)}/edit">${esc(i.name)}</a>`).join('')}</div></div>` : ''}
     <div class="bar"><input type="search" id="q" placeholder="Search ingredients" aria-label="Search ingredients"></div>
     <ul class="list">${ings.map(i => `<li data-q="${esc(i.name.toLowerCase())}"><a href="#/ingredient/${esc(i.id)}/edit"><div>
@@ -361,6 +362,64 @@ async function ingredientEdit(id) {
       await db.del('ingredients', i.id); go('#/pantry');
     }
   });
+}
+
+// ---------- Order list ----------
+
+async function orderView() {
+  const [recipes, ings, saved] = await Promise.all([db.all('recipes'), ingMap(), db.get('settings', 'orderPlan')]);
+  recipes.sort(byName);
+  const recs = toMap(recipes);
+  const planRow = (p = {}) => `<div class="plan-row">
+    <select name="recipe" aria-label="Recipe"><option value="">Choose recipe…</option>
+      ${recipes.map(r => `<option value="${esc(r.id)}" ${r.id === p.recipeId ? 'selected' : ''}>${esc(r.name)}</option>`).join('')}</select>
+    <input name="portions" type="number" min="0" step="1" inputmode="numeric" placeholder="Portions" aria-label="Portions" value="${esc(p.portions)}">
+    <button type="button" class="x" aria-label="Remove">×</button></div>`;
+  page('pantry', 'Order list', recipes.length ? `
+    <div class="card no-print"><h2>What are you cooking?</h2>
+      <div id="plan">${(saved?.rows?.length ? saved.rows : [{}]).map(planRow).join('')}</div>
+      <button type="button" class="ghost" id="addPlan">+ Add recipe</button></div>
+    <div class="card" id="out"></div>` : '<p class="empty">Add recipes first.</p>', { back: '#/pantry' });
+  if (!recipes.length) return;
+
+  const planEl = document.getElementById('plan'), out = document.getElementById('out');
+  const readPlan = () => [...planEl.querySelectorAll('.plan-row')].map(el => ({
+    recipeId: el.querySelector('[name=recipe]').value, portions: num(el.querySelector('[name=portions]').value),
+  }));
+  let shareText = '';
+  const draw = () => {
+    const plan = readPlan();
+    db.put('settings', { id: 'orderPlan', rows: plan });
+    const o = orderList(plan, ings, recs);
+    const forLine = plan.filter(p => recs.has(p.recipeId) && p.portions > 0).map(p => `${recs.get(p.recipeId).name} ×${p.portions}`).join(', ');
+    if (!o.lines.length) { out.innerHTML = '<p class="muted">Choose recipes and portions to see what to order.</p>'; return; }
+    shareText = [`Order list — ${new Date().toLocaleDateString('en-AU')}`, `For: ${forLine}`, '',
+      ...o.lines.map(l => `${l.ing.name} — ${fmtAmount(l.order, l.ing.unit)}`), '', `Est. cost: ${money(o.total)}`].join('\n');
+    out.innerHTML = `<h2>To order</h2><p class="muted">For: ${esc(forLine)}</p>
+      <table><thead><tr><th>Ingredient</th><th class="n">Need</th><th class="n">Order</th><th class="n">Est.</th></tr></thead>
+      <tbody>${o.lines.map(l => `<tr><td>${esc(l.ing.name)}${Number(l.ing.yieldPct) < 100 ? `<br><small>yield ${esc(l.ing.yieldPct)}%</small>` : ''}</td>
+        <td class="n muted">${fmtAmount(l.usable, l.ing.unit)}</td><td class="n"><b>${fmtAmount(l.order, l.ing.unit)}</b></td><td class="n muted">${money(l.cost)}</td></tr>`).join('')}</tbody>
+      <tfoot><tr><th colspan="3">Estimated total</th><td class="n"><b>${money(o.total)}</b></td></tr></tfoot></table>
+      ${o.problems.map(p => `<p class="warn">⚠ ${esc(p)}</p>`).join('')}
+      <p><small>Need = usable amount in the recipes. Order = need ÷ trim yield.</small></p>
+      <div class="actions no-print"><button type="button" id="share">Share list</button><button type="button" class="ghost" id="print">Print</button></div>`;
+  };
+
+  document.getElementById('addPlan').addEventListener('click', () => { planEl.insertAdjacentHTML('beforeend', planRow()); planEl.lastElementChild.querySelector('select').focus(); });
+  planEl.addEventListener('click', e => { if (e.target.matches('.x')) { e.target.closest('.plan-row').remove(); draw(); } });
+  planEl.addEventListener('input', draw);
+  planEl.addEventListener('change', draw);
+  out.addEventListener('click', async e => {
+    if (e.target.id === 'print') window.print();
+    if (e.target.id !== 'share') return;
+    try {
+      if (navigator.share) await navigator.share({ title: 'Order list', text: shareText });
+      else { await navigator.clipboard.writeText(shareText); e.target.textContent = 'Copied'; }
+    } catch (err) {
+      if (err.name !== 'AbortError') throw err;
+    }
+  });
+  draw();
 }
 
 // ---------- Log ----------
@@ -518,6 +577,7 @@ const routes = [
   [/^#\/recipe\/([^/]+)\/edit$/, recipeEdit],
   [/^#\/recipe\/([^/]+)\/card$/, recipeCard],
   [/^#\/pantry$/, pantryList],
+  [/^#\/order$/, orderView],
   [/^#\/ingredient\/([^/]+)\/edit$/, ingredientEdit],
   [/^#\/log$/, logList],
   [/^#\/log\/([^/]+)\/edit$/, logEdit],

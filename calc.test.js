@@ -1,6 +1,6 @@
 // Run: node calc.test.js
 import assert from 'node:assert/strict';
-import { convert, recipeCost, suggestedPrice, actualCostPct, recipeAllergens } from './calc.js';
+import { convert, recipeCost, suggestedPrice, actualCostPct, recipeAllergens, orderList, fmtAmount } from './calc.js';
 
 const close = (a, b) => assert.ok(Math.abs(a - b) < 1e-9, `${a} != ${b}`);
 
@@ -59,5 +59,32 @@ const ca = recipeCost(a, ings, cyc);
 close(ca.total, 2);
 assert.ok(ca.problems.some(p => p.includes('circular')));
 assert.deepEqual(recipeAllergens(a, ings, cyc), ['Gluten', 'Wheat']);
+
+// Order list: expands sub-recipes, grosses up for yield, and at 100% yield its cost equals recipe costing
+{
+  const I = new Map([
+    ['tom', { name: 'Tomato', unit: 'kg', price: 4, yieldPct: 100 }],
+    ['oni', { name: 'Onion', unit: 'kg', price: 3, yieldPct: 90 }],
+    ['egg', { name: 'Egg', unit: 'each', price: 0.5, yieldPct: 100 }],
+  ]);
+  const sauce = { id: 'sauce', name: 'Sauce', portions: 10, yieldQty: 2, yieldUnit: 'L', items: [{ ingredientId: 'tom', qty: 2, unit: 'kg' }, { ingredientId: 'oni', qty: 450, unit: 'g' }] };
+  const dish = { id: 'dish', name: 'Dish', portions: 4, items: [{ recipeId: 'sauce', qty: 500, unit: 'ml' }, { ingredientId: 'egg', qty: 3, unit: 'each' }, { ingredientId: 'tom', qty: 100, unit: 'g' }] };
+  const R = new Map([[sauce.id, sauce], [dish.id, dish]]);
+  // 8 dishes = 2 batches: sauce 1 L = half a sauce batch -> tom 1 kg + oni 0.225 kg; eggs 6; tom +0.2 kg
+  const o = orderList([{ recipeId: 'dish', portions: 8 }, { recipeId: 'sauce', portions: 5 }, { recipeId: 'nope', portions: 3 }], I, R);
+  const by = Object.fromEntries(o.lines.map(l => [l.ing.name, l]));
+  close(by.Tomato.usable, 1 + 0.2 + 1);       // + 5 portions of sauce = half batch = 1 kg
+  close(by.Onion.usable, 0.225 + 0.225);
+  close(by.Onion.order, 0.45 / 0.9);          // grossed up for 90% yield
+  assert.equal(by.Egg.order, 6);
+  close(o.total, 2.2 * 4 + 0.5 * 3 + 6 * 0.5);
+  close(o.total, recipeCost(dish, I, R).total * 2 + recipeCost(sauce, I, R).total * 0.5); // matches costing
+  assert.deepEqual(o.problems, []);
+  // eggs round up to whole units
+  assert.equal(orderList([{ recipeId: 'dish', portions: 1 }], I, R).lines.find(l => l.ing.name === 'Egg').order, 1);
+  assert.equal(fmtAmount(0.04, 'kg'), '40 g');
+  assert.equal(fmtAmount(3.333, 'kg'), '3.33 kg');
+  assert.equal(fmtAmount(6, 'each'), '6 each');
+}
 
 console.log('calc ok');

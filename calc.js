@@ -83,3 +83,54 @@ export const usesRecipe = (recipe, id) => (recipe.items ?? []).some(it => it.rec
 
 export const money = n => Number.isFinite(n) ? '$' + n.toFixed(2) : '—';
 export const pct = n => Number.isFinite(n) ? n.toFixed(1) + '%' : '—';
+
+// Expand a recipe (scaled by `factor` batches) into raw ingredient needs, in each
+// ingredient's purchase unit, before trim yield. Sub-recipes are expanded recursively.
+export function ingredientNeeds(recipe, factor, ings, recs, needs = new Map(), problems = [], seen = new Set([recipe.id])) {
+  for (const it of recipe.items ?? []) {
+    const qty = Number(it.qty) * factor;
+    if (it.recipeId) {
+      const sub = recs.get(it.recipeId);
+      if (!sub) { problems.push('A sub-recipe was deleted'); continue; }
+      if (seen.has(sub.id)) { problems.push(`${sub.name}: circular sub-recipe`); continue; }
+      const subFactor = it.unit === 'portion'
+        ? qty / Math.max(1, Number(sub.portions) || 1)
+        : sub.yieldQty > 0 ? convert(qty, it.unit, sub.yieldUnit) / sub.yieldQty : NaN;
+      if (!Number.isFinite(subFactor)) { problems.push(`${sub.name}: set its batch yield in ${it.unit}, or use portions`); continue; }
+      ingredientNeeds(sub, subFactor, ings, recs, needs, problems, new Set([...seen, sub.id]));
+      continue;
+    }
+    const ing = ings.get(it.ingredientId);
+    if (!ing) { problems.push('An ingredient was deleted from Pantry'); continue; }
+    const q = convert(qty, it.unit, ing.unit);
+    if (!Number.isFinite(q)) { problems.push(`${ing.name}: can't convert ${it.unit} to ${ing.unit}`); continue; }
+    needs.set(it.ingredientId, (needs.get(it.ingredientId) ?? 0) + q);
+  }
+  return { needs, problems };
+}
+
+// plan: [{ recipeId, portions }]. Order qty grosses up for trim yield; 'each' rounds up.
+export function orderList(plan, ings, recs) {
+  const needs = new Map(), problems = [];
+  for (const { recipeId, portions } of plan) {
+    const r = recs.get(recipeId);
+    if (r && portions > 0) ingredientNeeds(r, portions / Math.max(1, Number(r.portions) || 1), ings, recs, needs, problems);
+  }
+  const lines = [...needs].map(([id, usable]) => {
+    const ing = ings.get(id);
+    let order = usable / ((Number(ing.yieldPct) || 100) / 100);
+    if (ing.unit === 'each') order = Math.ceil(order - 1e-9);
+    if (!hasPrice(ing)) problems.push(`Price missing: ${ing.name}`);
+    return { ing, usable, order, cost: hasPrice(ing) ? order * Number(ing.price) : NaN };
+  }).sort((a, b) => a.ing.name.localeCompare(b.ing.name));
+  const total = lines.reduce((n, l) => n + (Number.isFinite(l.cost) ? l.cost : 0), 0);
+  return { lines, total, problems: [...new Set(problems)] };
+}
+
+// 0.04 kg -> "40 g", 3.3 kg -> "3.3 kg", 6 each -> "6 each"
+export function fmtAmount(q, unit) {
+  const r = n => String(Math.round(n * 100) / 100);
+  if (unit === 'kg' && q < 1) return `${Math.round(q * 1000)} g`;
+  if (unit === 'L' && q < 1) return `${Math.round(q * 1000)} ml`;
+  return `${r(q)} ${unit}`;
+}
