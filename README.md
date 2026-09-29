@@ -12,7 +12,7 @@ Installable web app (PWA), works offline, data stays on your phone.
 - **Pantry** — ingredient prices per kg / L / each with trim yield %; type new ingredients straight into a recipe and price them later
 - **Allergens** — Australian mandatory allergens per ingredient, rolled up per recipe and as a chart
 - **Service log** — school service periods and work shifts with station, hours, dishes and chef feedback
-- **Order list** — pick recipes and portions; sub-recipes expand to raw ingredients, grossed up for trim yield, with estimated cost; share or print
+- **Order list** — pick recipes and portions; sub-recipes expand to raw ingredients, grossed up for trim yield, minus stock on hand, with estimated cost; share or print
 - **Recipe card** — costed standard recipe card, scalable, print or save as A4 PDF
 - **Backup** — export / import a JSON file
 

@@ -145,3 +145,8 @@ a.chip { color: var(--text); text-decoration: none; }
 
 .plan-row { display: grid; grid-template-columns: 1fr 96px 36px; gap: 6px; margin-bottom: 8px; }
 @media print { .card { border: 0; padding: 0; } }
+.actions { flex-wrap: wrap; }
+.ok-text { color: var(--accent); font-weight: 600; }
+table.order td { vertical-align: top; }
+table.order input.have { width: 64px; min-height: 36px; padding: 6px; text-align: right; }
+table.order td.n small { display: block; }

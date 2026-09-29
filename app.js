@@ -383,34 +383,63 @@ async function orderView() {
   if (!recipes.length) return;
 
   const planEl = document.getElementById('plan'), out = document.getElementById('out');
+  let onHand = { ...(saved?.onHand ?? {}) }; // ingredientId -> qty in purchase unit
   const readPlan = () => [...planEl.querySelectorAll('.plan-row')].map(el => ({
     recipeId: el.querySelector('[name=recipe]').value, portions: num(el.querySelector('[name=portions]').value),
   }));
+  const save = () => db.put('settings', { id: 'orderPlan', rows: readPlan(), onHand });
+  const forLine = plan => plan.filter(p => recs.has(p.recipeId) && p.portions > 0).map(p => `${recs.get(p.recipeId).name} ×${p.portions}`).join(', ');
   let shareText = '';
+
+  // Figures that depend on stock are patched in place, so the stock inputs keep focus while typing.
+  const update = () => {
+    const plan = readPlan(), o = orderList(plan, ings, recs, onHand);
+    for (const l of o.lines) {
+      const tr = out.querySelector(`tr[data-id="${CSS.escape(l.id)}"]`);
+      if (!tr) continue;
+      tr.querySelector('.order').innerHTML = l.order > 0 ? `<b>${fmtAmount(l.order, l.ing.unit)}</b>` : '<span class="ok-text">In stock</span>';
+      tr.querySelector('.cost').textContent = l.order > 0 ? money(l.cost) : '—';
+    }
+    out.querySelector('.total').textContent = money(o.total);
+    out.querySelector('.warns').innerHTML = o.problems.map(p => `<p class="warn">⚠ ${esc(p)}</p>`).join('');
+    const toOrder = o.lines.filter(l => l.order > 0);
+    shareText = [`Order list — ${new Date().toLocaleDateString('en-AU')}`, `For: ${forLine(plan)}`, '',
+      ...(toOrder.length ? toOrder.map(l => `${l.ing.name} — ${fmtAmount(l.order, l.ing.unit)}`) : ['Nothing to order — all in stock.']),
+      '', `Est. cost: ${money(o.total)}`].join('\n');
+  };
+
   const draw = () => {
-    const plan = readPlan();
-    db.put('settings', { id: 'orderPlan', rows: plan });
-    const o = orderList(plan, ings, recs);
-    const forLine = plan.filter(p => recs.has(p.recipeId) && p.portions > 0).map(p => `${recs.get(p.recipeId).name} ×${p.portions}`).join(', ');
+    save();
+    const plan = readPlan(), o = orderList(plan, ings, recs, onHand);
     if (!o.lines.length) { out.innerHTML = '<p class="muted">Choose recipes and portions to see what to order.</p>'; return; }
-    shareText = [`Order list — ${new Date().toLocaleDateString('en-AU')}`, `For: ${forLine}`, '',
-      ...o.lines.map(l => `${l.ing.name} — ${fmtAmount(l.order, l.ing.unit)}`), '', `Est. cost: ${money(o.total)}`].join('\n');
-    out.innerHTML = `<h2>To order</h2><p class="muted">For: ${esc(forLine)}</p>
-      <table><thead><tr><th>Ingredient</th><th class="n">Need</th><th class="n">Order</th><th class="n">Est.</th></tr></thead>
-      <tbody>${o.lines.map(l => `<tr><td>${esc(l.ing.name)}${Number(l.ing.yieldPct) < 100 ? `<br><small>yield ${esc(l.ing.yieldPct)}%</small>` : ''}</td>
-        <td class="n muted">${fmtAmount(l.usable, l.ing.unit)}</td><td class="n"><b>${fmtAmount(l.order, l.ing.unit)}</b></td><td class="n muted">${money(l.cost)}</td></tr>`).join('')}</tbody>
-      <tfoot><tr><th colspan="3">Estimated total</th><td class="n"><b>${money(o.total)}</b></td></tr></tfoot></table>
-      ${o.problems.map(p => `<p class="warn">⚠ ${esc(p)}</p>`).join('')}
-      <p><small>Need = usable amount in the recipes. Order = need ÷ trim yield.</small></p>
-      <div class="actions no-print"><button type="button" id="share">Share list</button><button type="button" class="ghost" id="print">Print</button></div>`;
+    out.innerHTML = `<h2>To order</h2><p class="muted">For: ${esc(forLine(plan))}</p>
+      <table class="order"><thead><tr><th>Ingredient</th><th class="n">On hand</th><th class="n">Order</th><th class="n">Est.</th></tr></thead>
+      <tbody>${o.lines.map(l => `<tr data-id="${esc(l.id)}">
+        <td>${esc(l.ing.name)}<br><small>need ${fmtAmount(l.usable, l.ing.unit)}${Number(l.ing.yieldPct) < 100 ? ` · yield ${esc(l.ing.yieldPct)}%` : ''}</small></td>
+        <td class="n"><input class="have" type="number" min="0" step="any" inputmode="decimal" placeholder="0" value="${esc(l.have || '')}" aria-label="${esc(l.ing.name)} on hand in ${esc(l.ing.unit)}"><small>${esc(l.ing.unit)}</small></td>
+        <td class="n order"></td><td class="n muted cost"></td></tr>`).join('')}</tbody>
+      <tfoot><tr><th colspan="3">Estimated total</th><td class="n"><b class="total"></b></td></tr></tfoot></table>
+      <div class="warns"></div>
+      <p><small>Order = need ÷ trim yield − on hand. Count stock in the purchase unit (kg, L, each).</small></p>
+      <div class="actions no-print"><button type="button" id="share">Share list</button><button type="button" class="ghost" id="print">Print</button><button type="button" class="ghost" id="resetHave">Reset on hand</button></div>`;
+    update();
   };
 
   document.getElementById('addPlan').addEventListener('click', () => { planEl.insertAdjacentHTML('beforeend', planRow()); planEl.lastElementChild.querySelector('select').focus(); });
   planEl.addEventListener('click', e => { if (e.target.matches('.x')) { e.target.closest('.plan-row').remove(); draw(); } });
   planEl.addEventListener('input', draw);
   planEl.addEventListener('change', draw);
+  out.addEventListener('input', e => {
+    const tr = e.target.closest('tr[data-id]');
+    if (!tr || !e.target.matches('.have')) return;
+    const v = num(e.target.value);
+    if (v > 0) onHand[tr.dataset.id] = v; else delete onHand[tr.dataset.id];
+    save();
+    update();
+  });
   out.addEventListener('click', async e => {
     if (e.target.id === 'print') window.print();
+    if (e.target.id === 'resetHave' && confirm('Clear all on-hand amounts?')) { onHand = {}; draw(); }
     if (e.target.id !== 'share') return;
     try {
       if (navigator.share) await navigator.share({ title: 'Order list', text: shareText });

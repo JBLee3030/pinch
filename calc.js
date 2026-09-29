@@ -109,8 +109,9 @@ export function ingredientNeeds(recipe, factor, ings, recs, needs = new Map(), p
   return { needs, problems };
 }
 
-// plan: [{ recipeId, portions }]. Order qty grosses up for trim yield; 'each' rounds up.
-export function orderList(plan, ings, recs) {
+// plan: [{ recipeId, portions }]; onHand: { ingredientId: qty in purchase unit }.
+// gross = need grossed up for trim yield; order = gross - on hand (min 0); 'each' rounds up.
+export function orderList(plan, ings, recs, onHand = {}) {
   const needs = new Map(), problems = [];
   for (const { recipeId, portions } of plan) {
     const r = recs.get(recipeId);
@@ -118,10 +119,12 @@ export function orderList(plan, ings, recs) {
   }
   const lines = [...needs].map(([id, usable]) => {
     const ing = ings.get(id);
-    let order = usable / ((Number(ing.yieldPct) || 100) / 100);
+    const gross = usable / ((Number(ing.yieldPct) || 100) / 100);
+    const have = Math.max(0, Number(onHand[id]) || 0);
+    let order = Math.max(0, gross - have);
     if (ing.unit === 'each') order = Math.ceil(order - 1e-9);
-    if (!hasPrice(ing)) problems.push(`Price missing: ${ing.name}`);
-    return { ing, usable, order, cost: hasPrice(ing) ? order * Number(ing.price) : NaN };
+    if (order > 0 && !hasPrice(ing)) problems.push(`Price missing: ${ing.name}`);
+    return { id, ing, usable, gross, have, order, cost: hasPrice(ing) ? order * Number(ing.price) : order > 0 ? NaN : 0 };
   }).sort((a, b) => a.ing.name.localeCompare(b.ing.name));
   const total = lines.reduce((n, l) => n + (Number.isFinite(l.cost) ? l.cost : 0), 0);
   return { lines, total, problems: [...new Set(problems)] };

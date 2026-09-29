@@ -82,6 +82,18 @@ assert.deepEqual(recipeAllergens(a, ings, cyc), ['Gluten', 'Wheat']);
   assert.deepEqual(o.problems, []);
   // eggs round up to whole units
   assert.equal(orderList([{ recipeId: 'dish', portions: 1 }], I, R).lines.find(l => l.ing.name === 'Egg').order, 1);
+  // On hand: subtracted from the yield-adjusted gross, never below zero; eggs round up after subtracting
+  const h = orderList([{ recipeId: 'dish', portions: 8 }], I, R, { tom: 0.5, oni: 10, egg: 2.5 });
+  const hb = Object.fromEntries(h.lines.map(l => [l.ing.name, l]));
+  close(hb.Tomato.order, 1.2 - 0.5);
+  assert.equal(hb.Onion.order, 0);
+  assert.equal(hb.Onion.cost, 0);
+  assert.equal(hb.Egg.order, 4);                // 6 - 2.5 = 3.5 -> 4
+  close(h.total, 0.7 * 4 + 4 * 0.5);
+  // Missing price only matters if we actually need to order it
+  const I2 = new Map([...I, ['oni', { ...I.get('oni'), price: null }]]);
+  assert.deepEqual(orderList([{ recipeId: 'sauce', portions: 10 }], I2, R, { oni: 1 }).problems, []);
+  assert.deepEqual(orderList([{ recipeId: 'sauce', portions: 10 }], I2, R).problems, ['Price missing: Onion']);
   assert.equal(fmtAmount(0.04, 'kg'), '40 g');
   assert.equal(fmtAmount(3.333, 'kg'), '3.33 kg');
   assert.equal(fmtAmount(6, 'each'), '6 each');
