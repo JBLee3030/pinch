@@ -81,8 +81,8 @@ export function recipeAllergens(recipe, ings, recs = new Map()) {
 
 export const usesRecipe = (recipe, id) => (recipe.items ?? []).some(it => it.recipeId === id);
 
-export const money = n => Number.isFinite(n) ? '$' + n.toFixed(2) : '—';
-export const pct = n => Number.isFinite(n) ? n.toFixed(1) + '%' : '—';
+export const money = n => Number.isFinite(n) ? '$' + n.toFixed(2) : '-';
+export const pct = n => Number.isFinite(n) ? n.toFixed(1) + '%' : '-';
 
 // Expand a recipe (scaled by `factor` batches) into raw ingredient needs, in each
 // ingredient's purchase unit, before trim yield. Sub-recipes are expanded recursively.
@@ -142,8 +142,8 @@ export function fmtAmount(q, unit) {
 export const TEMP_CHECKS = {
   fridge: { label: 'Fridge / cool room', max: 5 },
   freezer: { label: 'Freezer', max: -15 },
-  delivery_chilled: { label: 'Delivery – chilled', max: 5 },
-  delivery_frozen: { label: 'Delivery – frozen', max: -15 },
+  delivery_chilled: { label: 'Delivery, chilled', max: 5 },
+  delivery_frozen: { label: 'Delivery, frozen', max: -15 },
   hot_hold: { label: 'Hot holding', min: 60 },
   cooking: { label: 'Cooking (core)', min: 75 },
   reheat: { label: 'Reheating (core)', min: 75 },

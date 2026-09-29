@@ -57,6 +57,10 @@ I built Pinch while studying Commercial Cookery and Kitchen Management in Melbou
 - First-run guide, in-app feedback and a share link for inviting classmates
 - JSON backup export / import
 
+## Design
+
+Mobile-first and Toss-inspired: grey canvas, flat white cards, the key number biggest, one primary action per screen, 44 px touch targets, WCAG AA contrast in light and dark. Tokens, components and rules: [`DESIGN.md`](DESIGN.md).
+
 ## How it's built
 
 | | |

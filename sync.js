@@ -50,7 +50,7 @@ async function accessToken() {
   refreshing ??= api('/auth/v1/token?grant_type=refresh_token', { method: 'POST', auth: false, body: { refresh_token: s.refresh_token } })
     .then(setSession)
     .catch(e => {
-      if (e.status >= 400 && e.status < 500) { state.session = null; state.error = 'Signed out — please sign in again'; save(); }
+      if (e.status >= 400 && e.status < 500) { state.session = null; state.error = 'Signed out. Please sign in again.'; save(); }
       throw e;
     })
     .finally(() => { refreshing = null; });
@@ -174,7 +174,7 @@ export async function sync() {
     state.error = null;
   } catch (e) {
     // fetch() rejects with TypeError when the network is down
-    state.error = !navigator.onLine || e instanceof TypeError ? 'Offline — will sync when back online' : e.message;
+    state.error = !navigator.onLine || e instanceof TypeError ? 'Offline. Pinch will sync when you are back online.' : e.message;
   } finally {
     syncing = false;
     save();

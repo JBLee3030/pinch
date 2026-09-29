@@ -25,11 +25,27 @@ async function ingMap() {
 }
 const toMap = list => new Map(list.map(x => [x.id, x]));
 
+// Tabler Icons (MIT), outline set: https://tabler.io/icons
+const ICON = {
+  back: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6l6 6"/></svg>',
+  plus: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5l0 14"/><path d="M5 12l14 0"/></svg>',
+};
+
+// Tab roots get a large title; sub pages get a compact bar with a back button and no tab bar.
 function page(tab, title, body, { back, action = '' } = {}) {
-  document.querySelectorAll('nav a').forEach(a => a.classList.toggle('on', a.dataset.tab === tab));
-  view.innerHTML = `${db.DEMO ? '<div class="demo-bar">Demo with sample data · <a href="./">Open Pinch</a></div>' : ''}<header>${back ? `<a class="back" href="${back}" aria-label="Back">‹</a>` : ''}<h1>${esc(title)}</h1>${action}</header><main>${body}</main>`;
+  document.querySelectorAll('nav a').forEach(a => {
+    a.classList.toggle('on', a.dataset.tab === tab);
+    a.toggleAttribute('aria-current', a.dataset.tab === tab);
+  });
+  document.body.classList.toggle('sub', !!back);
+  view.innerHTML = `${db.DEMO ? '<div class="demo-bar">Demo with sample data. <a href="./">Open Pinch</a></div>' : ''}
+    <header class="${back ? 'top' : 'top root'}">
+      ${back ? `<a class="icon-btn" href="${back}" aria-label="Back">${ICON.back}</a><h1 class="bar-title">${esc(title)}</h1>` : `<h1 class="page-title">${esc(title)}</h1>`}
+      <div class="bar-action">${action}</div>
+    </header><main>${body}</main>`;
   window.scrollTo(0, 0);
 }
+const newBtn = href => `<a class="btn sm tint" href="${href}">${ICON.plus}New</a>`;
 
 async function readPhoto(file) {
   if (!file?.size) return null;
@@ -47,7 +63,7 @@ const photoValue = async (fd, old) => fd.get('rmPhoto') ? null : (await readPhot
 
 // ---------- Recipes ----------
 
-const costLine = c => `${money(c.perPortion)} / portion${c.problems.length ? ' · <span class="warn-text">⚠ incomplete</span>' : ''}`;
+const costLine = c => `${money(c.perPortion)}<small>${c.problems.length ? '<span class="warn-text">Incomplete</span>' : 'per portion'}</small>`;
 
 async function recipeList() {
   const [recipes, ings] = await Promise.all([db.all('recipes'), ingMap()]);
@@ -59,20 +75,21 @@ async function recipeList() {
       <select id="cat" aria-label="Category"><option value="">All</option>${opts(cats)}</select></div>
     <p><a href="#/allergens">Allergen chart →</a></p>
     <ul class="list">${recipes.map(r => `<li data-q="${esc(r.name.toLowerCase())}" data-cat="${esc(r.category)}"><a href="#/recipe/${esc(r.id)}">
-      ${r.photo ? `<img src="${esc(r.photo)}" alt="">` : '<span class="ph"></span>'}
-      <div><b>${esc(r.name)}</b><small>${esc(r.category || 'Uncategorised')} · ${costLine(recipeCost(r, ings, recs))}</small></div></a></li>`).join('')}</ul>`
+      ${r.photo ? `<img src="${esc(r.photo)}" alt="">` : '<span class="ph" aria-hidden="true"></span>'}
+      <div class="grow"><b>${esc(r.name)}</b><small>${esc(r.category || 'Uncategorised')}</small></div>
+      <span class="trail">${costLine(recipeCost(r, ings, recs))}</span></a></li>`).join('')}</ul>`
     : `<div class="card welcome"><h2>Welcome to Pinch</h2>
         <ol class="steps">
-          <li><b>Write a recipe.</b> Type ingredients as you go — cost per portion, allergens and a recipe card are worked out for you.</li>
+          <li><b>Write a recipe.</b> Type ingredients as you go. Pinch works out cost per portion, allergens and a recipe card.</li>
           <li><b>Add prices</b> in <a href="#/pantry">Pantry</a> whenever you have them.</li>
-          <li><b>Log your services</b> in <a href="#/log">Log</a> — it builds your portfolio.</li>
+          <li><b>Log your services</b> in <a href="#/log">Log</a> to build your portfolio.</li>
         </ol>
         <div class="actions"><a class="btn" href="#/recipe/new/edit">Write your first recipe</a><button class="ghost" id="sample">Load sample recipes</button></div></div>
       ${standalone() ? '' : `<div class="card"><h2>Install on your phone</h2><p class="muted">${/iPhone|iPad|iPod/.test(navigator.userAgent)
         ? 'In Safari, tap <b>Share</b> → <b>Add to Home Screen</b>. Then always open Pinch from its icon.'
         : 'In Chrome, tap <b>⋮</b> → <b>Install app</b> (or Add to Home screen).'}</p></div>`}
       <p class="muted center">Already use Pinch on another device? <a href="#/settings">Sign in</a> to bring your recipes over.</p>`,
-    { action: '<a class="btn" href="#/recipe/new/edit">+ New</a>' });
+    { action: newBtn('#/recipe/new/edit') });
 
   const q = document.getElementById('q'), cat = document.getElementById('cat');
   const filter = () => document.querySelectorAll('.list li').forEach(li => {
@@ -98,24 +115,31 @@ async function recipeView(id) {
     ${r.photo ? `<img class="hero" src="${esc(r.photo)}" alt="">` : ''}
     <p class="muted">${esc(r.category || 'Uncategorised')} · ${esc({ school: 'From school', work: 'From work', own: 'My own' }[r.source] || '')}${r.yieldQty ? ` · Yields ${esc(r.yieldQty)} ${esc(r.yieldUnit)}` : ''}</p>
     ${usedIn.length ? `<p class="muted">Used in: ${usedIn.map(x => `<a href="#/recipe/${esc(x.id)}">${esc(x.name)}</a>`).join(', ')}</p>` : ''}
+    <div class="card stat-card">
+      <p class="stat-label">Cost per portion</p>
+      <p class="stat">${money(c.perPortion)}</p>
+      <p class="stat-sub">${r.menuPrice
+        ? `Food cost <b>${pct(actualCostPct(c.perPortion, r.menuPrice))}</b> at ${money(r.menuPrice)}`
+        : `Sell at <b>${money(price.inc)}</b> for ${pct(target)} food cost`}</p>
+      ${c.problems.length ? `<p class="warn">⚠ ${c.problems.length === 1 ? esc(c.problems[0]) : `${c.problems.length} things to fix below`}</p>` : ''}
+    </div>
     <div class="card"><h2>Allergens</h2>${allergens.length
       ? `<div class="chips">${allergens.map(a => `<span class="chip alert">${a}</span>`).join('')}</div>`
       : '<p class="muted">None declared in Pantry.</p>'}
       <small>Based on Pantry data. Always check supplier labels.</small></div>
     <div class="card"><h2>Costing</h2><dl class="kv">
       <dt>Batch cost (${esc(portionsLabel(r.portions))})</dt><dd>${money(c.total)}</dd>
-      <dt>Cost per portion</dt><dd class="big">${money(c.perPortion)}</dd>
       <dt>Target food cost</dt><dd>${pct(target)}</dd>
       <dt>Suggested price ex GST</dt><dd>${money(price.ex)}</dd>
-      <dt>Suggested menu price inc GST</dt><dd class="big">${money(price.inc)}</dd>
-      ${r.menuPrice ? `<dt>Menu price inc GST</dt><dd>${money(r.menuPrice)}</dd><dt>Actual food cost</dt><dd class="big">${pct(actualCostPct(c.perPortion, r.menuPrice))}</dd>` : ''}
+      <dt>Suggested price inc GST</dt><dd>${money(price.inc)}</dd>
+      ${r.menuPrice ? `<dt>Menu price inc GST</dt><dd>${money(r.menuPrice)}</dd><dt>Actual food cost</dt><dd>${pct(actualCostPct(c.perPortion, r.menuPrice))}</dd>` : ''}
     </dl>${c.problems.map(p => `<p class="warn">⚠ ${esc(p)}</p>`).join('')}
       <a class="btn ghost wide" href="#/recipe/${esc(r.id)}/card">Costed recipe card (PDF)</a></div>
     <div class="card"><h2>Ingredients</h2>
       <label class="inline">Scale to <input type="number" id="scale" min="1" step="1" inputmode="numeric" value="${esc(r.portions)}"> portions</label>
       <table><tbody id="items"></tbody></table></div>
     ${r.method ? `<div class="card"><h2>Method</h2><div class="method">${esc(r.method)}</div></div>` : ''}`,
-    { back: '#/recipes', action: `<a class="btn ghost" href="#/recipe/${esc(r.id)}/edit">Edit</a>` });
+    { back: '#/recipes', action: `<a class="btn sm tint" href="#/recipe/${esc(r.id)}/edit">Edit</a>` });
 
   const scale = document.getElementById('scale');
   const drawItems = () => {
@@ -157,7 +181,7 @@ async function recipeCard(id) {
     const rows = (r.items ?? []).map(it => {
       const cost = itemCost(it, ings, recs, new Set([r.id])).cost * f;
       const sub = it.recipeId && recs.get(it.recipeId);
-      let name, unitPrice = '—', yieldPct = '—';
+      let name, unitPrice = '-', yieldPct = '-';
       if (sub) {
         const sc = recipeCost(sub, ings, recs, new Set([r.id, sub.id]));
         name = `${esc(sub.name)} <small>(sub-recipe)</small>`;
@@ -261,7 +285,7 @@ async function recipeEdit(id) {
     <h2>Ingredients</h2>
     <datalist id="ingOpts">${ingList.map(i => `<option value="${esc(i.name)}">`).join('')}${subs.map(x => `<option value="${esc(x.name + SUB)}">`).join('')}</datalist>
     <div id="rows">${(r.items.length ? r.items : [{}]).map(row).join('')}</div>
-    <p><small>Type any ingredient. New ones are added to Pantry when you save — fill in prices later.</small></p>
+    <p><small>Type any ingredient. New ones are added to Pantry when you save, and you can price them later.</small></p>
     <div class="actions"><button type="button" class="ghost" id="add">+ Add ingredient</button><button type="button" class="ghost" id="pasteOpen">Paste a list</button></div>
     <div class="card paste" id="paste" hidden>
       <label>Paste ingredients, one per line<textarea id="pasteText" placeholder="500 g tipo 00 flour&#10;5 eggs&#10;2 cloves garlic&#10;1/2 cup olive oil"></textarea></label>
@@ -298,7 +322,7 @@ async function recipeEdit(id) {
     paste.hidden = true;
     msg.textContent = '';
     document.querySelector('.paste-note')?.remove();
-    rows.insertAdjacentHTML('afterend', `<p class="paste-note muted"><small>Added ${lines.length} ingredients — ${matched} matched to Pantry, ${lines.length - matched} new.${unsure ? ` ${unsure} highlighted row(s) need a quantity.` : ''}</small></p>`);
+    rows.insertAdjacentHTML('afterend', `<p class="paste-note muted"><small>Added ${lines.length} ingredients: ${matched} from Pantry, ${lines.length - matched} new.${unsure ? ` ${unsure} highlighted row(s) need a quantity.` : ''}</small></p>`);
   };
   rows.addEventListener('click', e => e.target.matches('.x') && e.target.closest('.item').remove());
   rows.addEventListener('change', e => {
@@ -367,11 +391,11 @@ async function pantryList() {
     <div class="links"><a href="#/order">Order list →</a><a href="#/pantry/import">Import prices →</a></div>
     ${missing.length ? `<div class="card"><h2>Needs price (${missing.length})</h2><div class="chips">${missing.map(i => `<a class="chip" href="#/ingredient/${esc(i.id)}/edit">${esc(i.name)}</a>`).join('')}</div></div>` : ''}
     <div class="bar"><input type="search" id="q" placeholder="Search ingredients" aria-label="Search ingredients"></div>
-    <ul class="list">${ings.map(i => `<li data-q="${esc(i.name.toLowerCase())}"><a href="#/ingredient/${esc(i.id)}/edit"><div>
-      <b>${esc(i.name)}</b><small>${hasPrice(i) ? money(i.price) : '<span class="warn-text">No price</span>'} / ${esc(i.unit)} · yield ${esc(i.yieldPct)}% · in ${used(i.id)} recipes
-      ${i.allergens?.length ? `<br><span class="alert-text">${i.allergens.map(esc).join(', ')}</span>` : ''}</small></div></a></li>`).join('')}</ul>`
+    <ul class="list">${ings.map(i => `<li data-q="${esc(i.name.toLowerCase())}"><a href="#/ingredient/${esc(i.id)}/edit">
+      <div class="grow"><b>${esc(i.name)}</b><small>Yield ${esc(i.yieldPct)}%, in ${used(i.id)} recipe${used(i.id) === 1 ? '' : 's'}${i.allergens?.length ? `<br><span class="alert-text">${i.allergens.map(esc).join(', ')}</span>` : ''}</small></div>
+      <span class="trail">${hasPrice(i) ? money(i.price) : '<span class="warn-text">No price</span>'}<small>${i.unit === 'each' ? 'each' : `per ${esc(i.unit)}`}</small></span></a></li>`).join('')}</ul>`
     : '<div class="empty"><p>No ingredients yet.</p><p>Add what you buy, with price per kg, litre or each.</p></div>',
-    { action: '<a class="btn" href="#/ingredient/new/edit">+ New</a>' });
+    { action: newBtn('#/ingredient/new/edit') });
   const q = document.getElementById('q');
   q?.addEventListener('input', () => document.querySelectorAll('.list li').forEach(li => { li.hidden = !li.dataset.q.includes(q.value.toLowerCase()); }));
 }
@@ -430,7 +454,7 @@ async function importPrices() {
   };
   document.getElementById('preview').onclick = () => {
     rows = parsePriceList(document.getElementById('csvText').value);
-    if (!rows.length) { out.innerHTML = '<p class="warn">Nothing to import — paste some rows first.</p>'; return; }
+    if (!rows.length) { out.innerHTML = '<p class="warn">Nothing to import yet. Paste some rows first.</p>'; return; }
     out.innerHTML = `<div class="card"><h2>Check before importing</h2>
       <p class="muted"><small>Matched items get the new price. Pick “New ingredient” if a match is wrong.</small></p>
       <div class="import-rows">${rows.map((r, i) => {
@@ -497,16 +521,16 @@ async function orderView() {
   const update = () => {
     const plan = readPlan(), o = orderList(plan, ings, recs, onHand);
     for (const l of o.lines) {
-      const tr = out.querySelector(`tr[data-id="${CSS.escape(l.id)}"]`);
+      const tr = out.querySelector(`li[data-id="${CSS.escape(l.id)}"]`);
       if (!tr) continue;
       tr.querySelector('.order').innerHTML = l.order > 0 ? `<b>${fmtAmount(l.order, l.ing.unit)}</b>` : '<span class="ok-text">In stock</span>';
-      tr.querySelector('.cost').textContent = l.order > 0 ? money(l.cost) : '—';
+      tr.querySelector('.cost').textContent = l.order > 0 ? money(l.cost) : '';
     }
     out.querySelector('.total').textContent = money(o.total);
     out.querySelector('.warns').innerHTML = o.problems.map(p => `<p class="warn">⚠ ${esc(p)}</p>`).join('');
     const toOrder = o.lines.filter(l => l.order > 0);
-    shareText = [`Order list — ${new Date().toLocaleDateString('en-AU')}`, `For: ${forLine(plan)}`, '',
-      ...(toOrder.length ? toOrder.map(l => `${l.ing.name} — ${fmtAmount(l.order, l.ing.unit)}`) : ['Nothing to order — all in stock.']),
+    shareText = [`Order list, ${new Date().toLocaleDateString('en-AU')}`, `For: ${forLine(plan)}`, '',
+      ...(toOrder.length ? toOrder.map(l => `${l.ing.name}: ${fmtAmount(l.order, l.ing.unit)}`) : ['Nothing to order. Everything is in stock.']),
       '', `Est. cost: ${money(o.total)}`].join('\n');
   };
 
@@ -515,12 +539,12 @@ async function orderView() {
     const plan = readPlan(), o = orderList(plan, ings, recs, onHand);
     if (!o.lines.length) { out.innerHTML = '<p class="muted">Choose recipes and portions to see what to order.</p>'; return; }
     out.innerHTML = `<h2>To order</h2><p class="muted">For: ${esc(forLine(plan))}</p>
-      <table class="order"><thead><tr><th>Ingredient</th><th class="n">On hand</th><th class="n">Order</th><th class="n">Est.</th></tr></thead>
-      <tbody>${o.lines.map(l => `<tr data-id="${esc(l.id)}">
-        <td>${esc(l.ing.name)}<br><small>need ${fmtAmount(l.usable, l.ing.unit)}${Number(l.ing.yieldPct) < 100 ? ` · yield ${esc(l.ing.yieldPct)}%` : ''}</small></td>
-        <td class="n"><input class="have" type="number" min="0" step="any" inputmode="decimal" placeholder="0" value="${esc(l.have || '')}" aria-label="${esc(l.ing.name)} on hand in ${esc(l.ing.unit)}"><small>${esc(l.ing.unit)}</small></td>
-        <td class="n order"></td><td class="n muted cost"></td></tr>`).join('')}</tbody>
-      <tfoot><tr><th colspan="3">Estimated total</th><td class="n"><b class="total"></b></td></tr></tfoot></table>
+      <ul class="order-rows">${o.lines.map(l => `<li data-id="${esc(l.id)}">
+        <div class="grow"><b>${esc(l.ing.name)}</b>
+          <small>Need ${fmtAmount(l.usable, l.ing.unit)}${Number(l.ing.yieldPct) < 100 ? `, yield ${esc(l.ing.yieldPct)}%` : ''}</small>
+          <label class="have-field">On hand<input class="have" type="number" min="0" step="any" inputmode="decimal" placeholder="0" value="${esc(l.have || '')}" aria-label="${esc(l.ing.name)} on hand in ${esc(l.ing.unit)}"><span>${esc(l.ing.unit)}</span></label></div>
+        <div class="trail"><span class="order"></span><small class="cost"></small></div></li>`).join('')}</ul>
+      <div class="total-row"><span>Estimated total</span><b class="total"></b></div>
       <div class="warns"></div>
       <p><small>Order = need ÷ trim yield − on hand. Count stock in the purchase unit (kg, L, each).</small></p>
       <div class="actions no-print"><button type="button" id="share">Share list</button><button type="button" class="ghost" id="print">Print</button><button type="button" class="ghost" id="resetHave">Reset on hand</button></div>`;
@@ -532,7 +556,7 @@ async function orderView() {
   planEl.addEventListener('input', draw);
   planEl.addEventListener('change', draw);
   out.addEventListener('input', e => {
-    const tr = e.target.closest('tr[data-id]');
+    const tr = e.target.closest('li[data-id]');
     if (!tr || !e.target.matches('.have')) return;
     const v = num(e.target.value);
     if (v > 0) onHand[tr.dataset.id] = v; else delete onHand[tr.dataset.id];
@@ -572,10 +596,12 @@ async function logList() {
       <div><small>Work shifts</small><div class="big">${work.length}</div><small>${fmtQty(hours)} hours</small></div>
     </div></div>
     ${logs.length ? `<ul class="list">${logs.map(l => `<li><a href="#/log/${esc(l.id)}/edit">
-      ${l.photo ? `<img src="${esc(l.photo)}" alt="">` : `<span class="ph tag ${l.type}">${l.type === 'school' ? 'SCH' : 'WRK'}</span>`}
-      <div><b>${esc(l.date)} · ${esc(l.period)}</b><small>${esc(l.venue || '—')}${l.station ? ' · ' + esc(l.station) : ''}${l.hours ? ' · ' + esc(l.hours) + 'h' : ''}</small></div></a></li>`).join('')}</ul>`
+      ${l.photo ? `<img src="${esc(l.photo)}" alt="">` : `<span class="ph tag ${l.type}">${l.type === 'school' ? 'School' : 'Work'}</span>`}
+      <div class="grow"><b>${esc(new Date(l.date + 'T00:00').toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' }))}, ${esc(l.period)}</b>
+        <small>${esc([l.venue, l.station].filter(Boolean).join(' · ') || 'No venue')}</small></div>
+      ${l.hours ? `<span class="trail">${esc(l.hours)} h</span>` : ''}</a></li>`).join('')}</ul>`
       : '<p class="empty">Log every service: what you cooked, where, and what chef said.</p>'}`,
-    { action: '<a class="btn" href="#/log/new/edit">+ New</a>' });
+    { action: newBtn('#/log/new/edit') });
 }
 
 async function logEdit(id) {
@@ -623,7 +649,7 @@ const nowLocal = () => { const d = new Date(); d.setMinutes(d.getMinutes() - d.g
 const badge = st => `<span class="badge ${st.status}">${{ pass: 'PASS', fail: 'FAIL', pending: 'OPEN' }[st.status]}</span>`;
 const tempValue = e => e.type === 'cooling'
   ? [e.start, e.stage1, e.stage2].filter(r => r?.temp != null && r.temp !== '').map(r => `${r.temp}°`).join(' → ')
-  : `${e.temp ?? '—'} °C`;
+  : `${e.temp ?? '-'} °C`;
 
 async function tempList() {
   const temps = (await db.all('temps')).sort((a, b) => b.at.localeCompare(a.at));
@@ -635,16 +661,17 @@ async function tempList() {
     <div class="card"><div class="row2">
       <div><small>Checks today</small><div class="big">${todays.length}</div></div>
       <div><small>Failed today</small><div class="big ${fails ? 'alert-text' : ''}">${fails}</div></div></div>
-      ${open ? `<p class="warn">⚠ ${open} check(s) still open — finish the cooling readings.</p>` : ''}</div>
+      ${open ? `<p class="warn">⚠ ${open} check(s) still open. Finish the cooling readings.</p>` : ''}</div>
     ${days.length ? days.map(d => `<h2 class="day">${esc(new Date(d + 'T00:00').toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }))}</h2>
       <ul class="list">${temps.filter(t => t.at.startsWith(d)).map(t => {
         const st = tempStatus(t);
         return `<li><a href="#/temp/${esc(t.id)}/edit"><div class="grow"><b>${esc(t.item || TEMP_CHECKS[t.type]?.label)}</b>
-          <small>${esc(t.at.slice(11, 16))} · ${esc(TEMP_CHECKS[t.type]?.label ?? t.type)} · ${esc(tempValue(t))}${t.action ? `<br>Action: ${esc(t.action)}` : ''}</small></div>${badge(st)}</a></li>`;
+          <small>${esc(t.at.slice(11, 16))} · ${esc(TEMP_CHECKS[t.type]?.label ?? t.type)}${t.action ? `<br>Action: ${esc(t.action)}` : ''}</small></div>
+          <span class="trail">${esc(tempValue(t))}${badge(st)}</span></a></li>`;
       }).join('')}</ul>`).join('')
       : '<p class="empty">Record fridge, freezer, delivery, hot-holding, cooking and cooling temperatures. Each check is marked PASS or FAIL against food safety limits.</p>'}
     ${temps.length ? '<div class="actions no-print"><button type="button" class="ghost" id="print">Print</button></div>' : ''}`,
-    { back: '#/log', action: '<a class="btn" href="#/temp/new/edit">+ New</a>' });
+    { back: '#/log', action: newBtn('#/temp/new/edit') });
   document.getElementById('print')?.addEventListener('click', () => window.print());
 }
 
@@ -691,7 +718,7 @@ async function tempEdit(id) {
     const e = read(), st = tempStatus(e);
     document.getElementById('spot').hidden = e.type === 'cooling';
     document.getElementById('cool').hidden = e.type !== 'cooling';
-    document.getElementById('status').innerHTML = `${badge(st)} ${esc(st.note)}${st.status === 'fail' ? ' — record a corrective action.' : ''}`;
+    document.getElementById('status').innerHTML = `${badge(st)} ${esc(st.note)}${st.status === 'fail' ? '. Record a corrective action.' : ''}`;
   };
   form.addEventListener('input', e => {
     // Typing a cooling reading stamps its time with now, if blank — no fiddling with date pickers mid-service.
@@ -734,7 +761,7 @@ function experience(logs) {
   }
   return [...m.values()].sort((a, b) => b.last.localeCompare(a.last)).map(v => {
     const a = monthYear(v.first), b = monthYear(v.last);
-    return { ...v, stations: [...v.stations], range: a === b ? a : `${a} – ${b}` };
+    return { ...v, stations: [...v.stations], range: a === b ? a : `${a} - ${b}` };
   });
 }
 
@@ -746,7 +773,7 @@ async function portfolioView() {
   const srcLabel = { school: 'Training', work: 'Work', own: 'Original' };
 
   page('log', 'Portfolio', `
-    <details class="card no-print" ${pf.recipeIds.length ? '' : 'open'}><summary><b>Edit portfolio</b></summary>
+    <details class="card no-print" ${pf.recipeIds.length ? '' : 'open'}><summary>Your details</summary>
       <form id="pf">
         <p class="muted">Name: ${s.cookName ? `<b>${esc(s.cookName)}</b> (from Settings)` : '<a href="#/settings">add your name in Settings</a>'}</p>
         <label>Headline<input name="headline" placeholder="Commis chef · Cert IV Kitchen Management" value="${esc(pf.headline)}"></label>
@@ -825,7 +852,7 @@ async function resetView() {
       await sync.finishReset(recovery, f.p1.value, standalone());
       recovery = null;
       f.outerHTML = standalone()
-        ? '<div class="card"><p>Password updated — you’re signed in.</p><p><a class="btn" href="#/recipes">Go to my recipes</a></p></div>'
+        ? '<div class="card"><p>Password updated. You’re signed in.</p><p><a class="btn" href="#/recipes">Go to my recipes</a></p></div>'
         : '<div class="card"><p><b>Password updated.</b></p><p>Now open Pinch from your home screen and sign in with the new password.</p></div>';
     } catch (err) {
       msg.textContent = err.status === 401 || err.status === 403
@@ -845,25 +872,26 @@ async function settingsView() {
   const est = await navigator.storage?.estimate?.().catch(() => null);
   page('settings', 'Settings', `
     <div class="card" id="acct"></div>
-    <form class="card" id="fb">
-      <h2>Feedback</h2>
-      <label>What's missing, confusing or broken?<textarea name="message" maxlength="2000" required placeholder="e.g. I'd like to…"></textarea></label>
-      <button type="submit">Send feedback</button> <span id="fbMsg" class="muted"></span>
-    </form>
-    <div class="card"><h2>Invite classmates</h2><p class="muted">Pinch is free. Share the link — everyone gets their own private recipe book.</p>
-      <button type="button" class="ghost" id="invite">Share Pinch</button> <span id="inviteMsg" class="muted"></span></div>
     <form id="f" class="card">
+      <h2>You</h2>
       <label>Your name <small>(shown on recipe cards)</small><input name="cookName" autocomplete="name" value="${esc(s.cookName)}"></label>
       <label>Default target food cost %<input name="targetCostPct" type="number" min="1" max="100" step="any" inputmode="decimal" required value="${esc(s.targetCostPct)}"></label>
       <label>School service periods required<input name="logTarget" type="number" min="1" step="1" inputmode="numeric" required value="${esc(s.logTarget)}"></label>
       <button type="submit">Save</button> <span id="saved" class="muted"></span>
     </form>
     <div class="card"><h2>Backup</h2>
-      <p class="muted">Your data lives only on this phone. Export a backup regularly and keep it in Files, Drive or email.</p>
+      <p class="muted">A backup file is a copy you keep yourself, in Files, Drive or email.</p>
       <p>Last backup: <b>${s.lastBackup ? esc(new Date(s.lastBackup).toLocaleString()) : 'never'}</b>${est ? ` · Using ${(est.usage / 1e6).toFixed(1)} MB` : ''}</p>
       <div class="actions"><button id="export">Export backup</button><label class="btn ghost">Import<input type="file" id="import" accept="application/json,.json" hidden></label></div>
     </div>
-    <p class="muted"><small>Pinch v1</small></p>`);
+    <form class="card" id="fb">
+      <h2>Feedback</h2>
+      <label>What's missing, confusing or broken?<textarea name="message" maxlength="2000" required placeholder="e.g. I'd like to…"></textarea></label>
+      <button type="submit">Send feedback</button> <span id="fbMsg" class="muted"></span>
+    </form>
+    <div class="card"><h2>Invite classmates</h2><p class="muted">Pinch is free. Share the link. Everyone gets their own private recipe book.</p>
+      <button type="button" class="ghost" id="invite">Share Pinch</button> <span id="inviteMsg" class="muted"></span></div>
+    <p class="muted center"><small>Pinch v1</small></p>`);
 
   const acct = document.getElementById('acct');
   drawAccount = () => {
@@ -924,13 +952,13 @@ async function settingsView() {
     try {
       await sync.sendFeedback(fb.message.value.trim(), `${standalone() ? 'installed' : 'browser'} · ${navigator.userAgent}`.slice(0, 500));
       fb.reset();
-      msg.textContent = 'Thanks — got it!';
+      msg.textContent = 'Thanks, got it!';
     } catch (err) {
-      msg.textContent = navigator.onLine ? 'Could not send: ' + err.message : 'You are offline — try again later.';
+      msg.textContent = navigator.onLine ? 'Could not send: ' + err.message : 'You are offline. Try again later.';
     } finally { button.disabled = false; }
   });
   document.getElementById('invite').onclick = async () => {
-    const text = 'Pinch — free recipe costing, order lists and a service log for cooks. Open on your phone and add it to your home screen:';
+    const text = 'Pinch: free recipe costing, order lists and a service log for cooks. Open it on your phone and add it to your home screen.';
     try {
       if (navigator.share) await navigator.share({ title: 'Pinch', text, url: APP_URL });
       else { await navigator.clipboard.writeText(`${text} ${APP_URL}`); document.getElementById('inviteMsg').textContent = 'Link copied'; }
@@ -1040,7 +1068,7 @@ async function loadDemo() {
   await T('d-t2', 5, 'freezer', 'Chest freezer', -18);
   await T('d-t3', 4.5, 'delivery_chilled', 'Dairy delivery', 4);
   await T('d-t4', 3, 'fridge', 'Dessert fridge', 6.5, 'Moved food to another fridge; reported to chef');
-  await T('d-t5', 1, 'hot_hold', 'Bain-marie — ragù', 67);
+  await T('d-t5', 1, 'hot_hold', 'Bain-marie, ragù', 67);
   await db.put('temps', { id: 'd-t6', type: 'cooling', item: 'Beef ragù (10 L)', at: at(2.5), temp: null, action: '', note: '',
     start: { at: at(2.5), temp: 63 }, stage1: { at: at(0.8), temp: 19 }, stage2: { at: '', temp: null }, createdAt: t });
   await db.put('settings', { ...(await settings()), id: 'settings', cookName: 'Demo Cook' });
