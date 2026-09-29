@@ -39,6 +39,8 @@ I built Pinch while studying Commercial Cookery and Kitchen Management in Melbou
 - Cost per portion, suggested menu price from a target food cost %, actual food cost % against the menu price (GST-aware)
 - Pantry of ingredient prices per kg / L / each with trim yield %; type a new ingredient straight into a recipe and price it later — missing prices are flagged, never counted as $0
 - Costed standard recipe card, printable to A4 / PDF
+- Cooking mode: one big step at a time, timers found in the method ("simmer 45 min"), a scaled ingredient checklist, and the screen kept awake
+- Quick capture: name + ingredient lines + Save; on iPhone, copy a printed recipe with the Camera's Live Text and paste it
 - Paste a whole ingredient list: quantities, fractions and units are read (Australian cup / tbsp / tsp), names are matched to the Pantry
 - Import supplier price lists from CSV or a spreadsheet; pack prices (5kg bag, dozen, 500g) become price per kg / L / each
 

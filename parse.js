@@ -150,3 +150,39 @@ export function parsePriceList(text) {
       yieldPct: y > 0 && y <= 100 ? y : null, ok, raw: r.join(', ') };
   });
 }
+
+// ---- Cooking mode: method steps and timers
+
+// Method text -> steps. One per line (list numbers and bullets stripped); a single long
+// paragraph is split into sentences.
+export function splitSteps(method) {
+  let lines = String(method ?? '').split(/\r?\n/)
+    .map(l => l.replace(/^\s*(?:step\s*\d+[.):]?|\d+[.)]|[-•*])\s*/i, '').trim())
+    .filter(Boolean);
+  if (lines.length === 1 && lines[0].length > 120) lines = lines[0].split(/(?<=[.!?])\s+(?=[A-Z])/);
+  return lines;
+}
+
+const DUR_NUM = String.raw`\d+(?:[.,]\d+)?\s*[${FR}]?|[${FR}]`;
+const DUR_RE = new RegExp(
+  `(${DUR_NUM})(?:\\s*(?:-|–|to)\\s*(?:${DUR_NUM}))?\\s*(hours?|hrs?|hr|h|minutes?|mins?|min|seconds?|secs?|sec)\\b` +
+  `(?:\\s*(?:and\\s*)?(${DUR_NUM})\\s*(minutes?|mins?|min)\\b)?`, 'gi');
+const SECS = u => (/^h/i.test(u) ? 3600 : /^m/i.test(u) ? 60 : 1);
+
+// "Simmer 45 min" -> [{ text: '45 min', seconds: 2700 }]. "1 hr 30 min" is one timer;
+// a range ("8-10 min") starts from the first number so you check early.
+export function findDurations(text) {
+  const out = [];
+  for (const m of String(text ?? '').matchAll(DUR_RE)) {
+    let seconds = toNumber(m[1]) * SECS(m[2]);
+    if (m[3]) seconds += toNumber(m[3]) * 60;
+    if (seconds > 0 && seconds <= 24 * 3600) out.push({ text: m[0].trim(), seconds: Math.round(seconds) });
+  }
+  return out;
+}
+
+// 2700 -> "45 min", 5400 -> "1 h 30 min", 30 -> "30 s"
+export function fmtDuration(s) {
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+  return [h && `${h} h`, m && `${m} min`, !h && !m && `${sec} s`].filter(Boolean).join(' ');
+}

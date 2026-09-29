@@ -378,3 +378,44 @@ details.more summary::after { content: "+"; margin-left: auto; font-size: 20px; 
 details.more[open] summary::after { content: "−"; }
 details.more[open] summary { margin-bottom: var(--s4); }
 details.more :is(input, select) { background-color: var(--fill); }
+
+/* ---------- Cooking mode ---------- */
+.cta-bar { position: sticky; bottom: 0; z-index: 4; margin: var(--s6) calc(var(--gutter) * -1) 0;
+  padding: var(--s3) var(--gutter) calc(var(--s3) + env(safe-area-inset-bottom)); background: linear-gradient(to bottom, transparent, var(--bg) 28%); }
+.cta-bar .btn { display: flex; width: 100%; min-height: var(--h-lg); font-size: 17px; border-radius: 16px; }
+.tip { background: var(--accent-weak); border-radius: var(--r-control); padding: var(--s3) var(--s4); }
+.tip small { color: var(--text-2); }
+
+.seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 4px; padding: 4px; margin-bottom: var(--s4); background: var(--fill); border-radius: var(--r-control); }
+.seg button { min-height: 40px; background: transparent; color: var(--text-2); font-size: 15px; border-radius: 10px; }
+.seg button[aria-selected=true] { background: var(--surface); color: var(--text); box-shadow: 0 1px 3px rgb(0 0 0 / .08); }
+
+#steps { background: var(--surface); border-radius: var(--r-card); padding: var(--s6) var(--s5); min-height: calc(100dvh - 290px); touch-action: pan-y; }
+.step-count { font: 600 15px/1.3 var(--font); color: var(--accent); margin-bottom: var(--s3); }
+.step-text { font: 600 24px/1.45 var(--font); letter-spacing: -.01em; margin-bottom: var(--s5); }
+.step-timers { display: flex; flex-wrap: wrap; gap: var(--s2); }
+.step-timers button { min-height: var(--h-md); }
+.cook-nav { position: sticky; bottom: 0; display: grid; grid-template-columns: 1fr 2fr; gap: var(--s2); margin: var(--s4) calc(var(--gutter) * -1) 0;
+  padding: var(--s3) var(--gutter) calc(var(--s3) + env(safe-area-inset-bottom)); background: linear-gradient(to bottom, transparent, var(--bg) 28%); }
+.cook-nav button { min-height: var(--h-lg); font-size: 17px; border-radius: 16px; }
+
+#cookTimers { display: grid; gap: var(--s2); margin-bottom: var(--s3); }
+#cookTimers:empty { display: none; }
+.timer { display: flex; align-items: center; gap: var(--s3); padding: var(--s2) var(--s2) var(--s2) var(--s4); border-radius: var(--r-control); background: var(--surface); }
+.timer span { flex: 1; font: var(--t-sub); color: var(--text-2); }
+.timer b { font: 700 22px/1 var(--font); }
+.timer.done { background: var(--warn-weak); }
+.timer.done b { color: var(--warn); }
+@media (prefers-reduced-motion: no-preference) { .timer.done { animation: pulse 1s var(--ease) infinite alternate; } @keyframes pulse { to { filter: brightness(.94); } } }
+
+.timer-pill { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom) + var(--s3)); z-index: 11;
+  display: inline-flex; align-items: center; min-height: var(--h-sm); padding: 0 var(--s5); border-radius: var(--r-pill);
+  background: var(--text); color: var(--surface); font: 700 15px/1 var(--font); text-decoration: none; box-shadow: 0 6px 20px rgb(0 0 0 / .18); white-space: nowrap; }
+body.sub .timer-pill { bottom: calc(env(safe-area-inset-bottom) + 88px); }
+.timer-pill.done { background: var(--warn); }
+
+.checklist { list-style: none; margin: var(--s3) 0 0; padding: 0; }
+.checklist li + li { border-top: 1px solid var(--line); }
+.checklist label { display: flex; align-items: center; gap: var(--s3); margin: 0; min-height: 56px; color: var(--text); font: 500 17px/1.4 var(--font); cursor: pointer; }
+.checklist label b { font-weight: 700; white-space: nowrap; }
+.checklist label.got span, .checklist label.got b { color: var(--text-3); text-decoration: line-through; }

@@ -1,6 +1,6 @@
 import * as db from './db.js';
 import * as sync from './sync.js';
-import { parseIngredientLine, matchIngredient, parsePriceList } from './parse.js';
+import { parseIngredientLine, matchIngredient, parsePriceList, splitSteps, findDurations, fmtDuration } from './parse.js';
 import { ALLERGENS, PURCHASE_UNITS, UNITS, recipeCost, itemCost, suggestedPrice, actualCostPct, recipeAllergens, usesRecipe, hasPrice, orderList, fmtAmount, TEMP_CHECKS, tempStatus, money, pct } from './calc.js';
 
 const view = document.getElementById('view');
@@ -44,6 +44,7 @@ function page(tab, title, body, { back, action = '' } = {}) {
       <div class="bar-action">${action}</div>
     </header><main>${body}</main>`;
   window.scrollTo(0, 0);
+  drawTimers(); // running kitchen timers follow you to other screens
 }
 const newBtn = href => `<a class="btn sm tint" href="${href}">${ICON.plus}New</a>`;
 
@@ -138,7 +139,8 @@ async function recipeView(id) {
     <div class="card"><h2>Ingredients</h2>
       <label class="inline">Scale to <input type="number" id="scale" min="1" step="1" inputmode="numeric" value="${esc(r.portions)}"> portions</label>
       <table><tbody id="items"></tbody></table></div>
-    ${r.method ? `<div class="card"><h2>Method</h2><div class="method">${esc(r.method)}</div></div>` : ''}`,
+    ${r.method ? `<div class="card"><h2>Method</h2><div class="method">${esc(r.method)}</div></div>` : ''}
+    <div class="cta-bar"><a class="btn" href="#/recipe/${esc(r.id)}/cook">Start cooking</a></div>`,
     { back: '#/recipes', action: `<a class="btn sm tint" href="#/recipe/${esc(r.id)}/edit">Edit</a>` });
 
   const scale = document.getElementById('scale');
@@ -276,6 +278,7 @@ async function recipeEdit(id) {
       <label class="sr-only" for="pasteText">Ingredients, one per line</label>
       <textarea id="pasteText" placeholder="One per line, e.g.&#10;500 g tipo 00 flour&#10;5 eggs&#10;2 cloves garlic&#10;1/2 cup olive oil"></textarea>
       <p><small>Type or paste. Amounts and units are read for you, and names are matched to your Pantry.</small></p>
+      <p class="tip"><small><b>From a printed recipe:</b> open the Camera, point it at the page, tap the text icon, select the ingredients and tap Copy. Then paste here.</small></p>
       ${typing ? '' : '<button type="button" id="pasteAdd">Add to recipe</button> <span id="pasteMsg" class="muted"></span>'}
     </div>
     <div id="rows">${r.items.map(row).join('')}</div>
@@ -401,6 +404,166 @@ async function allergenChart() {
     }).join('')}</tbody></table></div>
     <p><small>Based on Pantry data. Always check supplier labels.</small></p>`
     : '<p class="empty">No recipes yet.</p>', { back: '#/recipes' });
+}
+
+// ---------- Cooking mode ----------
+// Big one-step-at-a-time method, timers found in the text, a scaled ingredient checklist,
+// and the screen kept awake. Timers live outside the view so they keep running (and ring)
+// if you jump to another recipe.
+
+const timers = []; // { id, label, recipeId, end, done }
+let tickHandle = null, audio = null, wake = null;
+const clock = ms => {
+  const s = Math.max(0, Math.ceil(ms / 1000)), h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = String(s % 60).padStart(2, '0');
+  return h ? `${h}:${String(m).padStart(2, '0')}:${sec}` : `${m}:${sec}`;
+};
+
+function startTimer(label, seconds, recipeId) {
+  // Audio must be unlocked by the tap that starts the timer (iOS)
+  audio ??= new (window.AudioContext || window.webkitAudioContext)();
+  audio.resume?.();
+  timers.push({ id: uid(), label, recipeId, end: Date.now() + seconds * 1000, done: false });
+  tickHandle ??= setInterval(tick, 1000);
+  drawTimers();
+}
+
+function ring() {
+  navigator.vibrate?.([300, 150, 300, 150, 300]);
+  if (!audio) return;
+  for (let i = 0; i < 3; i++) {
+    const o = audio.createOscillator(), g = audio.createGain(), t = audio.currentTime + i * 0.45;
+    o.frequency.value = 880;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.4, t + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.35);
+    o.connect(g).connect(audio.destination);
+    o.start(t);
+    o.stop(t + 0.4);
+  }
+}
+
+function tick() {
+  for (const t of timers) if (!t.done && Date.now() >= t.end) { t.done = true; ring(); }
+  if (!timers.length) { clearInterval(tickHandle); tickHandle = null; }
+  drawTimers();
+}
+
+function drawTimers() {
+  const html = timers.map(t => `<div class="timer ${t.done ? 'done' : ''}" role="timer">
+    <span>${esc(t.label)}</span><b>${t.done ? 'Done' : clock(t.end - Date.now())}</b>
+    <button type="button" class="x" data-stop="${t.id}" aria-label="${t.done ? 'Dismiss' : 'Stop'} timer ${esc(t.label)}">×</button></div>`).join('');
+  const box = document.getElementById('cookTimers');
+  if (box) box.innerHTML = html;
+  // Elsewhere in the app, a pill shows the next timer and leads back to cooking mode
+  const pill = document.getElementById('timerPill'), next = timers.find(t => !t.done) ?? timers[0];
+  pill.hidden = !next || !!box;
+  if (next && !box) {
+    pill.href = `#/recipe/${encodeURIComponent(next.recipeId)}/cook`;
+    pill.textContent = next.done ? `${next.label}: done` : `${next.label} ${clock(next.end - Date.now())}`;
+    pill.classList.toggle('done', next.done);
+  }
+}
+document.addEventListener('click', e => {
+  const id = e.target.closest('[data-stop]')?.dataset.stop;
+  if (!id) return;
+  timers.splice(timers.findIndex(t => t.id === id), 1);
+  drawTimers();
+});
+
+async function keepAwake(on) {
+  try {
+    if (on && !wake) { wake = await navigator.wakeLock?.request('screen'); wake?.addEventListener('release', () => { wake = null; }); }
+    if (!on && wake) { await wake.release(); wake = null; }
+  } catch { /* not supported or not allowed: cooking mode still works */ }
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && location.hash.endsWith('/cook')) keepAwake(true);
+});
+
+async function cookView(id) {
+  const r = await db.get('recipes', id);
+  if (!r) return go('#/recipes');
+  const [ings, recipes] = await Promise.all([ingMap(), db.all('recipes')]);
+  const recs = toMap(recipes);
+  const steps = splitSteps(r.method);
+  let at = 0, portions = r.portions;
+  const ticked = new Set();
+
+  page('recipes', r.name, `
+    <div class="seg" role="tablist">
+      <button type="button" role="tab" aria-selected="${steps.length ? 'true' : 'false'}" data-seg="steps">Steps${steps.length ? ` (${steps.length})` : ''}</button>
+      <button type="button" role="tab" aria-selected="${steps.length ? 'false' : 'true'}" data-seg="ings">Ingredients (${(r.items ?? []).length})</button>
+    </div>
+    <div id="cookTimers" aria-live="polite"></div>
+    <section id="steps" ${steps.length ? '' : 'hidden'}></section>
+    <section id="ings" ${steps.length ? 'hidden' : ''}>
+      <div class="card">
+        <label class="inline">Portions <input id="cookPortions" type="number" min="1" step="1" inputmode="numeric" value="${esc(r.portions)}"></label>
+        <ul class="checklist" id="checklist"></ul>
+      </div>
+      ${steps.length ? '' : `<p class="muted center">No method yet. <a href="#/recipe/${esc(r.id)}/edit">Add the steps</a> to cook step by step.</p>`}
+    </section>
+    <div class="cook-nav" id="cookNav" ${steps.length ? '' : 'hidden'}>
+      <button type="button" class="ghost" id="prev">Back</button><button type="button" id="next">Next step</button>
+    </div>`, { back: `#/recipe/${esc(r.id)}` });
+  keepAwake(true);
+  drawTimers();
+
+  const stepsEl = document.getElementById('steps'), prev = document.getElementById('prev'), next = document.getElementById('next');
+  const drawStep = () => {
+    const text = steps[at] ?? '';
+    stepsEl.innerHTML = `<p class="step-count">Step ${at + 1} of ${steps.length}</p>
+      <p class="step-text">${esc(text)}</p>
+      <div class="step-timers">${findDurations(text).map(d =>
+        `<button type="button" class="tint" data-timer="${d.seconds}" data-label="${esc(`Step ${at + 1}: ${fmtDuration(d.seconds)}`)}">Start ${esc(fmtDuration(d.seconds))} timer</button>`).join('')}</div>`;
+    prev.disabled = at === 0;
+    next.textContent = at === steps.length - 1 ? 'Finish' : 'Next step';
+  };
+  const drawChecklist = () => {
+    const f = portions / r.portions;
+    document.getElementById('checklist').innerHTML = (r.items ?? []).map((it, i) => {
+      const name = it.recipeId ? `${recs.get(it.recipeId)?.name ?? '(deleted)'} (sub-recipe)` : ings.get(it.ingredientId)?.name ?? '(deleted)';
+      return `<li><label class="${ticked.has(i) ? 'got' : ''}"><input type="checkbox" data-i="${i}" ${ticked.has(i) ? 'checked' : ''}>
+        <span class="grow">${esc(name)}</span><b>${fmtQty(it.qty * f)} ${esc(it.unit)}</b></label></li>`;
+    }).join('') || '<li class="muted">No ingredients yet.</li>';
+  };
+  const go_ = d => {
+    if (at + d >= steps.length) return go(`#/recipe/${r.id}`); // Finish
+    at = Math.max(0, at + d);
+    drawStep();
+    window.scrollTo(0, 0);
+  };
+  if (steps.length) drawStep();
+  drawChecklist();
+
+  prev.onclick = () => go_(-1);
+  next.onclick = () => go_(1);
+  stepsEl.addEventListener('click', e => {
+    const b = e.target.closest('[data-timer]');
+    if (b) startTimer(b.dataset.label, Number(b.dataset.timer), r.id);
+  });
+  // Swipe between steps (buttons do the same, for anyone who can't swipe)
+  let x0 = null;
+  stepsEl.addEventListener('touchstart', e => { x0 = e.touches[0].clientX; }, { passive: true });
+  stepsEl.addEventListener('touchend', e => {
+    const dx = e.changedTouches[0].clientX - (x0 ?? 0);
+    if (x0 !== null && Math.abs(dx) > 60) go_(dx < 0 ? 1 : -1);
+    x0 = null;
+  });
+  document.querySelector('.seg').addEventListener('click', e => {
+    const tab = e.target.closest('[data-seg]')?.dataset.seg;
+    if (!tab) return;
+    document.querySelectorAll('.seg [role=tab]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.seg === tab)));
+    stepsEl.hidden = tab !== 'steps' || !steps.length;
+    document.getElementById('cookNav').hidden = tab !== 'steps' || !steps.length;
+    document.getElementById('ings').hidden = tab !== 'ings';
+  });
+  document.getElementById('cookPortions').addEventListener('input', e => { portions = Number(e.target.value) || r.portions; drawChecklist(); });
+  document.getElementById('checklist').addEventListener('change', e => {
+    const i = Number(e.target.dataset.i);
+    if (e.target.checked) ticked.add(i); else ticked.delete(i);
+    e.target.closest('label').classList.toggle('got', e.target.checked);
+  });
 }
 
 // ---------- Pantry ----------
@@ -914,7 +1077,7 @@ async function settingsView() {
     </form>
     <div class="card"><h2>Invite classmates</h2><p class="muted">Pinch is free. Share the link. Everyone gets their own private recipe book.</p>
       <button type="button" class="ghost" id="invite">Share Pinch</button> <span id="inviteMsg" class="muted"></span></div>
-    <p class="muted center"><small>Pinch v3</small></p>`);
+    <p class="muted center"><small>Pinch v4</small></p>`);
 
   const acct = document.getElementById('acct');
   drawAccount = () => {
@@ -1109,6 +1272,7 @@ const routes = [
   [/^#\/recipe\/([^/]+)$/, recipeView],
   [/^#\/recipe\/([^/]+)\/edit$/, recipeEdit],
   [/^#\/recipe\/([^/]+)\/card$/, recipeCard],
+  [/^#\/recipe\/([^/]+)\/cook$/, cookView],
   [/^#\/pantry$/, pantryList],
   [/^#\/order$/, orderView],
   [/^#\/pantry\/import$/, importPrices],
@@ -1124,6 +1288,7 @@ const routes = [
 
 async function render() {
   const h = location.hash;
+  if (!h.endsWith('/cook')) keepAwake(false);
   for (const [re, fn] of routes) {
     const m = h.match(re);
     if (m) return fn(...m.slice(1).map(decodeURIComponent));

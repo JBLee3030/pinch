@@ -1,7 +1,7 @@
 // Run: node calc.test.js
 import assert from 'node:assert/strict';
 import { remoteWins } from './db.js';
-import { parseIngredientLine as P, matchIngredient, parsePriceList, packUnit } from './parse.js';
+import { parseIngredientLine as P, matchIngredient, parsePriceList, packUnit, splitSteps, findDurations, fmtDuration } from './parse.js';
 import { convert, recipeCost, suggestedPrice, actualCostPct, recipeAllergens, orderList, fmtAmount, tempStatus } from './calc.js';
 
 const close = (a, b) => assert.ok(Math.abs(a - b) < 1e-9, `${a} != ${b}`);
@@ -197,6 +197,26 @@ assert.equal(remoteWins({}, 1), true);
   // Semicolon CSV (European Excel)
   assert.deepEqual(parsePriceList('Name;Price;Unit\nButter;12,50;kg').map(r => [r.name, r.price, r.unit]), [['Butter', 12.5, 'kg']]);
   assert.equal(parsePriceList('Name,Price\nWagyu,"$1,234.50"')[0].price, 1234.5); // thousands separator
+}
+
+// Cooking mode: steps and timers
+{
+  assert.deepEqual(splitSteps('1. Sweat onion.\n2) Add tomatoes\n\n- Season'), ['Sweat onion.', 'Add tomatoes', 'Season']);
+  assert.deepEqual(splitSteps('Step 1 Boil water'), ['Boil water']);
+  assert.deepEqual(splitSteps(''), []);
+  assert.equal(splitSteps('Bring the stock to the boil and skim well. Add the rice and stir for a minute or two until glossy. Ladle in stock slowly.').length, 3);
+  const d = t => findDurations(t).map(x => x.seconds);
+  assert.deepEqual(d('Simmer 45 min, stirring'), [2700]);
+  assert.deepEqual(d('Rest 30 minutes wrapped'), [1800]);
+  assert.deepEqual(d('Braise 1 hr 30 min'), [5400]);               // one timer, not two
+  assert.deepEqual(d('Roast 1½ hours'), [5400]);
+  assert.deepEqual(d('Cook 8-10 minutes'), [480]);                  // range: first number
+  assert.deepEqual(d('Blanch 30 sec, then refresh. Bake 12 mins.'), [30, 720]);
+  assert.deepEqual(d('Roll to setting 6, cut 5 mm wide'), []);      // not a time
+  assert.deepEqual(d('Heat to 180 C for 2h'), [7200]);
+  assert.equal(fmtDuration(2700), '45 min');
+  assert.equal(fmtDuration(5400), '1 h 30 min');
+  assert.equal(fmtDuration(30), '30 s');
 }
 
 console.log('calc ok');
