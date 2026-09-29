@@ -1,5 +1,6 @@
 // Run: node calc.test.js
 import assert from 'node:assert/strict';
+import { remoteWins } from './db.js';
 import { convert, recipeCost, suggestedPrice, actualCostPct, recipeAllergens, orderList, fmtAmount, tempStatus } from './calc.js';
 
 const close = (a, b) => assert.ok(Math.abs(a - b) < 1e-9, `${a} != ${b}`);
@@ -119,5 +120,12 @@ assert.deepEqual(recipeAllergens(a, ings, cyc), ['Gluten', 'Wheat']);
   assert.equal(st({ type: 'cooling', start: R('14:00', 62), stage1: R('15:30', 20), stage2: R('20:10', 4) }), 'fail'); // over 6 h
   assert.equal(st({ type: 'cooling', start: R('14:00', 62), stage1: R('15:30', 20), stage2: R('19:00', 7) }), 'fail');
 }
+
+// Sync: last write wins; rows from before sync existed (no _ts) lose to any remote edit
+assert.equal(remoteWins(undefined, 5), true);
+assert.equal(remoteWins({ _ts: 10 }, 11), true);
+assert.equal(remoteWins({ _ts: 10 }, 10), false); // our own push echoing back
+assert.equal(remoteWins({ _ts: 10 }, 9), false);
+assert.equal(remoteWins({}, 1), true);
 
 console.log('calc ok');

@@ -1,7 +1,7 @@
 # Pinch
 
 A pocket notebook for cooks: recipes, food costing, allergens and a service log.
-Installable web app (PWA), works offline, data stays on your phone.
+Installable web app (PWA), works offline. Data lives on your phone; optional sign-in syncs it to the cloud.
 
 **Live:** https://jblee3030.github.io/pinch/ — open on your phone, then *Share → Add to Home Screen*.
 
@@ -16,6 +16,7 @@ Installable web app (PWA), works offline, data stays on your phone.
 - **Recipe card** — costed standard recipe card, scalable, print or save as A4 PDF
 - **Temp log** — fridge, freezer, delivery, hot-holding, cooking and 2-stage cooling checks marked PASS / FAIL against food safety limits, with corrective actions
 - **Portfolio** — headline, bio, kitchen experience and stats from the log, featured dish photos; print or save as PDF
+- **Account & sync** — optional email + password sign-in; local-first sync to Supabase across devices (last edit wins), schema in `supabase.sql`
 - **Backup** — export / import a JSON file
 
 ## Develop

@@ -1,4 +1,5 @@
 import * as db from './db.js';
+import * as sync from './sync.js';
 import { ALLERGENS, PURCHASE_UNITS, UNITS, recipeCost, itemCost, suggestedPrice, actualCostPct, recipeAllergens, usesRecipe, hasPrice, orderList, fmtAmount, TEMP_CHECKS, tempStatus, money, pct } from './calc.js';
 
 const view = document.getElementById('view');
@@ -698,10 +699,14 @@ async function portfolioView() {
 
 // ---------- Settings ----------
 
+// Account card; redrawn on sync status changes while Settings is open.
+let drawAccount = () => {};
+
 async function settingsView() {
   const s = await settings();
   const est = await navigator.storage?.estimate?.().catch(() => null);
   page('settings', 'Settings', `
+    <div class="card" id="acct"></div>
     <form id="f" class="card">
       <label>Your name <small>(shown on recipe cards)</small><input name="cookName" autocomplete="name" value="${esc(s.cookName)}"></label>
       <label>Default target food cost %<input name="targetCostPct" type="number" min="1" max="100" step="any" inputmode="decimal" required value="${esc(s.targetCostPct)}"></label>
@@ -714,6 +719,44 @@ async function settingsView() {
       <div class="actions"><button id="export">Export backup</button><label class="btn ghost">Import<input type="file" id="import" accept="application/json,.json" hidden></label></div>
     </div>
     <p class="muted"><small>Pinch v1</small></p>`);
+
+  const acct = document.getElementById('acct');
+  drawAccount = () => {
+    if (!acct.isConnected) return;
+    const st = sync.status();
+    const err = st.error ? `<p class="warn">⚠ ${esc(st.error)}</p>` : '';
+    acct.innerHTML = st.email ? `<h2>Account &amp; sync</h2>
+      <p>Signed in as <b>${esc(st.email)}</b></p>
+      <p class="muted">${st.syncing ? 'Syncing…' : st.lastSync ? `Last synced ${esc(new Date(st.lastSync).toLocaleString('en-AU'))}` : 'Not synced yet'}</p>${err}
+      <div class="actions"><button type="button" id="syncNow">Sync now</button><button type="button" class="ghost" id="signOut">Sign out</button></div>`
+    : `<h2>Account &amp; sync</h2>
+      <p class="muted">Optional. Sign in to back up to the cloud and use Pinch on more than one device. Without an account, data stays on this phone only.</p>${err}
+      <form id="auth">
+        <label>Email<input name="email" type="email" autocomplete="username" required></label>
+        <label>Password <small>(8+ characters)</small><input name="password" type="password" autocomplete="current-password" minlength="8" required></label>
+        <div class="actions"><button type="submit" value="in">Sign in</button><button type="submit" class="ghost" value="up">Create account</button></div>
+        <p id="authMsg" class="muted"></p>
+      </form>`;
+  };
+  acct.addEventListener('submit', async e => {
+    e.preventDefault();
+    const fd = new FormData(e.target), up = e.submitter?.value === 'up';
+    const msg = acct.querySelector('#authMsg'), buttons = acct.querySelectorAll('button');
+    msg.textContent = up ? 'Creating account…' : 'Signing in…';
+    buttons.forEach(b => { b.disabled = true; });
+    try {
+      await (up ? sync.signUp : sync.signIn)(fd.get('email').trim(), fd.get('password'));
+      drawAccount();
+    } catch (err) {
+      msg.textContent = err.message;
+      buttons.forEach(b => { b.disabled = false; });
+    }
+  });
+  acct.addEventListener('click', async e => {
+    if (e.target.id === 'syncNow') sync.sync();
+    if (e.target.id === 'signOut' && confirm('Sign out? Your data stays on this phone.')) await sync.signOut();
+  });
+  drawAccount();
 
   const form = document.getElementById('f');
   form.onsubmit = async e => {
@@ -811,4 +854,10 @@ window.addEventListener('hashchange', render);
 window.addEventListener('unhandledrejection', e => alert('Something went wrong: ' + (e.reason?.message ?? e.reason)));
 navigator.storage?.persist?.();
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
+// After a sync brings in changes, refresh read-only screens (never a form mid-edit).
+sync.onStatus(st => {
+  drawAccount();
+  if (st.changed && !/\/edit|order|portfolio|card|settings/.test(location.hash)) render();
+});
 render();
+sync.sync();
