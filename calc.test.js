@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { remoteWins } from './db.js';
 import { extractRecipe, safeUrl } from './supabase/functions/recipe-import/index.js';
 import { parseIngredientLine as P, matchIngredient, parsePriceList, packUnit, splitSteps, findDurations, fmtDuration } from './parse.js';
-import { convert, recipeCost, suggestedPrice, actualCostPct, recipeAllergens, orderList, fmtAmount, tempStatus } from './calc.js';
+import { convert, recipeCost, suggestedPrice, actualCostPct, recipeAllergens, orderList, fmtAmount, tempStatus, yieldTest } from './calc.js';
 
 const close = (a, b) => assert.ok(Math.abs(a - b) < 1e-9, `${a} != ${b}`);
 
@@ -259,6 +259,22 @@ assert.equal(remoteWins({}, 1), true);
   assert.ok(safeUrl('https://www.taste.com.au/recipes/x'));
   for (const bad of ['javascript:alert(1)', 'file:///etc/passwd', 'http://localhost:3000', 'http://192.168.0.1/', 'http://[::1]/', 'http://printer.local/', 'https://x.com:8443/', 'not a url'])
     assert.equal(safeUrl(bad), null, bad);
+}
+
+// Yield test: 5 kg beef at $18/kg -> 3.6 kg usable, 0.9 kg bones worth $2/kg, 0.3 kg fat
+{
+  const y = yieldTest({ ap: 5, ep: 3.6, price: 18, trims: [{ qty: 0.9, value: 2 }, { qty: 0.3 }] });
+  close(y.yieldPct, 72);
+  close(y.totalCost, 90);
+  close(y.credit, 1.8);
+  close(y.costPerUsable, (90 - 1.8) / 3.6);           // $24.50 per usable kg
+  close(y.unaccounted, 0.2);
+  assert.equal(y.overTrim, false);
+  // Consistent with recipe costing: with no credit, price / yield = cost per usable kg
+  close(yieldTest({ ap: 2, ep: 1.5, price: 12 }).costPerUsable, 12 / 0.75);
+  assert.equal(yieldTest({ ap: 5, ep: 3, price: 18, trims: [{ qty: 2.5 }] }).overTrim, true);
+  assert.equal(yieldTest({ ap: 0, ep: 0, price: 1 }), null);
+  assert.equal(yieldTest({ ap: 2, ep: 3, price: 1 }), null); // can't get more than you bought
 }
 
 console.log('calc ok');

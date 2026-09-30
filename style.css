@@ -423,3 +423,13 @@ body.sub .timer-pill { bottom: calc(env(safe-area-inset-bottom) + 88px); }
 .import-card .bar input { background-color: var(--fill); }
 .import-card .bar button { flex: none; }
 .import-card p { margin: 0; }
+
+/* Quick log & yield test */
+.quick-log { display: flex; align-items: center; gap: var(--s3); color: inherit; text-decoration: none; background: var(--accent-weak); }
+.quick-log b { display: block; font: var(--t-row); }
+.quick-log small { display: block; margin-top: 2px; color: var(--text-2); }
+.quick-log:active { filter: brightness(.97); }
+.trim-row { display: grid; grid-template-columns: 1fr 1fr 44px; gap: var(--s2); padding-bottom: var(--s3); margin-bottom: var(--s3); border-bottom: 1px solid var(--line); align-items: center; }
+.trim-row [name=tname] { grid-column: 1 / -1; }
+.trim-row input { padding: 0 var(--s3); font-size: 16px; }
+h2 small { font-weight: 400; }

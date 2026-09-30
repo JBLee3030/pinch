@@ -37,6 +37,7 @@ I built Pinch while studying Commercial Cookery and Kitchen Management in Melbou
 - Recipe book with photos, method and scaling to any number of portions
 - Sub-recipes (a sauce or dough inside a dish) by portion or by weight/volume; cost and allergens roll up through every level, and circular references are blocked
 - Cost per portion, suggested menu price from a target food cost %, actual food cost % against the menu price (GST-aware)
+- Yield test: bought vs usable weight (and reusable trim) gives yield % and the real cost per usable kg, saved to the Pantry in one tap
 - Pantry of ingredient prices per kg / L / each with trim yield %; type a new ingredient straight into a recipe and price it later — missing prices are flagged, never counted as $0
 - Costed standard recipe card, printable to A4 / PDF
 - Cooking mode: one big step at a time, timers found in the method ("simmer 45 min"), a scaled ingredient checklist, and the screen kept awake
@@ -51,6 +52,7 @@ I built Pinch while studying Commercial Cookery and Kitchen Management in Melbou
 - Food safety temperature log: fridge, freezer, deliveries, hot holding, cooking and 2-stage cooling (60 → 21 °C within 2 h → 5 °C within 6 h), each marked PASS / FAIL / OPEN with corrective actions
 
 **Career**
+- Log today's service in two taps (venue, station, hours and the current service filled in)
 - Service log for training-kitchen service periods and work shifts (station, hours, dishes, chef feedback) with progress toward the course requirement
 - Portfolio page generated from the log and featured dishes, printable to PDF
 

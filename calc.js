@@ -174,3 +174,22 @@ export function tempStatus(e) {
   if ((c.max != null && e.temp > c.max) || (c.min != null && e.temp < c.min)) return { status: 'fail', note: `Must be ${limitText(e.type)}` };
   return { status: 'pass', note: limitText(e.type) };
 }
+
+// Butcher's / kitchen yield test. ap = as-purchased weight, ep = edible portion after trimming,
+// trims = recorded trim and by-products [{ qty, value per unit }] (e.g. bones for stock).
+export function yieldTest({ ap, ep, price, trims = [] }) {
+  ap = Number(ap); ep = Number(ep); price = Number(price) || 0;
+  if (!(ap > 0) || !(ep >= 0) || ep > ap) return null;
+  const trimQty = trims.reduce((n, t) => n + (Number(t.qty) || 0), 0);
+  const credit = trims.reduce((n, t) => n + (Number(t.qty) || 0) * (Number(t.value) || 0), 0);
+  const totalCost = ap * price;
+  const rest = ap - ep - trimQty;
+  return {
+    yieldPct: ep / ap * 100,
+    totalCost,
+    credit,
+    costPerUsable: ep > 0 ? (totalCost - credit) / ep : NaN,
+    unaccounted: Math.max(0, rest),
+    overTrim: rest < -1e-9, // trims + EP weigh more than what was bought
+  };
+}
