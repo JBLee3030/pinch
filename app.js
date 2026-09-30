@@ -74,7 +74,7 @@ async function recipeList() {
   page('recipes', 'Recipes', recipes.length ? `
     <div class="bar"><input type="search" id="q" placeholder="Search recipes" aria-label="Search recipes">
       <select id="cat" aria-label="Category"><option value="">All</option>${opts(cats)}</select></div>
-    <p><a href="#/allergens">Allergen chart →</a></p>
+    <div class="links" role="navigation" aria-label="Recipe tools"><a href="#/allergens">Allergen chart</a></div>
     <ul class="list">${recipes.map(r => `<li data-q="${esc(r.name.toLowerCase())}" data-cat="${esc(r.category)}"><a href="#/recipe/${esc(r.id)}">
       ${r.photo ? `<img src="${esc(r.photo)}" alt="">` : '<span class="ph" aria-hidden="true"></span>'}
       <div class="grow"><b>${esc(r.name)}</b><small>${esc(r.category || 'Uncategorised')}</small></div>
@@ -600,7 +600,7 @@ async function pantryList() {
   const used = id => recipes.filter(r => r.items?.some(it => it.ingredientId === id)).length;
   const missing = ings.filter(i => !hasPrice(i));
   page('pantry', 'Pantry', ings.length ? `
-    <div class="links"><a href="#/order">Order list →</a><a href="#/yield">Yield test →</a><a href="#/pantry/import">Import prices →</a></div>
+    <div class="links" role="navigation" aria-label="Pantry tools"><a href="#/order">Order list</a><a href="#/yield">Yield test</a><a href="#/pantry/import">Import prices</a></div>
     ${missing.length ? `<div class="card"><h2>Needs price (${missing.length})</h2><div class="chips">${missing.map(i => `<a class="chip" href="#/ingredient/${esc(i.id)}/edit">${esc(i.name)}</a>`).join('')}</div></div>` : ''}
     <div class="bar"><input type="search" id="q" placeholder="Search ingredients" aria-label="Search ingredients"></div>
     <ul class="list">${ings.map(i => `<li data-q="${esc(i.name.toLowerCase())}"><a href="#/ingredient/${esc(i.id)}/edit">
@@ -755,7 +755,7 @@ async function yieldView(id) {
         ${v.trims.map(t => `<dt>${esc(t.name || 'Trim')}</dt><dd>${fmtQty(t.qty)} ${u}</dd>`).join('')}
         <dt>Unaccounted loss</dt><dd>${fmtQty(y.unaccounted)} ${u}</dd>
       </dl>
-      ${ing ? `<div class="actions no-print"><button type="button" id="apply">Use ${pct(y.yieldPct)} for ${esc(ing.name)}</button><button type="button" class="ghost" id="print">Print</button></div>
+      ${ing ? `<div class="stack no-print"><button type="button" id="apply">Use ${pct(y.yieldPct)} for ${esc(ing.name)}</button><button type="button" class="ghost" id="print">Print</button></div>
         <p id="applyMsg" class="muted"></p>`
         : '<p class="muted"><small>Choose an ingredient above to save this yield to your Pantry.</small></p>'}</div>`;
   };
@@ -885,7 +885,7 @@ async function logList() {
       <span class="grow"><b>${doneNow ? `${periodNow()} logged. Log another` : `Log today’s ${periodNow().toLowerCase()} service`}</b>
         <small>${last ? esc([last.venue, last.station].filter(Boolean).join(' · ') || 'Same as last time') : 'Takes a few seconds'}</small></span>
       <span class="btn sm">${ICON.plus}Log</span></a>
-    <div class="links"><a href="#/temps">Temp log →</a><a href="#/portfolio">Portfolio →</a></div>
+    <div class="links" role="navigation" aria-label="Log tools"><a href="#/temps">Temp log</a><a href="#/portfolio">Portfolio</a></div>
     <div class="card"><div class="row2">
       <div><small>School service periods</small><div class="big">${school} / ${esc(s.logTarget)}</div>
         <div class="progress"><i style="width:${Math.min(100, school / s.logTarget * 100)}%"></i></div></div>
@@ -1190,7 +1190,7 @@ async function settingsView() {
     </form>
     <div class="card"><h2>Invite classmates</h2><p class="muted">Pinch is free. Share the link. Everyone gets their own private recipe book.</p>
       <button type="button" class="ghost" id="invite">Share Pinch</button> <span id="inviteMsg" class="muted"></span></div>
-    <p class="muted center"><small>Pinch v7</small></p>`);
+    <p class="muted center"><small>Pinch v8</small></p>`);
 
   const acct = document.getElementById('acct');
   drawAccount = () => {

@@ -75,13 +75,15 @@ System UI font (SF Pro on iPhone, Roboto on Android): native feel, zero download
 
 ## Sizing and alignment
 
-These are the rules the v7 layout pass enforced across every screen:
+These are the rules the v7 and v8 layout passes enforced and checked on every screen (automated: no overflow at 360 / 375 px, no control under 44 px, side-by-side controls equal in width and height):
 
 1. **One control height.** Fields, selects and buttons are 52 px; the bottom CTA is 56 px; icon buttons inside rows (×) are 44 px. No 36 / 40 px fields.
 2. **Nothing leaves the screen.** Grid and flex children can shrink (`min-width: 0`); dates, long names and numbers truncate inside their field instead of pushing a neighbour off-screen.
 3. **Side-by-side fields align on the field**, not the label (`.row2` aligns to the bottom), so a wrapping label never staggers the inputs.
 4. **Long values get their own line.** Names (ingredient, recipe, trim) take a full row; amount, unit and × go on the line below.
-5. **A button on its own is full width.** Buttons that share a row split it. Button labels never wrap.
+5. **A button on its own is full width. Buttons that share a row are exactly equal**, in width and height (with an odd number, the first takes a full row). Button labels never wrap.
+   - Exception, on purpose: a **primary + secondary pair** at the bottom of a screen (Save + Delete, Next + Back) is a fixed **2 : 1**, secondary on the left.
+   - Shortcuts to other screens are rows in one white card with a chevron, never content-width pills.
 6. **Fields contrast with what they sit on:** grey fields inside white cards, white fields on the grey canvas.
 7. **Record the value first.** Where a value and its time are captured together (temperatures), the value field comes first and the time sits below at full width.
 
