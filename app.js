@@ -170,9 +170,9 @@ async function recipeCard(id) {
   const sourceLabel = r.source === 'web' && r.sourceUrl ? `Source: ${r.sourceUrl}` : { school: 'School', work: 'Work', own: 'Own recipe', web: 'Web' }[r.source] || '';
 
   page('recipes', 'Recipe card', `
-    <div class="no-print bar"><label class="inline">Portions <input type="number" id="cp" min="1" step="1" inputmode="numeric" value="${esc(r.portions)}"></label>
-      <button id="print">Print / Save PDF</button></div>
-    <div class="sheet-wrap"><article class="sheet" id="sheet"></article></div>`, { back: `#/recipe/${esc(r.id)}` });
+    <div class="no-print card"><label class="inline">Portions <input type="number" id="cp" min="1" step="1" inputmode="numeric" value="${esc(r.portions)}"></label></div>
+    <div class="sheet-wrap"><article class="sheet" id="sheet"></article></div>
+    <div class="cta-bar no-print"><button id="print">Print or save as PDF</button></div>`, { back: `#/recipe/${esc(r.id)}` });
 
   const cp = document.getElementById('cp'), sheet = document.getElementById('sheet');
   const draw = () => {
@@ -292,9 +292,7 @@ async function recipeEdit(id) {
       <button type="button" class="ghost" id="add">${typing ? 'Add one at a time' : '+ Add ingredient'}</button>
       ${typing ? '' : '<button type="button" class="ghost" id="pasteOpen">Paste a list</button>'}
     </div>
-    <div class="row2" style="margin-top:16px">
-      <label>Portions<input name="portions" type="number" min="1" step="1" inputmode="numeric" required value="${esc(r.portions)}"></label>
-    </div>
+    <label style="margin-top:16px">Portions<input name="portions" type="number" min="1" step="1" inputmode="numeric" required value="${esc(r.portions)}"></label>
     <label>Method <small>(optional)</small><textarea name="method" placeholder="1. …">${esc(r.method)}</textarea></label>
     ${photoField(r.photo)}
     <details class="more">
@@ -982,7 +980,7 @@ async function tempEdit(id) {
   const last = [...temps].sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0))[0];
   const t = isNew ? { id: uid(), at: nowLocal(), type: last?.type ?? 'fridge' } : temps.find(x => x.id === id);
   if (!t) return go('#/temps');
-  const reading = (key, label, hint) => `<fieldset class="reading"><legend>${label} <small>${hint}</small></legend><div class="row2">
+  const reading = (key, label, hint) => `<fieldset class="reading"><legend>${label} <small>${hint}</small></legend><div class="row2 tt">
     <label>Time<input name="${key}At" type="datetime-local" value="${esc(t[key]?.at ?? (key === 'start' ? t.at : ''))}"></label>
     <label>°C<input name="${key}Temp" type="number" step="0.1" inputmode="decimal" value="${esc(t[key]?.temp)}"></label></div></fieldset>`;
 
@@ -990,9 +988,9 @@ async function tempEdit(id) {
     <label>Check<select name="type">${Object.entries(TEMP_CHECKS).map(([k, c]) => `<option value="${k}" ${k === t.type ? 'selected' : ''}>${esc(c.label)}</option>`).join('')}</select></label>
     <label>Equipment or food<input name="item" list="items" placeholder="Walk-in cool room, Bain-marie, Beef ragù…" value="${esc(t.item)}"></label>
     ${datalist('items', temps.map(x => x.item))}
-    <div id="spot" class="row2">
+    <div id="spot" class="row2 tt">
       <label>Time<input name="at" type="datetime-local" value="${esc(t.at)}"></label>
-      <label>Temperature °C<input name="temp" type="number" step="0.1" inputmode="decimal" value="${esc(t.temp)}"></label></div>
+      <label>°C<input name="temp" type="number" step="0.1" inputmode="decimal" value="${esc(t.temp)}"></label></div>
     <div id="cool">${reading('start', 'Start', '~60 °C')}${reading('stage1', 'Stage 1', '≤ 21 °C within 2 h')}${reading('stage2', 'Stage 2', '≤ 5 °C within 6 h of start')}</div>
     <p id="status"></p>
     <label>Corrective action<input name="action" list="actions" placeholder="What you did if it failed" value="${esc(t.action)}"></label>
@@ -1085,8 +1083,8 @@ async function portfolioView() {
           : '<p class="muted">No recipes yet.</p>'}
         <label class="inline" style="margin-top:12px"><input type="checkbox" name="showCosting" ${pf.showCosting ? 'checked' : ''}> Show costing on dishes</label>
       </form></details>
-    <div class="no-print bar"><button id="print">Print / Save PDF</button></div>
-    <div class="sheet-wrap"><article class="sheet portfolio" id="sheet"></article></div>`, { back: '#/log' });
+    <div class="sheet-wrap"><article class="sheet portfolio" id="sheet"></article></div>
+    <div class="cta-bar no-print"><button id="print">Print or save as PDF</button></div>`, { back: '#/log' });
 
   const sheet = document.getElementById('sheet'), form = document.getElementById('pf');
   const dish = r => {
@@ -1192,7 +1190,7 @@ async function settingsView() {
     </form>
     <div class="card"><h2>Invite classmates</h2><p class="muted">Pinch is free. Share the link. Everyone gets their own private recipe book.</p>
       <button type="button" class="ghost" id="invite">Share Pinch</button> <span id="inviteMsg" class="muted"></span></div>
-    <p class="muted center"><small>Pinch v6</small></p>`);
+    <p class="muted center"><small>Pinch v7</small></p>`);
 
   const acct = document.getElementById('acct');
   drawAccount = () => {

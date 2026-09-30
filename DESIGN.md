@@ -73,6 +73,18 @@ System UI font (SF Pro on iPhone, Roboto on Android): native feel, zero download
 | Chips | `.chip`, `.chip.alert` | Tags and allergens |
 | Links row | `.links` | Secondary destinations as white pills |
 
+## Sizing and alignment
+
+These are the rules the v7 layout pass enforced across every screen:
+
+1. **One control height.** Fields, selects and buttons are 52 px; the bottom CTA is 56 px; icon buttons inside rows (×) are 44 px. No 36 / 40 px fields.
+2. **Nothing leaves the screen.** Grid and flex children can shrink (`min-width: 0`); dates, long names and numbers truncate inside their field instead of pushing a neighbour off-screen.
+3. **Side-by-side fields align on the field**, not the label (`.row2` aligns to the bottom), so a wrapping label never staggers the inputs.
+4. **Long values get their own line.** Names (ingredient, recipe, trim) take a full row; amount, unit and × go on the line below.
+5. **A button on its own is full width.** Buttons that share a row split it. Button labels never wrap.
+6. **Fields contrast with what they sit on:** grey fields inside white cards, white fields on the grey canvas.
+7. **Record the value first.** Where a value and its time are captured together (temperatures), the value field comes first and the time sits below at full width.
+
 ## Icons
 
 [Tabler Icons](https://tabler.io/icons) (MIT), outline set, 24 px, stroke 2 (1.8 in the tab bar, 2.2 when active). Copied as inline SVG with `aria-hidden="true"`; every icon sits next to a text label or inside a control with an `aria-label`. No emoji as icons.

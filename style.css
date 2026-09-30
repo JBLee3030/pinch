@@ -349,7 +349,6 @@ table.order td.n small { display: block; margin-top: 2px; }
 
 /* ---------- Refinements after first review ---------- */
 /* Forms sitting straight on the grey canvas use white fields (grey-on-grey disappears) */
-form:not(.card) :is(input, select, textarea):not([type=checkbox]):not([type=file]):not(.card *, details *) { background-color: var(--surface); }
 form:not(.card) :is(input, select, textarea):focus { background-color: var(--surface); }
 /* Recipe ingredient rows: name on its own line, amount below */
 .item { grid-template-columns: 1fr 104px 44px; padding-bottom: var(--s3); margin-bottom: var(--s3); border-bottom: 1px solid var(--line); }
@@ -433,3 +432,41 @@ body.sub .timer-pill { bottom: calc(env(safe-area-inset-bottom) + 88px); }
 .trim-row [name=tname] { grid-column: 1 / -1; }
 .trim-row input { padding: 0 var(--s3); font-size: 16px; }
 h2 small { font-weight: 400; }
+
+/* ---------- Layout rules (see DESIGN.md "Sizing and alignment") ---------- */
+/* 1. One control height. Grid/flex children may shrink; nothing pushes past the screen edge. */
+input, select, textarea { min-width: 0; }
+input[type=date], input[type=datetime-local], input[type=time] { display: block; min-height: var(--h-md); -webkit-appearance: none; appearance: none; text-align: left; }
+input::-webkit-date-and-time-value { text-align: left; }
+fieldset { min-width: 0; }
+.have-field input, table.order input.have { min-height: var(--h-sm); }
+.checks label { min-height: var(--h-md); }
+input[type=file]::file-selector-button { border: 0; border-radius: 10px; margin-right: var(--s3); padding: var(--s2) var(--s3); background: var(--surface); color: var(--text); font: 600 15px/1 var(--font); }
+
+/* 2. Side-by-side fields line up on their inputs, even when one label wraps */
+.row2 { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: end; }
+.row2 > * { min-width: 0; }
+.row2.tt { grid-template-columns: minmax(0, 1fr) 112px; }   /* time + °C */
+
+/* Fields in white panels (cards, details, reading groups) are grey; on the grey canvas they are white */
+form:not(.card) :is(input, select, textarea):not([type=checkbox]):not([type=file]):not(.card *, details *, fieldset *) { background-color: var(--surface); }
+fieldset.reading :is(input, select) { background-color: var(--fill); }
+
+/* 3. A button on its own spans the width; buttons in a row share it */
+:is(.card, form, #result, #out) > :is(button, .btn):not(.x):not(.sm):not(.link),
+.card > form > button, #paste > button { display: flex; width: 100%; }
+.actions > :is(button, .btn, label.btn) { flex: 1 1 auto; }
+body.sub form .actions > button.danger { flex: 0 0 auto; }
+#fbMsg, #saved, #inviteMsg, #pasteMsg, #impMsg { display: block; margin-top: var(--s2); }
+
+/* 4. Button labels never wrap */
+button, .btn { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+fieldset.reading .row2 { clear: both; }              /* the floated legend must not squeeze the fields beside it */
+.cta-bar :is(.btn, button) { display: flex; width: 100%; min-height: var(--h-lg); font-size: 17px; border-radius: 16px; }
+/* Temperature readings: °C first (it's what you're recording), full-width time below so it never truncates */
+.row2.tt { grid-template-columns: minmax(0, 1fr); }
+.row2.tt > label:last-child { order: -1; }
+/* Order plan rows: recipe name on its own line, portions below (like ingredient rows) */
+.plan-row { grid-template-columns: minmax(0, 1fr) 44px; padding-bottom: var(--s3); margin-bottom: var(--s3); border-bottom: 1px solid var(--line); }
+.plan-row select { grid-column: 1 / -1; }
+.quick-log .btn { flex: none; }
