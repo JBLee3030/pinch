@@ -1190,7 +1190,7 @@ async function settingsView() {
     </form>
     <div class="card"><h2>Invite classmates</h2><p class="muted">Pinch is free. Share the link. Everyone gets their own private recipe book.</p>
       <button type="button" class="ghost" id="invite">Share Pinch</button> <span id="inviteMsg" class="muted"></span></div>
-    <p class="muted center"><small>Pinch v10</small></p>`);
+    <p class="muted center"><small>Pinch v11</small></p>`);
 
   const acct = document.getElementById('acct');
   drawAccount = () => {
