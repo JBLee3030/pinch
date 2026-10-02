@@ -1,6 +1,7 @@
 // Run: node calc.test.js
 import assert from 'node:assert/strict';
 import { remoteWins } from './db.js';
+import { DECKS, ALL_CARDS, review, pickSession, isDue, isLearned } from './study.js';
 import { extractRecipe, safeUrl } from './supabase/functions/recipe-import/index.js';
 import { parseIngredientLine as P, matchIngredient, parsePriceList, packUnit, splitSteps, findDurations, fmtDuration } from './parse.js';
 import { convert, recipeCost, suggestedPrice, actualCostPct, recipeAllergens, orderList, fmtAmount, tempStatus, yieldTest, convertFor, densityFor, MEASURES, scaleFromIngredient, itemGrams, bakersPercent, bakersBase, fToC, cToF } from './calc.js';
@@ -315,6 +316,31 @@ assert.equal(remoteWins({}, 1), true);
   close(itemGrams({ ingredientId: 'flour', qty: 250, unit: 'ml' }, I), 127.5);
   close(fToC(350), 530 / 3);
   close(cToF(180), 356);
+}
+
+// Study cards and spaced repetition
+{
+  const ids = ALL_CARDS.map(c => c.id);
+  assert.equal(new Set(ids).size, ids.length);                                   // ids unique (progress is keyed by id)
+  assert.ok(DECKS.every(d => d.cards.length && d.note));
+  assert.ok(ALL_CARDS.every(c => c.front && c.back && !/[—–]/.test(c.front + c.back))); // copy rule: no em/en dashes
+  const DAY = 86400000, t0 = Date.UTC(2026, 9, 1);
+  let st = {};
+  st = review(st, 'cuts-julienne', true, t0);
+  assert.deepEqual([st['cuts-julienne'].box, st['cuts-julienne'].due], [1, t0 + DAY]);
+  st = review(st, 'cuts-julienne', true, t0 + DAY);
+  assert.equal(st['cuts-julienne'].box, 2);
+  assert.equal(st['cuts-julienne'].due, t0 + DAY + 3 * DAY);
+  st = review(st, 'cuts-julienne', false, t0 + 5 * DAY);                          // wrong: back to box 1, due now
+  assert.deepEqual([st['cuts-julienne'].box, st['cuts-julienne'].due, st['cuts-julienne'].seen], [1, t0 + 5 * DAY, 3]);
+  assert.equal(isDue(st, 'cuts-julienne', t0 + 5 * DAY), true);
+  for (let i = 0; i < 6; i++) st = review(st, 'cuts-brunoise', true, t0);
+  assert.equal(st['cuts-brunoise'].box, 5);                                       // caps at 5
+  assert.equal(isLearned(st, 'cuts-brunoise'), true);
+  const s1 = pickSession(DECKS[0].cards, st, t0 + 5 * DAY, 4);
+  assert.equal(s1[0].id, 'cuts-julienne');                                         // due first
+  assert.ok(!s1.some(c => c.id === 'cuts-brunoise'));                              // not due yet, not new
+  assert.equal(s1.length, 4);
 }
 
 console.log('calc ok');

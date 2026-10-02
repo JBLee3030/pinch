@@ -1,5 +1,6 @@
 import * as db from './db.js';
 import * as sync from './sync.js';
+import { DECKS, ALL_CARDS, review, pickSession, isDue, isLearned } from './study.js';
 import { parseIngredientLine, matchIngredient, parsePriceList, splitSteps, findDurations, fmtDuration } from './parse.js';
 import { ALLERGENS, PURCHASE_UNITS, UNITS, recipeCost, itemCost, suggestedPrice, actualCostPct, recipeAllergens, usesRecipe, hasPrice, orderList, fmtAmount, TEMP_CHECKS, tempStatus, yieldTest, MEASURES, convertFor, densityFor, scaleFromIngredient, bakersPercent, bakersBase, fToC, cToF, money, pct } from './calc.js';
 
@@ -513,6 +514,90 @@ async function timersView() {
     startTimer(f.label.value.trim() || fmtDuration(secs), secs, null);
     f.reset();
   };
+}
+
+// ---------- Study: reference decks and flash cards ----------
+
+const studyState = async () => (await db.get('settings', 'study'))?.cards ?? {};
+
+async function studyHome() {
+  const st = await studyState(), now = Date.now();
+  const due = ALL_CARDS.filter(c => isDue(st, c.id, now)).length;
+  const fresh = ALL_CARDS.filter(c => !st[c.id]).length;
+  const learned = ALL_CARDS.filter(c => isLearned(st, c.id)).length;
+  page('study', 'Study', `
+    <div class="card stat-card">
+      <p class="stat-label">Today</p>
+      <p class="stat">${due ? `${due} to review` : fresh ? `${Math.min(10, fresh)} new cards` : 'All caught up'}</p>
+      <p class="stat-sub">${learned} of ${ALL_CARDS.length} cards learned</p>
+      <div class="progress"><i style="width:${learned / ALL_CARDS.length * 100}%"></i></div>
+      ${due || fresh ? '<a class="btn wide" href="#/study/go">Study 10 cards</a>' : ''}
+    </div>
+    <h2 class="day">Decks</h2>
+    <div class="links" role="navigation" aria-label="Decks">${DECKS.map(d => `<a href="#/study/deck/${d.id}"><span>${esc(d.title)}</span>
+      <span class="count">${d.cards.filter(c => isLearned(st, c.id)).length}/${d.cards.length}</span></a>`).join('')}</div>
+    <p class="muted center"><small>Cards you get right come back after 1, 3, 7, 14 and 30 days. Ones you miss come straight back.</small></p>`);
+}
+
+async function deckView(id) {
+  const d = DECKS.find(x => x.id === id);
+  if (!d) return go('#/study');
+  const st = await studyState();
+  page('study', d.title, `
+    <p class="muted">${esc(d.note)}</p>
+    <div class="card"><dl class="ref">${d.cards.map(c => `<dt>${esc(c.front)}${isLearned(st, c.id) ? ' <span class="badge pass">Learned</span>' : ''}</dt><dd>${esc(c.back)}</dd>`).join('')}</dl></div>
+    <div class="cta-bar"><a class="btn" href="#/study/go/${d.id}">Study this deck</a></div>`, { back: '#/study' });
+}
+
+async function studySession(deckId) {
+  const deck = deckId && DECKS.find(x => x.id === deckId);
+  let st = await studyState();
+  const pool = deck ? deck.cards : ALL_CARDS;
+  let queue = pickSession(pool, st, Date.now(), 10);
+  if (!queue.length && deck) queue = [...deck.cards].sort(() => Math.random() - 0.5).slice(0, 10); // all learned: practise anyway
+  if (!queue.length) return go('#/study');
+  const missedOnce = new Set();
+  let i = 0, right = 0, again = 0;
+  const back = deck ? `#/study/deck/${deck.id}` : '#/study';
+
+  page('study', deck ? deck.title : 'Study', `
+    <p class="step-count" id="count"></p>
+    <button type="button" class="flash" id="flash" aria-live="polite"></button>
+    <div class="cook-nav" id="nav"></div>`, { back });
+  const flash = document.getElementById('flash'), nav = document.getElementById('nav'), count = document.getElementById('count');
+  const show = revealed => {
+    const c = queue[i];
+    count.textContent = `Card ${i + 1} of ${queue.length}`;
+    flash.innerHTML = `<span class="flash-deck">${esc(DECKS.find(x => x.id === c.deck).title)}</span>
+      <span class="flash-front">${esc(c.front)}</span>
+      ${revealed ? `<span class="flash-back">${esc(c.back)}</span>` : '<span class="flash-hint">Tap to show the answer</span>'}`;
+    flash.disabled = revealed;
+    nav.className = `cook-nav${revealed ? '' : ' single'}`;
+    nav.innerHTML = revealed ? '<button type="button" class="ghost" id="again">Again</button><button type="button" id="got">Got it</button>'
+      : '<button type="button" id="reveal">Show answer</button>';
+  };
+  const answer = async gotIt => {
+    const c = queue[i];
+    // A card missed earlier in this session restarts at box 1 even if you get it on the retry: see it again tomorrow
+    st = review(gotIt && missedOnce.has(c.id) ? { ...st, [c.id]: { ...st[c.id], box: 0 } } : st, c.id, gotIt);
+    await db.put('settings', { id: 'study', cards: st });
+    if (gotIt) right++; else { again++; if (!missedOnce.has(c.id)) { missedOnce.add(c.id); queue.push(c); } }
+    i++;
+    if (i < queue.length) return show(false);
+    count.textContent = 'Done';
+    flash.disabled = true;
+    flash.innerHTML = `<span class="flash-deck">Session complete</span><span class="flash-front">${right} got it</span>
+      <span class="flash-back">${again ? `${again} to go again. They'll come back soon.` : 'Nothing missed.'}</span>`;
+    nav.className = 'cook-nav single';
+    nav.innerHTML = `<a class="btn" href="${back}">Done</a>`;
+  };
+  flash.onclick = () => show(true);
+  nav.addEventListener('click', e => {
+    if (e.target.id === 'reveal') show(true);
+    if (e.target.id === 'again') answer(false);
+    if (e.target.id === 'got') answer(true);
+  });
+  show(false);
 }
 
 // ---------- Scaling: by portions, from an ingredient you have, baker's % ----------
@@ -1426,7 +1511,7 @@ async function settingsView() {
     </form>
     <div class="card"><h2>Invite classmates</h2><p class="muted">Pinch is free. Share the link. Everyone gets their own private recipe book.</p>
       <button type="button" class="ghost" id="invite">Share Pinch</button> <span id="inviteMsg" class="muted"></span></div>
-    <p class="muted center"><small>Pinch v14</small></p>`);
+    <p class="muted center"><small>Pinch v15</small></p>`);
 
   const acct = document.getElementById('acct');
   drawAccount = () => {
@@ -1631,6 +1716,9 @@ const routes = [
   [/^#\/attempt\/([^/]+)\/edit$/, id => attemptEdit(null, id)],
   [/^#\/calc$/, calcView],
   [/^#\/timers$/, timersView],
+  [/^#\/study$/, studyHome],
+  [/^#\/study\/deck\/([^/]+)$/, deckView],
+  [/^#\/study\/go(?:\/([^/]+))?$/, id => studySession(id === 'undefined' ? null : id)],
   [/^#\/pantry$/, pantryList],
   [/^#\/order$/, orderView],
   [/^#\/pantry\/import$/, importPrices],

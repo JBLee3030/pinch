@@ -56,6 +56,9 @@ I built Pinch while studying Commercial Cookery and Kitchen Management in Melbou
 - Allergen chart across all recipes (Australian mandatory allergens)
 - Food safety temperature log: fridge, freezer, deliveries, hot holding, cooking and 2-stage cooling (60 → 21 °C within 2 h → 5 °C within 6 h), each marked PASS / FAIL / OPEN with corrective actions
 
+**Study**
+- Reference decks with flash cards: knife cuts, food safety temperatures (FSANZ), steak doneness, mother sauces, ratios and kitchen terms; spaced repetition (1, 3, 7, 14, 30 days), progress synced
+
 **Career**
 - Log today's service in two taps (venue, station, hours and the current service filled in)
 - Service log for training-kitchen service periods and work shifts (station, hours, dishes, chef feedback) with progress toward the course requirement
@@ -89,6 +92,7 @@ Mobile-first and Toss-inspired: grey canvas, flat white cards, the key number bi
 index.html   app shell and tab bar
 app.js       screens and routing
 calc.js      costing, ordering and food safety rules (pure, tested)
+study.js     reference decks and spaced repetition (pure, tested)
 parse.js     pasted recipes and supplier price lists (pure, tested)
 db.js        IndexedDB storage, change tracking, backup
 sync.js      optional Supabase auth and sync

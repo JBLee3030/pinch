@@ -523,3 +523,20 @@ fieldset.rating:has(input[value="4"]:checked) label:nth-of-type(-n+4) svg,
 fieldset.rating:has(input[value="5"]:checked) label:nth-of-type(-n+5) svg { fill: var(--accent); stroke: var(--accent); }
 .preset-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--s2); }
 .preset-grid button { width: 100%; }
+
+/* Study */
+.links .count { margin-left: auto; margin-right: var(--s3); font: 500 14px/1 var(--font); color: var(--text-3); }
+dl.ref { margin: 0; }
+dl.ref dt { font: var(--t-row); margin-top: var(--s4); }
+dl.ref dt:first-child { margin-top: 0; }
+dl.ref dd { margin: var(--s1) 0 0; color: var(--text-2); }
+.flash { display: flex; flex-direction: column; justify-content: center; gap: var(--s3); width: 100%; min-height: calc(100dvh - 300px); padding: var(--s6);
+  border-radius: var(--r-card); background: var(--surface); color: var(--text); text-align: left; white-space: normal; transform: none; filter: none; }
+.flash:active { transform: none; filter: none; }
+.flash:disabled { opacity: 1; cursor: default; }
+.flash-deck { font: 600 14px/1.3 var(--font); color: var(--accent); }
+.flash-front { font: 700 30px/1.25 var(--font); letter-spacing: -.02em; }
+.flash-back { font: 500 20px/1.45 var(--font); color: var(--text-2); }
+.flash-hint { font: var(--t-sub); color: var(--text-3); }
+.cook-nav.single { grid-template-columns: 1fr; }
+.cook-nav a.btn { display: flex; min-height: var(--h-lg); font-size: 17px; border-radius: 16px; }
