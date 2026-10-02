@@ -42,6 +42,8 @@ I built Pinch while studying Commercial Cookery and Kitchen Management in Melbou
 - Costed standard recipe card, printable to A4 / PDF
 - Practice log per recipe: rating, photo, how it went and what to change next time; the last note shows when you start cooking, and finishing cooking mode asks how it went
 - Scale three ways: by portions, from an ingredient you have ("3 kg mince makes 37 portions"), or by baker's percentage
+- Kitchen timers without a recipe (presets and custom), running in the background across screens
+- Find recipes by ingredient: search matches ingredient names, and each Pantry item lists the recipes that use it
 - Kitchen calculator: cups and spoons to grams per ingredient (Australian or US measures), °F/°C with fan-forced, oz/lb/fl oz
 - Cooking mode: one big step at a time, timers found in the method ("simmer 45 min"), a scaled ingredient checklist, and the screen kept awake
 - Import from a link: paste any recipe page URL (schema.org Recipe) to fill name, ingredients, method, servings and photo, with the source kept

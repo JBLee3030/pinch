@@ -78,10 +78,10 @@ async function recipeList() {
   const recs = toMap(recipes);
   const cats = [...new Set(recipes.map(r => r.category).filter(Boolean))].sort();
   page('recipes', 'Recipes', recipes.length ? `
-    <div class="bar"><input type="search" id="q" placeholder="Search recipes" aria-label="Search recipes">
+    <div class="bar"><input type="search" id="q" placeholder="Search recipes or ingredients" aria-label="Search recipes or ingredients">
       <select id="cat" aria-label="Category"><option value="">All</option>${opts(cats)}</select></div>
-    <div class="links" role="navigation" aria-label="Recipe tools"><a href="#/allergens">Allergen chart</a><a href="#/calc">Kitchen calculator</a></div>
-    <ul class="list">${recipes.map(r => `<li data-q="${esc(r.name.toLowerCase())}" data-cat="${esc(r.category)}"><a href="#/recipe/${esc(r.id)}">
+    <div class="links" role="navigation" aria-label="Recipe tools"><a href="#/allergens">Allergen chart</a><a href="#/calc">Kitchen calculator</a><a href="#/timers">Timers</a></div>
+    <ul class="list">${recipes.map(r => `<li data-q="${esc([r.name, ...(r.items ?? []).map(it => it.recipeId ? recs.get(it.recipeId)?.name : ings.get(it.ingredientId)?.name)].filter(Boolean).join(' ').toLowerCase())}" data-cat="${esc(r.category)}"><a href="#/recipe/${esc(r.id)}">
       ${r.photo ? `<img src="${esc(r.photo)}" alt="">` : '<span class="ph" aria-hidden="true"></span>'}
       <div class="grow"><b>${esc(r.name)}</b><small>${esc(r.category || 'Uncategorised')}</small></div>
       <span class="trail">${costLine(recipeCost(r, ings, recs))}</span></a></li>`).join('')}</ul>`
@@ -485,6 +485,36 @@ async function attemptEdit(recipeId, attemptId) {
   });
 }
 
+// ---------- Kitchen timers (no recipe needed) ----------
+
+async function timersView() {
+  const PRESETS = [1, 3, 5, 10, 15, 30];
+  page('recipes', 'Timers', `
+    <div id="cookTimers" aria-live="polite"></div>
+    <div class="card"><h2>Quick start</h2>
+      <div class="preset-grid">${PRESETS.map(m => `<button type="button" class="ghost" data-min="${m}">${m} min</button>`).join('')}</div></div>
+    <form class="card" id="tf">
+      <h2>Custom</h2>
+      <label>Name <small>(optional)</small><input name="label" placeholder="e.g. Stock, Bread proof" autocomplete="off"></label>
+      <div class="row2"><label>Minutes<input name="min" type="number" min="0" step="1" inputmode="numeric" placeholder="0"></label>
+        <label>Seconds<input name="sec" type="number" min="0" max="59" step="1" inputmode="numeric" placeholder="0"></label></div>
+      <button type="submit">Start timer</button>
+    </form>
+    <p class="muted center"><small>Timers keep running while you use the rest of Pinch. Keep the app open: a locked phone can't ring.</small></p>`, { back: '#/recipes' });
+  document.querySelector('.preset-grid').addEventListener('click', e => {
+    const m = Number(e.target.closest('[data-min]')?.dataset.min);
+    if (m) startTimer(`${m} min`, m * 60, null);
+  });
+  const f = document.getElementById('tf');
+  f.onsubmit = e => {
+    e.preventDefault();
+    const secs = (num(f.min.value) || 0) * 60 + (num(f.sec.value) || 0);
+    if (!(secs > 0)) { f.min.focus(); return; }
+    startTimer(f.label.value.trim() || fmtDuration(secs), secs, null);
+    f.reset();
+  };
+}
+
 // ---------- Scaling: by portions, from an ingredient you have, baker's % ----------
 
 async function scaleView(id) {
@@ -684,7 +714,7 @@ function drawTimers() {
   const pill = document.getElementById('timerPill'), next = timers.find(t => !t.done) ?? timers[0];
   pill.hidden = !next || !!box;
   if (next && !box) {
-    pill.href = `#/recipe/${encodeURIComponent(next.recipeId)}/cook`;
+    pill.href = next.recipeId ? `#/recipe/${encodeURIComponent(next.recipeId)}/cook` : '#/timers';
     pill.textContent = next.done ? `${next.label}: done` : `${next.label} ${clock(next.end - Date.now())}`;
     pill.classList.toggle('done', next.done);
   }
@@ -818,6 +848,7 @@ async function ingredientEdit(id) {
   const isNew = id === 'new';
   const i = isNew ? { id: uid(), unit: 'kg', yieldPct: 100, allergens: [] } : await db.get('ingredients', id);
   if (!i) return go('#/pantry');
+  const usedIn = isNew ? [] : (await db.all('recipes')).filter(r => r.items?.some(it => it.ingredientId === i.id)).sort(byName);
   page('pantry', isNew ? 'New ingredient' : 'Edit ingredient', `<form id="f">
     <label>Name<input name="name" required value="${esc(i.name)}"></label>
     <div class="row2">
@@ -828,6 +859,9 @@ async function ingredientEdit(id) {
     ${isNew ? '' : `<p><small>${i.lastYieldTest ? `Last yield test ${esc(new Date(i.lastYieldTest.date + 'T00:00').toLocaleDateString('en-AU'))}: ${pct(i.lastYieldTest.yieldPct)}. ` : ''}<a href="#/yield/${esc(i.id)}">Run a yield test</a></small></p>`}
     <h2>Allergens</h2>
     <div class="checks">${ALLERGENS.map(a => `<label><input type="checkbox" name="allergens" value="${a}" ${i.allergens?.includes(a) ? 'checked' : ''}> ${a}</label>`).join('')}</div>
+    ${isNew ? '' : `<h2 style="margin-top:24px">Used in</h2>${usedIn.length
+      ? `<div class="links" role="navigation" aria-label="Recipes using ${esc(i.name)}">${usedIn.map(r => `<a href="#/recipe/${esc(r.id)}">${esc(r.name)}</a>`).join('')}</div>`
+      : '<p class="muted">Not used in any recipe yet.</p>'}`}
     <div class="actions"><button type="submit">Save</button>${isNew ? '' : '<button type="button" class="danger" id="del">Delete</button>'}</div>
   </form>`, { back: '#/pantry' });
 
@@ -1392,7 +1426,7 @@ async function settingsView() {
     </form>
     <div class="card"><h2>Invite classmates</h2><p class="muted">Pinch is free. Share the link. Everyone gets their own private recipe book.</p>
       <button type="button" class="ghost" id="invite">Share Pinch</button> <span id="inviteMsg" class="muted"></span></div>
-    <p class="muted center"><small>Pinch v13</small></p>`);
+    <p class="muted center"><small>Pinch v14</small></p>`);
 
   const acct = document.getElementById('acct');
   drawAccount = () => {
@@ -1596,6 +1630,7 @@ const routes = [
   [/^#\/recipe\/([^/]+)\/attempt$/, id => attemptEdit(id, null)],
   [/^#\/attempt\/([^/]+)\/edit$/, id => attemptEdit(null, id)],
   [/^#\/calc$/, calcView],
+  [/^#\/timers$/, timersView],
   [/^#\/pantry$/, pantryList],
   [/^#\/order$/, orderView],
   [/^#\/pantry\/import$/, importPrices],

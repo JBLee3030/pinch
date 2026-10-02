@@ -521,3 +521,5 @@ fieldset.rating:has(input[value="2"]:checked) label:nth-of-type(-n+2) svg,
 fieldset.rating:has(input[value="3"]:checked) label:nth-of-type(-n+3) svg,
 fieldset.rating:has(input[value="4"]:checked) label:nth-of-type(-n+4) svg,
 fieldset.rating:has(input[value="5"]:checked) label:nth-of-type(-n+5) svg { fill: var(--accent); stroke: var(--accent); }
+.preset-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--s2); }
+.preset-grid button { width: 100%; }
