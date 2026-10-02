@@ -46,6 +46,12 @@ function page(tab, title, body, { back, action = '' } = {}) {
   window.scrollTo(0, 0);
   drawTimers(); // running kitchen timers follow you to other screens
 }
+const STAR = '<path d="M12 17.75l-6.172 3.245l1.179 -6.873l-5 -4.867l6.9 -1l3.086 -6.253l3.086 6.253l6.9 1l-5 4.867l1.179 6.873z"/>';
+const stars = n => `<span class="stars" role="img" aria-label="${n ? `${n} out of 5` : 'Not rated'}">${[1, 2, 3, 4, 5].map(i =>
+  `<svg viewBox="0 0 24 24" aria-hidden="true" class="${i <= Math.round(n || 0) ? 'on' : ''}">${STAR}</svg>`).join('')}</span>`;
+const dateLabel = d => new Date(d + 'T00:00').toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' });
+const attemptsFor = async id => (await db.all('attempts')).filter(a => a.recipeId === id)
+  .sort((a, b) => b.date.localeCompare(a.date) || (b.createdAt ?? 0) - (a.createdAt ?? 0));
 const newBtn = href => `<a class="btn sm tint" href="${href}">${ICON.plus}New</a>`;
 
 async function readPhoto(file) {
@@ -104,9 +110,11 @@ async function recipeList() {
 async function recipeView(id) {
   const r = await db.get('recipes', id);
   if (!r) return go('#/recipes');
-  const [ings, s, recipes] = await Promise.all([ingMap(), settings(), db.all('recipes')]);
+  const [ings, s, recipes, attempts] = await Promise.all([ingMap(), settings(), db.all('recipes'), attemptsFor(id)]);
   const recs = toMap(recipes);
   const c = recipeCost(r, ings, recs);
+  const rated = attempts.filter(a => a.rating), avg = rated.length ? rated.reduce((n, a) => n + a.rating, 0) / rated.length : 0;
+  const lastNext = attempts.find(a => a.next)?.next;
   const target = r.targetCostPct || s.targetCostPct;
   const price = suggestedPrice(c.perPortion, target);
   const allergens = recipeAllergens(r, ings, recs);
@@ -141,6 +149,16 @@ async function recipeView(id) {
       <table><tbody id="items"></tbody></table>
       <a class="btn ghost wide" href="#/recipe/${esc(r.id)}/scale">Scale by an ingredient or baker's %</a></div>
     ${r.method ? `<div class="card"><h2>Method</h2><div class="method">${esc(r.method)}</div></div>` : ''}
+    <div class="card practice"><h2>Practice</h2>
+      ${attempts.length ? `
+        <p class="practice-sum">${stars(avg)}<span class="muted">${rated.length ? `${fmtQty(avg)} average, ` : ''}${attempts.length} attempt${attempts.length === 1 ? '' : 's'}</span></p>
+        ${lastNext ? `<p class="tip"><small><b>Next time:</b> ${esc(lastNext)}</small></p>` : ''}
+        <ul class="list">${attempts.map(a => `<li><a href="#/attempt/${esc(a.id)}/edit">
+          ${a.photo ? `<img src="${esc(a.photo)}" alt="">` : '<span class="ph" aria-hidden="true"></span>'}
+          <div class="grow"><b>${esc(dateLabel(a.date))}</b><small>${esc(a.notes || a.next || 'No notes')}</small></div>
+          <span class="trail">${stars(a.rating)}</span></a></li>`).join('')}</ul>`
+        : '<p class="muted">Each time you cook this, note how it went and what to change. Your notes show up when you start cooking.</p>'}
+      <a class="btn ghost wide" href="#/recipe/${esc(r.id)}/attempt">Log an attempt</a></div>
     <div class="cta-bar"><a class="btn" href="#/recipe/${esc(r.id)}/cook">Start cooking</a></div>`,
     { back: '#/recipes', action: `<a class="btn sm tint" href="#/recipe/${esc(r.id)}/edit">Edit</a>` });
 
@@ -414,6 +432,7 @@ async function recipeEdit(id) {
   document.getElementById('del')?.addEventListener('click', async () => {
     const n = recipes.filter(x => usesRecipe(x, r.id)).length;
     if (confirm(n ? `"${r.name}" is a sub-recipe in ${n} recipe(s). Their costing will show a warning. Delete anyway?` : `Delete "${r.name}"?`)) {
+      for (const a of await attemptsFor(r.id)) await db.del('attempts', a.id);
       await db.del('recipes', r.id); go('#/recipes');
     }
   });
@@ -431,6 +450,39 @@ async function allergenChart() {
     }).join('')}</tbody></table></div>
     <p><small>Based on Pantry data. Always check supplier labels.</small></p>`
     : '<p class="empty">No recipes yet.</p>', { back: '#/recipes' });
+}
+
+// ---------- Practice attempts ----------
+
+async function attemptEdit(recipeId, attemptId) {
+  const a = attemptId ? await db.get('attempts', attemptId) : { id: uid(), recipeId, date: today(), rating: null };
+  const r = a && await db.get('recipes', a.recipeId);
+  if (!a || !r) return go('#/recipes');
+  const isNew = !attemptId;
+  page('recipes', isNew ? 'How did it go?' : 'Attempt', `<form id="f">
+    <p class="muted">${esc(r.name)}</p>
+    <fieldset class="rating"><legend>Rating</legend>
+      ${[1, 2, 3, 4, 5].map(i => `<label><input type="radio" name="rating" value="${i}" ${i === a.rating ? 'checked' : ''}>
+        <svg viewBox="0 0 24 24" aria-hidden="true">${STAR}</svg><span class="sr-only">${i} star${i > 1 ? 's' : ''}</span></label>`).join('')}
+    </fieldset>
+    <label>Date<input name="date" type="date" required value="${esc(a.date)}"></label>
+    ${photoField(a.photo)}
+    <label>How did it go?<textarea name="notes" placeholder="Taste, texture, timing, what chef said…">${esc(a.notes)}</textarea></label>
+    <label>Next time<textarea name="next" placeholder="e.g. Salt the pasta water more. Pull the sauce off earlier.">${esc(a.next)}</textarea></label>
+    <div class="actions"><button type="submit">Save</button>${isNew ? '' : '<button type="button" class="danger" id="del">Delete</button>'}</div>
+  </form>`, { back: `#/recipe/${esc(r.id)}` });
+
+  const form = document.getElementById('f');
+  form.onsubmit = async e => {
+    e.preventDefault();
+    const fd = new FormData(form);
+    await db.put('attempts', { ...a, date: fd.get('date'), rating: num(fd.get('rating')), notes: fd.get('notes').trim(), next: fd.get('next').trim(),
+      photo: await photoValue(fd, a.photo), createdAt: a.createdAt ?? Date.now(), updatedAt: Date.now() });
+    go(`#/recipe/${r.id}`);
+  };
+  document.getElementById('del')?.addEventListener('click', async () => {
+    if (confirm('Delete this attempt?')) { await db.del('attempts', a.id); go(`#/recipe/${r.id}`); }
+  });
 }
 
 // ---------- Scaling: by portions, from an ingredient you have, baker's % ----------
@@ -657,7 +709,8 @@ document.addEventListener('visibilitychange', () => {
 async function cookView(id) {
   const r = await db.get('recipes', id);
   if (!r) return go('#/recipes');
-  const [ings, recipes] = await Promise.all([ingMap(), db.all('recipes')]);
+  const [ings, recipes, attempts] = await Promise.all([ingMap(), db.all('recipes'), attemptsFor(id)]);
+  const lastNext = attempts.find(a => a.next);
   const recs = toMap(recipes);
   const steps = splitSteps(r.method);
   let at = 0, portions = r.portions;
@@ -669,6 +722,7 @@ async function cookView(id) {
       <button type="button" role="tab" aria-selected="${steps.length ? 'false' : 'true'}" data-seg="ings">Ingredients (${(r.items ?? []).length})</button>
     </div>
     <div id="cookTimers" aria-live="polite"></div>
+    ${lastNext ? `<p class="tip"><small><b>Last time (${esc(dateLabel(lastNext.date))}), you noted:</b> ${esc(lastNext.next)}</small></p>` : ''}
     <section id="steps" ${steps.length ? '' : 'hidden'}></section>
     <section id="ings" ${steps.length ? 'hidden' : ''}>
       <div class="card">
@@ -702,7 +756,7 @@ async function cookView(id) {
     }).join('') || '<li class="muted">No ingredients yet.</li>';
   };
   const go_ = d => {
-    if (at + d >= steps.length) return go(`#/recipe/${r.id}`); // Finish
+    if (at + d >= steps.length) return go(`#/recipe/${r.id}/attempt`); // Finish: how did it go?
     at = Math.max(0, at + d);
     drawStep();
     window.scrollTo(0, 0);
@@ -1338,7 +1392,7 @@ async function settingsView() {
     </form>
     <div class="card"><h2>Invite classmates</h2><p class="muted">Pinch is free. Share the link. Everyone gets their own private recipe book.</p>
       <button type="button" class="ghost" id="invite">Share Pinch</button> <span id="inviteMsg" class="muted"></span></div>
-    <p class="muted center"><small>Pinch v12</small></p>`);
+    <p class="muted center"><small>Pinch v13</small></p>`);
 
   const acct = document.getElementById('acct');
   drawAccount = () => {
@@ -1518,6 +1572,10 @@ async function loadDemo() {
   await T('d-t5', 1, 'hot_hold', 'Bain-marie, ragù', 67);
   await db.put('temps', { id: 'd-t6', type: 'cooling', item: 'Beef ragù (10 L)', at: at(2.5), temp: null, action: '', note: '',
     start: { at: at(2.5), temp: 63 }, stage1: { at: at(0.8), temp: 19 }, stage2: { at: '', temp: null }, createdAt: t });
+  await db.put('attempts', { id: 'd-a1', recipeId: 's-tag', date: day(12), rating: 3, photo: DEMO_ART.tag, createdAt: t - 12,
+    notes: 'Pasta slightly overcooked, sauce a bit thin.', next: 'Pull the pasta at 90 seconds and finish it in the sauce.' });
+  await db.put('attempts', { id: 'd-a2', recipeId: 's-tag', date: day(3), rating: 4, photo: DEMO_ART.tag, createdAt: t - 3,
+    notes: 'Much better texture. Chef liked the gloss on the sauce.', next: 'Season the pasta water more; it tasted flat.' });
   await db.put('settings', { ...(await settings()), id: 'settings', cookName: 'Demo Cook' });
   await db.put('settings', { id: 'orderPlan', rows: [{ recipeId: 's-tag', portions: 40 }, { recipeId: 's-pomo', portions: 10 }], onHand: { 's-tom': 5.5, 's-oni': 10 } });
   await db.put('settings', { id: 'portfolio', headline: 'Commis chef · Cert IV Kitchen Management', contact: 'demo@example.com',
@@ -1535,6 +1593,8 @@ const routes = [
   [/^#\/recipe\/([^/]+)\/card$/, recipeCard],
   [/^#\/recipe\/([^/]+)\/cook$/, cookView],
   [/^#\/recipe\/([^/]+)\/scale$/, scaleView],
+  [/^#\/recipe\/([^/]+)\/attempt$/, id => attemptEdit(id, null)],
+  [/^#\/attempt\/([^/]+)\/edit$/, id => attemptEdit(null, id)],
   [/^#\/calc$/, calcView],
   [/^#\/pantry$/, pantryList],
   [/^#\/order$/, orderView],

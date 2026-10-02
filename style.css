@@ -501,3 +501,23 @@ label.btn { margin: 0; color: var(--text); font: 600 16px/1 var(--font); }   /* 
 #cups .seg { margin-bottom: var(--s4); }
 #cupOut { margin: var(--s2) 0 var(--s1); }
 #scStat:empty { display: none; }
+
+/* Practice attempts */
+.stars { display: inline-flex; gap: 2px; vertical-align: middle; }
+.stars svg { width: 16px; height: 16px; stroke: var(--line); stroke-width: 1.5; fill: var(--line); }
+.stars svg.on { stroke: var(--accent); fill: var(--accent); }
+.practice-sum { display: flex; align-items: center; gap: var(--s2); }
+.card .list { background: none; padding: 0; margin: var(--s2) 0 0; }
+.card .list li a { padding-left: 0; padding-right: 0; }
+.card .list li + li a { border-top: 1px solid var(--line); }
+fieldset.rating { border: 0; padding: 0; margin: 0 0 var(--s4); display: flex; gap: var(--s1); }
+fieldset.rating legend { font: 600 14px/1.4 var(--font); color: var(--text-2); margin-bottom: var(--s2); padding: 0; }
+fieldset.rating label { margin: 0; display: grid; place-items: center; width: 52px; height: 52px; border-radius: var(--r-control); cursor: pointer; }
+fieldset.rating input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+fieldset.rating svg { width: 36px; height: 36px; fill: var(--surface); stroke: var(--text-3); stroke-width: 1.5; transition: fill var(--dur-press) var(--ease); }
+fieldset.rating label:has(input:focus-visible) { outline: 2px solid var(--accent); }
+fieldset.rating:has(input[value="1"]:checked) label:nth-of-type(-n+1) svg,
+fieldset.rating:has(input[value="2"]:checked) label:nth-of-type(-n+2) svg,
+fieldset.rating:has(input[value="3"]:checked) label:nth-of-type(-n+3) svg,
+fieldset.rating:has(input[value="4"]:checked) label:nth-of-type(-n+4) svg,
+fieldset.rating:has(input[value="5"]:checked) label:nth-of-type(-n+5) svg { fill: var(--accent); stroke: var(--accent); }

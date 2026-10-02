@@ -40,6 +40,7 @@ I built Pinch while studying Commercial Cookery and Kitchen Management in Melbou
 - Yield test: bought vs usable weight (and reusable trim) gives yield % and the real cost per usable kg, saved to the Pantry in one tap
 - Pantry of ingredient prices per kg / L / each with trim yield %; type a new ingredient straight into a recipe and price it later — missing prices are flagged, never counted as $0
 - Costed standard recipe card, printable to A4 / PDF
+- Practice log per recipe: rating, photo, how it went and what to change next time; the last note shows when you start cooking, and finishing cooking mode asks how it went
 - Scale three ways: by portions, from an ingredient you have ("3 kg mince makes 37 portions"), or by baker's percentage
 - Kitchen calculator: cups and spoons to grams per ingredient (Australian or US measures), °F/°C with fan-forced, oz/lb/fl oz
 - Cooking mode: one big step at a time, timers found in the method ("simmer 45 min"), a scaled ingredient checklist, and the screen kept awake
