@@ -4,7 +4,7 @@ import { remoteWins } from './db.js';
 import { DECKS, ALL_CARDS, review, pickSession, isDue, isLearned } from './study.js';
 import { extractRecipe, safeUrl } from './supabase/functions/recipe-import/index.js';
 import { parseIngredientLine as P, matchIngredient, parsePriceList, packUnit, splitSteps, findDurations, fmtDuration } from './parse.js';
-import { convert, recipeCost, suggestedPrice, actualCostPct, recipeAllergens, orderList, fmtAmount, tempStatus, yieldTest, convertFor, densityFor, MEASURES, scaleFromIngredient, itemGrams, bakersPercent, bakersBase, fToC, cToF } from './calc.js';
+import { convert, recipeCost, suggestedPrice, actualCostPct, recipeAllergens, orderList, fmtAmount, tempStatus, yieldTest, convertFor, densityFor, MEASURES, scaleFromIngredient, itemGrams, bakersPercent, bakersBase, fToC, cToF, prepBatches, niceAmount } from './calc.js';
 
 const close = (a, b) => assert.ok(Math.abs(a - b) < 1e-9, `${a} != ${b}`);
 
@@ -342,5 +342,35 @@ assert.equal(remoteWins({}, 1), true);
   assert.ok(!s1.some(c => c.id === 'cuts-brunoise'));                              // not due yet, not new
   assert.equal(s1.length, 4);
 }
+
+// Prep list batches
+{
+  const stock = { id: 'stock', name: 'Stock', portions: 10, yieldQty: 5, yieldUnit: 'L', items: [] };
+  const sauce = { id: 'sauce', name: 'Sauce', portions: 10, yieldQty: 2, yieldUnit: 'L', items: [{ recipeId: 'stock', qty: 1, unit: 'L' }] };
+  const pasta = { id: 'pasta', name: 'Pasta', portions: 6, items: [] };
+  const dish = { id: 'dish', name: 'Dish', portions: 1, items: [{ recipeId: 'sauce', qty: 200, unit: 'ml' }, { recipeId: 'pasta', qty: 1, unit: 'portion' }] };
+  const R = new Map([stock, sauce, pasta, dish].map(x => [x.id, x]));
+  const { tasks, problems } = prepBatches([{ recipeId: 'dish', portions: 30 }, { recipeId: 'sauce', portions: 5 }], R);
+  const by = Object.fromEntries(tasks.map(t => [t.recipe.id, t]));
+  close(by.dish.factor, 30);
+  close(by.sauce.factor, 30 * 0.2 / 2 + 0.5);        // 6 L for dishes = 3 batches, plus half a batch on its own
+  close(by.stock.factor, 3.5 * 1 / 5);               // each sauce batch takes 1 L of a 5 L stock
+  close(by.pasta.factor, 30 / 6);
+  assert.deepEqual(tasks.map(t => t.recipe.id).slice(0, 1), ['stock']);   // deepest first
+  assert.equal(tasks.at(-1).recipe.id, 'dish');                            // the dish itself last
+  assert.deepEqual(problems, []);
+  const bad = prepBatches([{ recipeId: 'x', portions: 2 }], new Map([['x', { id: 'x', name: 'X', portions: 1, items: [{ recipeId: 'y', qty: 1, unit: 'kg' }] }],
+    ['y', { id: 'y', name: 'Y', portions: 1, items: [] }]]));
+  assert.deepEqual(bad.problems, ['Y: set its batch yield in kg, or use portions']);
+}
+
+// Readable scaled amounts
+assert.equal(niceAmount(10681.82, 'g'), '10.7 kg');
+assert.equal(niceAmount(0.04, 'kg'), '40 g');
+assert.equal(niceAmount(1250, 'ml'), '1.25 L');
+assert.equal(niceAmount(187.5, 'g'), '188 g');
+assert.equal(niceAmount(12.345, 'ml'), '12.3 ml');
+assert.equal(niceAmount(4.2666, 'each'), '4.27 each');
+assert.equal(niceAmount(2, 'portion'), '2 portion');
 
 console.log('calc ok');

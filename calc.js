@@ -274,3 +274,42 @@ export function bakersBase(recipe, ings, recs = new Map()) {
 // Oven and small conversions
 export const fToC = f => (f - 32) * 5 / 9;
 export const cToF = c => c * 9 / 5 + 32;
+
+// ---- Prep list: how many batches of each recipe (sub-recipes included) a service needs.
+// plan: [{ recipeId, portions }] -> tasks sorted so sub-recipes come before the dishes that use them.
+export function prepBatches(plan, recs) {
+  const need = new Map(), depth = new Map(), problems = [];
+  const visit = (r, factor, d, seen) => {
+    need.set(r.id, (need.get(r.id) ?? 0) + factor);
+    depth.set(r.id, Math.max(depth.get(r.id) ?? 0, d));
+    for (const it of r.items ?? []) {
+      if (!it.recipeId) continue;
+      const sub = recs.get(it.recipeId);
+      if (!sub) { problems.push('A sub-recipe was deleted'); continue; }
+      if (seen.has(sub.id)) { problems.push(`${sub.name}: circular sub-recipe`); continue; }
+      const qty = Number(it.qty) * factor;
+      const f = it.unit === 'portion' ? qty / Math.max(1, Number(sub.portions) || 1)
+        : sub.yieldQty > 0 ? convert(qty, it.unit, sub.yieldUnit) / sub.yieldQty : NaN;
+      if (!Number.isFinite(f)) { problems.push(`${sub.name}: set its batch yield in ${it.unit}, or use portions`); continue; }
+      visit(sub, f, d + 1, new Set([...seen, sub.id]));
+    }
+  };
+  for (const { recipeId, portions } of plan) {
+    const r = recs.get(recipeId);
+    if (r && portions > 0) visit(r, portions / Math.max(1, Number(r.portions) || 1), 0, new Set([r.id]));
+  }
+  const tasks = [...need].map(([id, factor]) => ({ recipe: recs.get(id), factor, depth: depth.get(id) }))
+    .sort((a, b) => b.depth - a.depth);
+  return { tasks, problems: [...new Set(problems)] };
+}
+
+// Readable amounts for scaled quantities: 10681.82 g -> "10.7 kg", 0.04 kg -> "40 g", 4.267 each -> "4.27 each".
+// Three significant-ish figures: >= 100 whole numbers, >= 10 one decimal, else two.
+export function niceParts(q, unit) {
+  let v = Number(q), u = unit;
+  if (u === 'g' && v >= 1000) { v /= 1000; u = 'kg'; } else if (u === 'kg' && v > 0 && v < 1) { v *= 1000; u = 'g'; }
+  if (u === 'ml' && v >= 1000) { v /= 1000; u = 'L'; } else if (u === 'L' && v > 0 && v < 1) { v *= 1000; u = 'ml'; }
+  const r = Math.abs(v) >= 100 ? Math.round(v) : Math.abs(v) >= 10 ? Math.round(v * 10) / 10 : Math.round(v * 100) / 100;
+  return [String(r), u];
+}
+export const niceAmount = (q, unit) => niceParts(q, unit).join(' ');

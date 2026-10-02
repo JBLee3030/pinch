@@ -2,7 +2,7 @@ import * as db from './db.js';
 import * as sync from './sync.js';
 import { DECKS, ALL_CARDS, review, pickSession, isDue, isLearned } from './study.js';
 import { parseIngredientLine, matchIngredient, parsePriceList, splitSteps, findDurations, fmtDuration } from './parse.js';
-import { ALLERGENS, PURCHASE_UNITS, UNITS, recipeCost, itemCost, suggestedPrice, actualCostPct, recipeAllergens, usesRecipe, hasPrice, orderList, fmtAmount, TEMP_CHECKS, tempStatus, yieldTest, MEASURES, convertFor, densityFor, scaleFromIngredient, bakersPercent, bakersBase, fToC, cToF, money, pct } from './calc.js';
+import { ALLERGENS, PURCHASE_UNITS, UNITS, recipeCost, itemCost, suggestedPrice, actualCostPct, recipeAllergens, usesRecipe, hasPrice, orderList, fmtAmount, TEMP_CHECKS, tempStatus, yieldTest, MEASURES, convertFor, densityFor, scaleFromIngredient, bakersPercent, bakersBase, fToC, cToF, prepBatches, niceAmount, niceParts, money, pct } from './calc.js';
 
 const view = document.getElementById('view');
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -81,7 +81,7 @@ async function recipeList() {
   page('recipes', 'Recipes', recipes.length ? `
     <div class="bar"><input type="search" id="q" placeholder="Search recipes or ingredients" aria-label="Search recipes or ingredients">
       <select id="cat" aria-label="Category"><option value="">All</option>${opts(cats)}</select></div>
-    <div class="links" role="navigation" aria-label="Recipe tools"><a href="#/allergens">Allergen chart</a><a href="#/calc">Kitchen calculator</a><a href="#/timers">Timers</a></div>
+    <div class="links" role="navigation" aria-label="Recipe tools"><a href="#/allergens">Allergen chart</a><a href="#/calc">Kitchen calculator</a><a href="#/timers">Timers</a><a href="#/prep">Prep list</a></div>
     <ul class="list">${recipes.map(r => `<li data-q="${esc([r.name, ...(r.items ?? []).map(it => it.recipeId ? recs.get(it.recipeId)?.name : ings.get(it.ingredientId)?.name)].filter(Boolean).join(' ').toLowerCase())}" data-cat="${esc(r.category)}"><a href="#/recipe/${esc(r.id)}">
       ${r.photo ? `<img src="${esc(r.photo)}" alt="">` : '<span class="ph" aria-hidden="true"></span>'}
       <div class="grow"><b>${esc(r.name)}</b><small>${esc(r.category || 'Uncategorised')}</small></div>
@@ -173,7 +173,7 @@ async function recipeView(id) {
       const sub = it.recipeId && recs.get(it.recipeId);
       const name = sub ? `<a href="#/recipe/${esc(sub.id)}">${esc(sub.name)}</a><br><small>Sub-recipe</small>`
         : esc(it.recipeId ? '(deleted)' : ings.get(it.ingredientId)?.name ?? '(deleted)');
-      return `<tr><td>${name}</td><td class="n">${fmtQty(it.qty * f)} ${esc(it.unit)}</td><td class="n muted">${money(cost)}</td></tr>`;
+      return `<tr><td>${name}</td><td class="n">${esc(niceAmount(it.qty * f, it.unit))}</td><td class="n muted">${money(cost)}</td></tr>`;
     }).join('') + `<tr><th>Total</th><td></td><td class="n"><b>${money(total)}</b></td></tr>`;
   };
   scale.addEventListener('input', drawItems);
@@ -213,7 +213,7 @@ async function recipeCard(id) {
         name = esc(ing?.name ?? '(deleted)');
         if (ing) { unitPrice = `${money(ing.price)}/${esc(ing.unit)}`; yieldPct = `${esc(ing.yieldPct)}%`; }
       }
-      return `<tr><td>${name}</td><td class="n">${fmtQty(it.qty * f)}</td><td>${esc(it.unit)}</td><td class="n">${unitPrice}</td><td class="n">${yieldPct}</td><td class="n">${money(cost)}</td></tr>`;
+      return `<tr><td>${name}</td><td class="n">${esc(niceParts(it.qty * f, it.unit)[0])}</td><td>${esc(niceParts(it.qty * f, it.unit)[1])}</td><td class="n">${unitPrice}</td><td class="n">${yieldPct}</td><td class="n">${money(cost)}</td></tr>`;
     }).join('');
 
     sheet.innerHTML = `
@@ -486,6 +486,91 @@ async function attemptEdit(recipeId, attemptId) {
   });
 }
 
+// ---------- Prep list for a service ----------
+// Sub-recipes first (stocks, sauces, doughs), longest jobs first within a level; each task lists
+// what to weigh out and the method as a checklist, with timer buttons. Ticks survive closing the app.
+
+async function prepView() {
+  const [recipes, ings, saved, orderPlan] = await Promise.all([db.all('recipes'), ingMap(), db.get('settings', 'prepPlan'), db.get('settings', 'orderPlan')]);
+  recipes.sort(byName);
+  const recs = toMap(recipes);
+  let done = new Set(saved?.done ?? []);
+  const planRow = (p = {}) => `<div class="plan-row">
+    <select name="recipe" aria-label="Recipe"><option value="">Choose recipe…</option>
+      ${recipes.map(r => `<option value="${esc(r.id)}" ${r.id === p.recipeId ? 'selected' : ''}>${esc(r.name)}</option>`).join('')}</select>
+    <input name="portions" type="number" min="0" step="1" inputmode="numeric" placeholder="Portions" aria-label="Portions" value="${esc(p.portions)}">
+    <button type="button" class="x" aria-label="Remove">×</button></div>`;
+  const hasOrder = orderPlan?.rows?.some(r => r.recipeId && r.portions > 0);
+  page('recipes', 'Prep list', recipes.length ? `
+    <div class="card no-print"><h2>What's on?</h2>
+      <div id="plan">${(saved?.rows?.length ? saved.rows : [{}]).map(planRow).join('')}</div>
+      <div class="actions"><button type="button" class="ghost" id="addPlan">+ Add recipe</button>${hasOrder ? '<button type="button" class="ghost" id="fromOrder">Use order list</button>' : ''}</div>
+    </div>
+    <div id="out"></div>` : '<p class="empty">Add recipes first.</p>', { back: '#/recipes' });
+  if (!recipes.length) return;
+
+  const planEl = document.getElementById('plan'), out = document.getElementById('out');
+  const readPlan = () => [...planEl.querySelectorAll('.plan-row')].map(el => ({ recipeId: el.querySelector('[name=recipe]').value, portions: num(el.querySelector('[name=portions]').value) }));
+  const save = () => db.put('settings', { id: 'prepPlan', rows: readPlan(), done: [...done] });
+  const nameOf = it => it.recipeId ? `${recs.get(it.recipeId)?.name ?? '(deleted)'}` : ings.get(it.ingredientId)?.name ?? '(deleted)';
+  const progress = () => {
+    const boxes = out.querySelectorAll('.checklist input'), ticked = [...boxes].filter(b => b.checked).length;
+    const el = out.querySelector('.prep-progress');
+    if (el) el.innerHTML = `<p class="stat-label">Progress</p><p class="stat">${ticked} / ${boxes.length}</p>
+      <div class="progress"><i style="width:${boxes.length ? ticked / boxes.length * 100 : 0}%"></i></div>`;
+  };
+
+  const draw = () => {
+    save();
+    const { tasks, problems } = prepBatches(readPlan(), recs);
+    if (!tasks.length) { out.innerHTML = '<p class="muted center">Choose what you’re cooking and how many portions.</p>'; return; }
+    // within each level, start the longest jobs first
+    const minutes = r => splitSteps(r.method).flatMap(findDurations).reduce((n, d) => n + d.seconds, 0);
+    tasks.sort((a, b) => b.depth - a.depth || minutes(b.recipe) - minutes(a.recipe));
+    out.innerHTML = `<div class="card stat-card prep-progress"></div>
+      ${problems.map(p => `<p class="warn">⚠ ${esc(p)}</p>`).join('')}
+      ${tasks.map(({ recipe: r, factor }, n) => {
+        const steps = splitSteps(r.method), total = minutes(r);
+        const makes = r.yieldQty ? `${fmtQty(r.yieldQty * factor)} ${esc(r.yieldUnit)} (${esc(portionsLabel(fmtQty(r.portions * factor)))})` : esc(portionsLabel(fmtQty(r.portions * factor)));
+        const box = (key, text, extra = '') => `<li><label class="${done.has(key) ? 'got' : ''}"><input type="checkbox" data-k="${esc(key)}" ${done.has(key) ? 'checked' : ''}>
+          <span class="grow">${text}</span>${extra}</label></li>`;
+        return `<div class="card task">
+          <h2><span class="task-n">${n + 1}</span>${esc(r.name)}</h2>
+          <p class="muted">Make ${makes}${total ? `, about ${esc(fmtDuration(total))} of cooking time` : ''}</p>
+          ${(r.items ?? []).length ? `<h3>Weigh out</h3><ul class="checklist">${r.items.map((it, i) => box(`${r.id}:i${i}`, esc(nameOf(it)) + (it.recipeId ? ' <small>(from above)</small>' : ''), `<b>${esc(niceAmount(it.qty * factor, it.unit))}</b>`)).join('')}</ul>` : ''}
+          ${steps.length ? `<h3>Method</h3><ul class="checklist steps">${steps.map((st, i) => box(`${r.id}:s${i}`, esc(st),
+            findDurations(st).map(d => `<button type="button" class="tint sm" data-timer="${d.seconds}" data-label="${esc(`${r.name}: ${fmtDuration(d.seconds)}`)}" data-rid="${esc(r.id)}">${esc(fmtDuration(d.seconds))}</button>`).join(''))).join('')}</ul>` : ''}
+        </div>`;
+      }).join('')}
+      <div class="actions no-print"><button type="button" class="ghost" id="print">Print</button><button type="button" class="ghost" id="resetDone">Clear ticks</button></div>`;
+    progress();
+  };
+
+  document.getElementById('addPlan').addEventListener('click', () => { planEl.insertAdjacentHTML('beforeend', planRow()); planEl.lastElementChild.querySelector('select').focus(); });
+  document.getElementById('fromOrder')?.addEventListener('click', () => {
+    planEl.innerHTML = orderPlan.rows.filter(r => r.recipeId).map(planRow).join('') || planRow();
+    draw();
+  });
+  planEl.addEventListener('click', e => { if (e.target.matches('.x')) { e.target.closest('.plan-row').remove(); draw(); } });
+  planEl.addEventListener('change', draw);
+  planEl.addEventListener('input', e => { if (e.target.name === 'portions') draw(); });
+  out.addEventListener('change', e => {
+    const k = e.target.dataset.k;
+    if (!k) return;
+    if (e.target.checked) done.add(k); else done.delete(k);
+    e.target.closest('label').classList.toggle('got', e.target.checked);
+    save();
+    progress();
+  });
+  out.addEventListener('click', e => {
+    const t = e.target.closest('[data-timer]');
+    if (t) { e.preventDefault(); startTimer(t.dataset.label, Number(t.dataset.timer), t.dataset.rid); }
+    if (e.target.id === 'print') window.print();
+    if (e.target.id === 'resetDone' && confirm('Clear all ticks?')) { done = new Set(); draw(); }
+  });
+  draw();
+}
+
 // ---------- Kitchen timers (no recipe needed) ----------
 
 async function timersView() {
@@ -637,7 +722,7 @@ async function scaleView(id) {
 
   const f = document.getElementById('sc'), stat = document.getElementById('scStat'), rowsEl = document.getElementById('scRows');
   const row = (name, amount, extra = '') => `<tr><td>${esc(name)}${extra ? `<br><small>${extra}</small>` : ''}</td><td class="n">${amount}</td></tr>`;
-  const scaled = factor => items.map(it => row(nameOf(it), `${fmtQty(it.qty * factor)} ${esc(it.unit)}`)).join('');
+  const scaled = factor => items.map(it => row(nameOf(it), esc(niceAmount(it.qty * factor, it.unit)))).join('');
   const draw = () => {
     document.querySelectorAll('[data-for]').forEach(el => { el.hidden = el.dataset.for !== mode; });
     if (mode === 'portions') {
@@ -663,7 +748,7 @@ async function scaleView(id) {
       stat.innerHTML = `<p class="stat-label">Total weight</p><p class="stat">${fmtAmount(b.total * factor / 1000, 'kg')}</p><p class="stat-sub">Base ${esc(nameOf(items[num(f.base.value)]))} = 100%</p>`;
       rowsEl.innerHTML = `<tr><th>Ingredient</th><th class="n">%</th><th class="n">Amount</th></tr>` + b.rows.map(({ i, grams, pct: p }) => {
         const it = items[i];
-        const amount = grams == null ? `${fmtQty(it.qty * factor)} ${esc(it.unit)}` : it.unit === 'each' ? `${fmtQty(it.qty * factor)} <small>(${Math.round(grams * factor)} g)</small>` : `${Math.round(grams * factor)} g`;
+        const amount = grams == null ? esc(niceAmount(it.qty * factor, it.unit)) : it.unit === 'each' ? `${fmtQty(it.qty * factor)} <small>(${esc(niceAmount(grams * factor, 'g'))})</small>` : esc(niceAmount(grams * factor, 'g'));
         return `<tr><td>${esc(nameOf(it))}</td><td class="n">${p == null ? '-' : `${fmtQty(p)}%`}</td><td class="n">${amount}</td></tr>`;
       }).join('') + `<tr><td colspan="3"><small>Volumes use ingredient densities; one egg counts as 50 g.</small></td></tr>`;
     }
@@ -867,7 +952,7 @@ async function cookView(id) {
     document.getElementById('checklist').innerHTML = (r.items ?? []).map((it, i) => {
       const name = it.recipeId ? `${recs.get(it.recipeId)?.name ?? '(deleted)'} (sub-recipe)` : ings.get(it.ingredientId)?.name ?? '(deleted)';
       return `<li><label class="${ticked.has(i) ? 'got' : ''}"><input type="checkbox" data-i="${i}" ${ticked.has(i) ? 'checked' : ''}>
-        <span class="grow">${esc(name)}</span><b>${fmtQty(it.qty * f)} ${esc(it.unit)}</b></label></li>`;
+        <span class="grow">${esc(name)}</span><b>${esc(niceAmount(it.qty * f, it.unit))}</b></label></li>`;
     }).join('') || '<li class="muted">No ingredients yet.</li>';
   };
   const go_ = d => {
@@ -1511,7 +1596,7 @@ async function settingsView() {
     </form>
     <div class="card"><h2>Invite classmates</h2><p class="muted">Pinch is free. Share the link. Everyone gets their own private recipe book.</p>
       <button type="button" class="ghost" id="invite">Share Pinch</button> <span id="inviteMsg" class="muted"></span></div>
-    <p class="muted center"><small>Pinch v15</small></p>`);
+    <p class="muted center"><small>Pinch v16</small></p>`);
 
   const acct = document.getElementById('acct');
   drawAccount = () => {
@@ -1716,6 +1801,7 @@ const routes = [
   [/^#\/attempt\/([^/]+)\/edit$/, id => attemptEdit(null, id)],
   [/^#\/calc$/, calcView],
   [/^#\/timers$/, timersView],
+  [/^#\/prep$/, prepView],
   [/^#\/study$/, studyHome],
   [/^#\/study\/deck\/([^/]+)$/, deckView],
   [/^#\/study\/go(?:\/([^/]+))?$/, id => studySession(id === 'undefined' ? null : id)],
