@@ -498,3 +498,6 @@ body.sub form .actions > button[type=submit] { grid-column: auto; }
 label.btn { margin: 0; color: var(--text); font: 600 16px/1 var(--font); }   /* a label styled as a button carries no field spacing */
 .actions { align-items: stretch; }
 .have-field input, table.order input.have { min-height: var(--h-md); }
+#cups .seg { margin-bottom: var(--s4); }
+#cupOut { margin: var(--s2) 0 var(--s1); }
+#scStat:empty { display: none; }

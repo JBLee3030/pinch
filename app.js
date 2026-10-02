@@ -1,7 +1,7 @@
 import * as db from './db.js';
 import * as sync from './sync.js';
 import { parseIngredientLine, matchIngredient, parsePriceList, splitSteps, findDurations, fmtDuration } from './parse.js';
-import { ALLERGENS, PURCHASE_UNITS, UNITS, recipeCost, itemCost, suggestedPrice, actualCostPct, recipeAllergens, usesRecipe, hasPrice, orderList, fmtAmount, TEMP_CHECKS, tempStatus, yieldTest, money, pct } from './calc.js';
+import { ALLERGENS, PURCHASE_UNITS, UNITS, recipeCost, itemCost, suggestedPrice, actualCostPct, recipeAllergens, usesRecipe, hasPrice, orderList, fmtAmount, TEMP_CHECKS, tempStatus, yieldTest, MEASURES, convertFor, densityFor, scaleFromIngredient, bakersPercent, bakersBase, fToC, cToF, money, pct } from './calc.js';
 
 const view = document.getElementById('view');
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -74,7 +74,7 @@ async function recipeList() {
   page('recipes', 'Recipes', recipes.length ? `
     <div class="bar"><input type="search" id="q" placeholder="Search recipes" aria-label="Search recipes">
       <select id="cat" aria-label="Category"><option value="">All</option>${opts(cats)}</select></div>
-    <div class="links" role="navigation" aria-label="Recipe tools"><a href="#/allergens">Allergen chart</a></div>
+    <div class="links" role="navigation" aria-label="Recipe tools"><a href="#/allergens">Allergen chart</a><a href="#/calc">Kitchen calculator</a></div>
     <ul class="list">${recipes.map(r => `<li data-q="${esc(r.name.toLowerCase())}" data-cat="${esc(r.category)}"><a href="#/recipe/${esc(r.id)}">
       ${r.photo ? `<img src="${esc(r.photo)}" alt="">` : '<span class="ph" aria-hidden="true"></span>'}
       <div class="grow"><b>${esc(r.name)}</b><small>${esc(r.category || 'Uncategorised')}</small></div>
@@ -138,7 +138,8 @@ async function recipeView(id) {
       <a class="btn ghost wide" href="#/recipe/${esc(r.id)}/card">Costed recipe card (PDF)</a></div>
     <div class="card"><h2>Ingredients</h2>
       <label class="inline">Scale to <input type="number" id="scale" min="1" step="1" inputmode="numeric" value="${esc(r.portions)}"> portions</label>
-      <table><tbody id="items"></tbody></table></div>
+      <table><tbody id="items"></tbody></table>
+      <a class="btn ghost wide" href="#/recipe/${esc(r.id)}/scale">Scale by an ingredient or baker's %</a></div>
     ${r.method ? `<div class="card"><h2>Method</h2><div class="method">${esc(r.method)}</div></div>` : ''}
     <div class="cta-bar"><a class="btn" href="#/recipe/${esc(r.id)}/cook">Start cooking</a></div>`,
     { back: '#/recipes', action: `<a class="btn sm tint" href="#/recipe/${esc(r.id)}/edit">Edit</a>` });
@@ -430,6 +431,153 @@ async function allergenChart() {
     }).join('')}</tbody></table></div>
     <p><small>Based on Pantry data. Always check supplier labels.</small></p>`
     : '<p class="empty">No recipes yet.</p>', { back: '#/recipes' });
+}
+
+// ---------- Scaling: by portions, from an ingredient you have, baker's % ----------
+
+async function scaleView(id) {
+  const r = await db.get('recipes', id);
+  if (!r) return go('#/recipes');
+  const [ings, recipes] = await Promise.all([ingMap(), db.all('recipes')]);
+  const recs = toMap(recipes);
+  const items = r.items ?? [];
+  const nameOf = it => it.recipeId ? `${recs.get(it.recipeId)?.name ?? '(deleted)'}` : ings.get(it.ingredientId)?.name ?? '(deleted)';
+  const baseIdx = bakersBase(r, ings, recs);
+  let mode = 'have';
+
+  page('recipes', 'Scale', `
+    <p class="muted">${esc(r.name)} · makes ${esc(portionsLabel(r.portions))}</p>
+    <div class="seg" role="tablist">
+      <button type="button" role="tab" data-mode="have" aria-selected="true">I have…</button>
+      <button type="button" role="tab" data-mode="portions" aria-selected="false">Portions</button>
+      <button type="button" role="tab" data-mode="bakers" aria-selected="false">Baker's %</button>
+    </div>
+    <form class="card" id="sc" onsubmit="return false">
+      <div data-for="have">
+        <label>Ingredient<select name="item">${items.map((it, i) => `<option value="${i}">${esc(nameOf(it))} (${fmtQty(it.qty)} ${esc(it.unit)})</option>`).join('')}</select></label>
+        <div class="row2"><label>I have<input name="have" type="number" min="0" step="any" inputmode="decimal" placeholder="e.g. 3"></label>
+          <label>Unit<select name="haveUnit">${opts(UNITS, items[0]?.unit)}</select></label></div>
+      </div>
+      <div data-for="portions" hidden><label>Portions<input name="portions" type="number" min="1" step="any" inputmode="decimal" value="${esc(r.portions)}"></label></div>
+      <div data-for="bakers" hidden>
+        ${baseIdx < 0 ? '<p class="muted">Baker\'s % needs weights (g or kg). Add them to the ingredients first.</p>' : `
+        <label>Base (100%)<select name="base">${items.map((it, i) => `<option value="${i}" ${i === baseIdx ? 'selected' : ''}>${esc(nameOf(it))}</option>`).join('')}</select></label>
+        <label>Base weight (g)<input name="baseG" type="number" min="0" step="any" inputmode="decimal"></label>`}
+      </div>
+    </form>
+    <div class="card stat-card" id="scStat"></div>
+    <div class="card"><table><tbody id="scRows"></tbody></table></div>`, { back: `#/recipe/${esc(r.id)}` });
+
+  const f = document.getElementById('sc'), stat = document.getElementById('scStat'), rowsEl = document.getElementById('scRows');
+  const row = (name, amount, extra = '') => `<tr><td>${esc(name)}${extra ? `<br><small>${extra}</small>` : ''}</td><td class="n">${amount}</td></tr>`;
+  const scaled = factor => items.map(it => row(nameOf(it), `${fmtQty(it.qty * factor)} ${esc(it.unit)}`)).join('');
+  const draw = () => {
+    document.querySelectorAll('[data-for]').forEach(el => { el.hidden = el.dataset.for !== mode; });
+    if (mode === 'portions') {
+      const p = num(f.portions.value) || r.portions, factor = p / r.portions;
+      stat.innerHTML = `<p class="stat-label">Scale</p><p class="stat">×${fmtQty(factor)}</p><p class="stat-sub">${esc(portionsLabel(fmtQty(p)))}</p>`;
+      rowsEl.innerHTML = scaled(factor);
+    } else if (mode === 'have') {
+      const it = items[num(f.item.value) ?? 0];
+      const res = scaleFromIngredient(r, num(f.item.value) ?? 0, num(f.have.value), f.haveUnit.value, ings, recs);
+      if (!res) {
+        stat.innerHTML = `<p class="stat-label">How far does it go?</p><p class="stat-sub">${it ? `Enter how much ${esc(nameOf(it))} you have.` : 'This recipe has no ingredients yet.'}${f.have.value && it ? ` <span class="warn-text">${esc(f.haveUnit.value)} doesn’t convert to ${esc(it.unit)} for this ingredient.</span>` : ''}</p>`;
+        rowsEl.innerHTML = scaled(1);
+        return;
+      }
+      stat.innerHTML = `<p class="stat-label">That makes</p><p class="stat">${esc(portionsLabel(fmtQty(res.portions)))}</p><p class="stat-sub">×${fmtQty(res.factor)} of the recipe. You’ll need:</p>`;
+      rowsEl.innerHTML = scaled(res.factor);
+    } else {
+      if (baseIdx < 0) { stat.innerHTML = ''; rowsEl.innerHTML = ''; return; }
+      const b = bakersPercent(r, ings, recs, num(f.base.value) ?? baseIdx);
+      if (!b) { stat.innerHTML = '<p class="stat-sub warn-text">Pick a base measured in g, kg or ml.</p>'; rowsEl.innerHTML = ''; return; }
+      if (!f.baseG.value) f.baseG.value = fmtQty(b.base);
+      const factor = (num(f.baseG.value) || b.base) / b.base;
+      stat.innerHTML = `<p class="stat-label">Total weight</p><p class="stat">${fmtAmount(b.total * factor / 1000, 'kg')}</p><p class="stat-sub">Base ${esc(nameOf(items[num(f.base.value)]))} = 100%</p>`;
+      rowsEl.innerHTML = `<tr><th>Ingredient</th><th class="n">%</th><th class="n">Amount</th></tr>` + b.rows.map(({ i, grams, pct: p }) => {
+        const it = items[i];
+        const amount = grams == null ? `${fmtQty(it.qty * factor)} ${esc(it.unit)}` : it.unit === 'each' ? `${fmtQty(it.qty * factor)} <small>(${Math.round(grams * factor)} g)</small>` : `${Math.round(grams * factor)} g`;
+        return `<tr><td>${esc(nameOf(it))}</td><td class="n">${p == null ? '-' : `${fmtQty(p)}%`}</td><td class="n">${amount}</td></tr>`;
+      }).join('') + `<tr><td colspan="3"><small>Volumes use ingredient densities; one egg counts as 50 g.</small></td></tr>`;
+    }
+  };
+  document.querySelector('.seg').addEventListener('click', e => {
+    const m = e.target.closest('[data-mode]')?.dataset.mode;
+    if (!m) return;
+    mode = m;
+    document.querySelectorAll('.seg [role=tab]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.mode === m)));
+    draw();
+  });
+  f.addEventListener('input', draw);
+  f.item.addEventListener('change', () => { f.haveUnit.value = items[num(f.item.value)]?.unit ?? 'g'; draw(); });
+  f.base?.addEventListener('change', () => { f.baseG.value = ''; draw(); });
+  draw();
+}
+
+// ---------- Kitchen calculator ----------
+
+const CALC_INGREDIENTS = ['Plain flour', 'Tipo 00 flour', 'Bread flour', 'Semolina', 'Caster sugar', 'White sugar', 'Brown sugar (packed)',
+  'Icing sugar', 'Butter', 'Cocoa powder', 'Rolled oats', 'Rice (uncooked)', 'Arborio rice', 'Breadcrumbs', 'Grated parmesan',
+  'Honey', 'Milk', 'Cream', 'Water', 'Olive oil', 'Table salt', 'Kosher salt'];
+
+async function calcView() {
+  let sys = 'au';
+  page('recipes', 'Kitchen calculator', `
+    <form class="card" id="cups" onsubmit="return false">
+      <h2>Cups and spoons to grams</h2>
+      <div class="seg" role="tablist" aria-label="Measures">
+        <button type="button" role="tab" data-sys="au" aria-selected="true">Australian</button>
+        <button type="button" role="tab" data-sys="us" aria-selected="false">US</button>
+      </div>
+      <div class="row2"><label>Amount<input name="amt" type="text" inputmode="decimal" value="1"></label>
+        <label>Measure<select name="unit"><option value="cup">cup</option><option value="tbsp">tbsp</option><option value="tsp">tsp</option></select></label></div>
+      <label>Ingredient<select name="what">${CALC_INGREDIENTS.map(n => `<option>${esc(n)}</option>`).join('')}</select></label>
+      <p class="stat" id="cupOut"></p><p class="stat-sub" id="cupSub"></p>
+    </form>
+    <form class="card" onsubmit="return false" data-pair="temp">
+      <h2>Oven temperature</h2>
+      <div class="row2"><label>°F<input data-k="f" type="number" inputmode="decimal" value="350"></label><label>°C<input data-k="c" type="number" inputmode="decimal"></label></div>
+      <p class="stat-sub" id="fan"></p>
+    </form>
+    <form class="card" onsubmit="return false" data-pair="weight">
+      <h2>Weight and volume</h2>
+      <div class="row2"><label>oz<input data-k="oz" type="number" inputmode="decimal"></label><label>g<input data-k="g" type="number" inputmode="decimal"></label></div>
+      <div class="row2"><label>lb<input data-k="lb" type="number" inputmode="decimal"></label><label>kg<input data-k="kg" type="number" inputmode="decimal"></label></div>
+      <div class="row2"><label>fl oz (US)<input data-k="floz" type="number" inputmode="decimal"></label><label>ml<input data-k="ml" type="number" inputmode="decimal"></label></div>
+    </form>
+    <p class="muted center"><small>Cup weights are approximate (spooned and levelled). Weigh when it matters.</small></p>`, { back: '#/recipes' });
+
+  // "1 1/2", "½", "0.5" all work in the amount box
+  const amount = v => { const p = parseIngredientLine(`${v} x`); return p?.qty ?? NaN; };
+  const cups = document.getElementById('cups');
+  const drawCups = () => {
+    const ml = amount(cups.amt.value) * MEASURES[sys][cups.unit.value];
+    const g = convertFor(ml, 'ml', 'g', cups.what.value);
+    document.getElementById('cupOut').textContent = Number.isFinite(g) ? `≈ ${g >= 100 ? Math.round(g) : fmtQty(g)} g` : '-';
+    document.getElementById('cupSub').textContent = Number.isFinite(ml) ? `${fmtQty(ml)} ml ${sys === 'au' ? 'Australian' : 'US'} measure, ${cups.what.value.toLowerCase()} at ${densityFor(cups.what.value)} g/ml` : 'Enter an amount, e.g. 1 1/2';
+  };
+  cups.addEventListener('input', drawCups);
+  cups.querySelector('.seg').addEventListener('click', e => {
+    const v = e.target.closest('[data-sys]')?.dataset.sys;
+    if (!v) return;
+    sys = v;
+    cups.querySelectorAll('[data-sys]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.sys === v)));
+    drawCups();
+  });
+
+  // Two-way pairs: typing in one box fills its partner
+  const PAIRS = { f: ['c', fToC], c: ['f', cToF], oz: ['g', x => x * 28.35], g: ['oz', x => x / 28.35], lb: ['kg', x => x * 0.4536], kg: ['lb', x => x / 0.4536],
+    floz: ['ml', x => x * 29.57], ml: ['floz', x => x / 29.57] };
+  const round = x => (Math.abs(x) >= 100 ? Math.round(x) : Math.round(x * 100) / 100);
+  document.querySelectorAll('[data-pair]').forEach(form => form.addEventListener('input', e => {
+    const k = e.target.dataset.k, [other, fn] = PAIRS[k] ?? [], v = num(e.target.value);
+    if (!other) return;
+    form.querySelector(`[data-k="${other}"]`).value = v == null ? '' : round(fn(v));
+    if (form.dataset.pair === 'temp') { const c = num(form.querySelector('[data-k=c]').value); document.getElementById('fan').textContent = c == null ? '' : `Fan-forced oven: about ${Math.round((c - 20) / 5) * 5} °C`; }
+  }));
+  const f = document.querySelector('[data-k=f]');
+  f.dispatchEvent(new Event('input', { bubbles: true }));
+  drawCups();
 }
 
 // ---------- Cooking mode ----------
@@ -1190,7 +1338,7 @@ async function settingsView() {
     </form>
     <div class="card"><h2>Invite classmates</h2><p class="muted">Pinch is free. Share the link. Everyone gets their own private recipe book.</p>
       <button type="button" class="ghost" id="invite">Share Pinch</button> <span id="inviteMsg" class="muted"></span></div>
-    <p class="muted center"><small>Pinch v11</small></p>`);
+    <p class="muted center"><small>Pinch v12</small></p>`);
 
   const acct = document.getElementById('acct');
   drawAccount = () => {
@@ -1386,6 +1534,8 @@ const routes = [
   [/^#\/recipe\/([^/]+)\/edit$/, recipeEdit],
   [/^#\/recipe\/([^/]+)\/card$/, recipeCard],
   [/^#\/recipe\/([^/]+)\/cook$/, cookView],
+  [/^#\/recipe\/([^/]+)\/scale$/, scaleView],
+  [/^#\/calc$/, calcView],
   [/^#\/pantry$/, pantryList],
   [/^#\/order$/, orderView],
   [/^#\/pantry\/import$/, importPrices],

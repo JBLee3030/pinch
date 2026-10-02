@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { remoteWins } from './db.js';
 import { extractRecipe, safeUrl } from './supabase/functions/recipe-import/index.js';
 import { parseIngredientLine as P, matchIngredient, parsePriceList, packUnit, splitSteps, findDurations, fmtDuration } from './parse.js';
-import { convert, recipeCost, suggestedPrice, actualCostPct, recipeAllergens, orderList, fmtAmount, tempStatus, yieldTest } from './calc.js';
+import { convert, recipeCost, suggestedPrice, actualCostPct, recipeAllergens, orderList, fmtAmount, tempStatus, yieldTest, convertFor, densityFor, MEASURES, scaleFromIngredient, itemGrams, bakersPercent, bakersBase, fToC, cToF } from './calc.js';
 
 const close = (a, b) => assert.ok(Math.abs(a - b) < 1e-9, `${a} != ${b}`);
 
@@ -20,7 +20,7 @@ const r = {
   items: [
     { ingredientId: 'onion', qty: 200, unit: 'g' }, // 0.2 * 3 / 0.9
     { ingredientId: 'flour', qty: 500, unit: 'g' }, // 1.00
-    { ingredientId: 'flour', qty: 1, unit: 'L' },   // bad unit
+    { ingredientId: 'onion', qty: 1, unit: 'L' },   // bad unit: no density for onion (flour by volume now converts)
     { ingredientId: 'gone', qty: 1, unit: 'kg' },   // deleted
   ],
 };
@@ -275,6 +275,46 @@ assert.equal(remoteWins({}, 1), true);
   assert.equal(yieldTest({ ap: 5, ep: 3, price: 18, trims: [{ qty: 2.5 }] }).overTrim, true);
   assert.equal(yieldTest({ ap: 0, ep: 0, price: 1 }), null);
   assert.equal(yieldTest({ ap: 2, ep: 3, price: 1 }), null); // can't get more than you bought
+}
+
+// Weight <-> volume by ingredient
+{
+  close(convertFor(250, 'ml', 'kg', 'Flour, tipo 00'), 0.1275);            // 1 AU cup of flour ~ 128 g
+  close(convertFor(MEASURES.us.cup, 'ml', 'g', 'Plain flour'), 236.6 * 0.51); // US cup ~ 121 g
+  close(convertFor(100, 'g', 'L', 'Olive oil, extra virgin'), 100 / 0.92 / 1000);
+  close(convertFor(1, 'kg', 'g', 'anything'), 1000);                       // same family: no density needed
+  assert.ok(Number.isNaN(convertFor(1, 'ml', 'kg', 'Mystery powder')));
+  assert.equal(densityFor('Brown sugar, packed'), 0.90);                   // specific beats 'sugar'
+  assert.equal(densityFor('Olive oil'), 0.92);
+  // costing now works for cups of flour priced per kg
+  const I = new Map([['f', { name: 'Flour, plain', unit: 'kg', price: 2, yieldPct: 100 }]]);
+  const c = recipeCost({ id: 'x', portions: 1, items: [{ ingredientId: 'f', qty: 500, unit: 'ml' }] }, I);
+  close(c.total, 0.5 * 0.51 * 2);
+  assert.deepEqual(c.problems, []);
+}
+
+// Scaling from an ingredient you have, baker's percentages
+{
+  const I = new Map([['mince', { name: 'Beef mince' }], ['flour', { name: 'Flour, tipo 00' }], ['egg', { name: 'Eggs, free range' }],
+    ['salt', { name: 'Salt' }], ['water', { name: 'Water' }]]);
+  const ragu = { portions: 10, items: [{ ingredientId: 'mince', qty: 800, unit: 'g' }] };
+  const s1 = scaleFromIngredient(ragu, 0, 3, 'kg', I);
+  close(s1.factor, 3.75);
+  close(s1.portions, 37.5);
+  assert.equal(scaleFromIngredient(ragu, 0, 3, 'L', I), null);             // no density for mince
+  const pasta = { portions: 6, items: [
+    { ingredientId: 'flour', qty: 600, unit: 'g' }, { ingredientId: 'egg', qty: 6, unit: 'each' },
+    { ingredientId: 'salt', qty: 1, unit: 'tsp' }, { ingredientId: 'water', qty: 30, unit: 'ml' }] };
+  assert.equal(bakersBase(pasta, I), 0);
+  const b = bakersPercent(pasta, I, new Map(), 0);
+  close(b.base, 600);
+  close(b.rows[1].pct, 50);                                                 // 6 eggs x 50 g = 300 g = 50%
+  assert.equal(b.rows[2].pct, null);                                         // 'tsp' isn't a stored unit
+  close(b.rows[3].pct, 5);                                                   // 30 ml water = 30 g
+  close(b.total, 600 + 300 + 30);
+  close(itemGrams({ ingredientId: 'flour', qty: 250, unit: 'ml' }, I), 127.5);
+  close(fToC(350), 530 / 3);
+  close(cToF(180), 356);
 }
 
 console.log('calc ok');

@@ -19,6 +19,38 @@ export function convert(qty, from, to) {
   return bf && bf === bt ? qty * f / t : NaN;
 }
 
+// ---- Weight <-> volume by ingredient (g per ml). Approximate: spooned, not packed, unless noted.
+// Specific names first; the first keyword found in the ingredient name wins.
+export const DENSITIES = [
+  ['icing sugar', 0.48], ['powdered sugar', 0.48], ['brown sugar', 0.90], ['caster sugar', 0.83], ['sugar', 0.84],
+  ['tipo 00', 0.51], ['00 flour', 0.51], ['bread flour', 0.51], ['self-raising', 0.51], ['self raising', 0.51], ['flour', 0.51],
+  ['semolina', 0.70], ['cocoa', 0.36], ['rolled oats', 0.38], ['oats', 0.38], ['panko', 0.25], ['breadcrumb', 0.47],
+  ['arborio', 0.82], ['rice', 0.78], ['butter', 0.96], ['honey', 1.42], ['golden syrup', 1.42], ['maple', 1.32],
+  ['oil', 0.92], ['cream', 1.0], ['milk', 1.03], ['yoghurt', 1.03], ['yogurt', 1.03], ['stock', 1.0], ['wine', 0.99],
+  ['vinegar', 1.01], ['water', 1.0], ['passata', 1.04], ['parmesan', 0.42], ['parmigiano', 0.42], ['pecorino', 0.42],
+  ['kosher salt', 0.57], ['salt flakes', 0.45], ['salt', 1.2], ['baking powder', 0.92], ['bicarb', 0.92], ['baking soda', 0.92],
+];
+export const densityFor = name => DENSITIES.find(([k]) => String(name ?? '').toLowerCase().includes(k))?.[1] ?? null;
+
+const MASS = { g: 1, kg: 1000 }, VOLUME = { ml: 1, L: 1000 };
+// Like convert(), but crosses weight and volume using the ingredient's density ("2 cups flour" priced per kg).
+export function convertFor(qty, from, to, name) {
+  const direct = convert(qty, from, to);
+  if (Number.isFinite(direct)) return direct;
+  const d = densityFor(name);
+  if (!d) return NaN;
+  if (VOLUME[from] && MASS[to]) return qty * VOLUME[from] * d / MASS[to];
+  if (MASS[from] && VOLUME[to]) return qty * MASS[from] / d / VOLUME[to];
+  return NaN;
+}
+
+// Cup and spoon sizes in ml
+export const MEASURES = { au: { cup: 250, tbsp: 20, tsp: 5 }, us: { cup: 236.6, tbsp: 14.8, tsp: 4.93 } };
+
+// Typical weight of one, for baker's percentages (whole egg without shell, 59 g egg)
+const EACH_GRAMS = [['yolk', 18], ['white', 32], ['egg', 50]];
+export const eachGrams = name => EACH_GRAMS.find(([k]) => String(name ?? '').toLowerCase().includes(k))?.[1] ?? null;
+
 // An item is either { ingredientId, qty, unit } or a sub-recipe { recipeId, qty, unit }.
 // Sub-recipe unit is 'portion', or any unit convertible to the sub-recipe's batch yield.
 // `seen` holds the recipe ids above this item, to stop circular sub-recipes.
@@ -40,7 +72,7 @@ export function itemCost(it, ings, recs = new Map(), seen = new Set()) {
   const ing = ings.get(it.ingredientId);
   if (!ing) return { cost: NaN, problems: ['An ingredient was deleted from Pantry'] };
   if (!hasPrice(ing)) return { cost: NaN, problems: [`Price missing: ${ing.name}`] };
-  const q = convert(qty, it.unit, ing.unit);
+  const q = convertFor(qty, it.unit, ing.unit, ing.name);
   if (!Number.isFinite(q)) return { cost: NaN, problems: [`${ing.name}: can't convert ${it.unit} to ${ing.unit}`] };
   return { cost: q * (Number(ing.price) || 0) / ((Number(ing.yieldPct) || 100) / 100), problems: [] };
 }
@@ -102,7 +134,7 @@ export function ingredientNeeds(recipe, factor, ings, recs, needs = new Map(), p
     }
     const ing = ings.get(it.ingredientId);
     if (!ing) { problems.push('An ingredient was deleted from Pantry'); continue; }
-    const q = convert(qty, it.unit, ing.unit);
+    const q = convertFor(qty, it.unit, ing.unit, ing.name);
     if (!Number.isFinite(q)) { problems.push(`${ing.name}: can't convert ${it.unit} to ${ing.unit}`); continue; }
     needs.set(it.ingredientId, (needs.get(it.ingredientId) ?? 0) + q);
   }
@@ -193,3 +225,52 @@ export function yieldTest({ ap, ep, price, trims = [] }) {
     overTrim: rest < -1e-9, // trims + EP weigh more than what was bought
   };
 }
+
+// ---- Scaling
+
+const itemName = (it, ings, recs) => (it.recipeId ? recs.get(it.recipeId)?.name : ings.get(it.ingredientId)?.name) ?? '';
+
+// "I have 3 kg of mince": how far does that go? -> { factor, portions }, or null if the units don't meet.
+export function scaleFromIngredient(recipe, index, haveQty, haveUnit, ings, recs = new Map()) {
+  const it = recipe.items?.[index];
+  if (!it || !(Number(it.qty) > 0) || !(Number(haveQty) > 0)) return null;
+  const have = convertFor(Number(haveQty), haveUnit, it.unit, itemName(it, ings, recs));
+  if (!Number.isFinite(have)) return null;
+  const factor = have / Number(it.qty);
+  return { factor, portions: (Number(recipe.portions) || 1) * factor };
+}
+
+// An item's weight in grams: weight units directly, volume via density (water if unknown), eggs by count.
+export function itemGrams(it, ings, recs = new Map()) {
+  const q = Number(it.qty), name = itemName(it, ings, recs);
+  if (MASS[it.unit]) return q * MASS[it.unit];
+  if (VOLUME[it.unit]) return q * VOLUME[it.unit] * (densityFor(name) ?? 1);
+  if (it.unit === 'each') { const g = eachGrams(name); return g ? q * g : null; }
+  return null;
+}
+
+// Baker's percentages against one base item (usually the flour): base = 100%.
+export function bakersPercent(recipe, ings, recs = new Map(), baseIndex) {
+  const grams = (recipe.items ?? []).map(it => itemGrams(it, ings, recs));
+  const base = grams[baseIndex];
+  if (!(base > 0)) return null;
+  return {
+    base,
+    rows: grams.map((g, i) => ({ i, grams: g, pct: g == null ? null : g / base * 100 })),
+    total: grams.reduce((n, g) => n + (g ?? 0), 0),
+  };
+}
+
+// The base for baker's %: the flour (or semolina) if there is one, else the heaviest item.
+export function bakersBase(recipe, ings, recs = new Map()) {
+  const items = recipe.items ?? [];
+  const flour = items.findIndex(it => /flour|semolina/i.test(itemName(it, ings, recs)) && itemGrams(it, ings, recs) > 0);
+  if (flour >= 0) return flour;
+  let best = -1, max = 0;
+  items.forEach((it, i) => { const g = itemGrams(it, ings, recs) ?? 0; if (g > max) { max = g; best = i; } });
+  return best;
+}
+
+// Oven and small conversions
+export const fToC = f => (f - 32) * 5 / 9;
+export const cToF = c => c * 9 / 5 + 32;
