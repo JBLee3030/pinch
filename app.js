@@ -2,7 +2,7 @@ import * as db from './db.js';
 import * as sync from './sync.js';
 import { DECKS, ALL_CARDS, review, pickSession, isDue, isLearned } from './study.js';
 import { parseIngredientLine, matchIngredient, parsePriceList, splitSteps, findDurations, fmtDuration } from './parse.js';
-import { ALLERGENS, PURCHASE_UNITS, UNITS, recipeCost, itemCost, suggestedPrice, actualCostPct, recipeAllergens, usesRecipe, hasPrice, orderList, fmtAmount, TEMP_CHECKS, tempStatus, yieldTest, MEASURES, convertFor, densityFor, scaleFromIngredient, bakersPercent, bakersBase, fToC, cToF, prepBatches, niceAmount, niceParts, withPriceHistory, costImpact, foodCostWatch, priceMoves, menuEngineering, MENU_CLASSES, daysUntil, examReadiness, money, pct } from './calc.js';
+import { ALLERGENS, PURCHASE_UNITS, UNITS, recipeCost, itemCost, suggestedPrice, actualCostPct, recipeAllergens, usesRecipe, hasPrice, orderList, fmtAmount, TEMP_CHECKS, tempStatus, yieldTest, MEASURES, convertFor, densityFor, scaleFromIngredient, bakersPercent, bakersBase, fToC, cToF, prepBatches, niceAmount, niceParts, withPriceHistory, costImpact, foodCostWatch, priceMoves, menuEngineering, MENU_CLASSES, daysUntil, examReadiness, stockValue, stockPeriods, WASTE_REASONS, wasteCost, wasteSummary, money, pct } from './calc.js';
 
 const view = document.getElementById('view');
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -1204,7 +1204,7 @@ async function pantryList() {
   page('pantry', 'Pantry', ings.length ? `
     ${news ? `<div class="card news"><h2>${esc(news.title ?? 'Prices updated')}</h2>
       ${news.impacts.length ? `<p class="muted">${news.impacts.length} recipe${news.impacts.length === 1 ? '' : 's'} changed cost:</p>${impactRows(news.impacts)}` : '<p class="muted">No recipe costs changed.</p>'}</div>` : ''}
-    <div class="links" role="navigation" aria-label="Pantry tools"><a href="#/order">Order list</a><a href="#/yield">Yield test</a><a href="#/pantry/import">Import prices</a><a href="#/costwatch">Food cost watch</a></div>
+    <div class="links" role="navigation" aria-label="Pantry tools"><a href="#/order">Order list</a><a href="#/yield">Yield test</a><a href="#/pantry/import">Import prices</a><a href="#/costwatch">Food cost watch</a><a href="#/stock">Stocktake</a><a href="#/waste">Waste log</a></div>
     ${missing.length ? `<div class="card"><h2>Needs price (${missing.length})</h2><div class="chips">${missing.map(i => `<a class="chip" href="#/ingredient/${esc(i.id)}/edit">${esc(i.name)}</a>`).join('')}</div></div>` : ''}
     <div class="bar"><input type="search" id="q" placeholder="Search ingredients" aria-label="Search ingredients"></div>
     <ul class="list">${ings.map(i => `<li data-q="${esc(i.name.toLowerCase())}"><a href="#/ingredient/${esc(i.id)}/edit">
@@ -1496,6 +1496,166 @@ async function orderView() {
     }
   });
   draw();
+}
+
+// ---------- Stocktake: count what's on the shelves, then actual food cost per period ----------
+
+const shortDate = d => new Date(d + 'T00:00').toLocaleDateString('en-AU', { day: 'numeric', month: 'short' });
+
+async function stockList() {
+  const [counts, waste, s, menus, ings, recipes] = await Promise.all([db.all('counts'), db.all('waste'), settings(), db.all('menus'), ingMap(), db.all('recipes')]);
+  counts.sort((a, b) => b.date.localeCompare(a.date));
+  const periods = stockPeriods(counts, waste), p = periods[0];
+  const pctFor = new Map(periods.map(x => [x.count.id, x.pct]));
+  const menu = p && menus.find(m => m.id === p.count.menuId);
+  const theory = menu ? menuEngineering(menu.items ?? [], ings, toMap(recipes)).foodCostPct : NaN;
+  page('pantry', 'Stocktake', `
+    ${p ? `<div class="card stat-card">
+      <p class="stat-label">Actual food cost, ${esc(shortDate(p.from))} to ${esc(shortDate(p.to))}</p>
+      <p class="stat ${p.pct > s.targetCostPct ? 'alert-text' : ''}">${Number.isFinite(p.pct) ? pct(p.pct) : 'Add sales'}</p>
+      <p class="stat-sub">Target <b>${pct(s.targetCostPct)}</b>${Number.isFinite(theory) ? ` · ${esc(menu.name)} costs <b>${pct(theory)}</b> on paper` : ''}</p>
+      <dl class="kv" style="margin:var(--s4) 0 0">
+        <dt>Opening stock</dt><dd>${money(p.opening)}</dd>
+        <dt>+ Purchases</dt><dd>${money(p.purchases)}</dd>
+        <dt>− Closing stock</dt><dd>${money(p.closing)}</dd>
+        <dt>= Food used</dt><dd>${money(p.used)}</dd>
+        <dt>Sales, ex GST</dt><dd>${p.sales ? money(p.sales) : '-'}</dd>
+        <dt>Waste logged</dt><dd>${money(p.waste)}${Number.isFinite(p.wastePct) && p.waste ? ` <small class="muted">(${pct(p.wastePct)} of used)</small>` : ''}</dd>
+      </dl></div>`
+    : counts.length ? '<div class="card"><p class="muted">Your first count is the opening stock. Count again at the end of the week (or period) and add purchases and sales to see your actual food cost.</p></div>' : ''}
+    ${counts.length ? `<h2 class="day">Counts</h2><ul class="list">${counts.map(c => { const v = stockValue(c.lines ?? []); return `<li><a href="#/stock/${esc(c.id)}">
+      <div class="grow"><b>${esc(dateLabel(c.date))}</b><small>${(c.lines ?? []).length} items${Number.isFinite(pctFor.get(c.id)) ? `, food cost ${pct(pctFor.get(c.id))}` : ''}${v.missing ? `, <span class="warn-text">${v.missing} without a price</span>` : ''}</small></div>
+      <span class="trail">${money(v.value)}<small>stock value</small></span></a></li>`; }).join('')}</ul>`
+    : '<div class="empty"><p>No stocktakes yet.</p><p>Count what\'s in the fridges, freezers and dry store. Pinch values it at your Pantry prices.</p></div>'}
+    <p class="muted center"><small>Actual food cost = (opening stock + purchases − closing stock) ÷ food sales. Compare it with what the recipes say it should be: the gap is waste, over-portioning or price changes.</small></p>
+    <div class="cta-bar"><a class="btn" href="#/stock/new">Count stock</a></div>`, { back: '#/pantry' });
+}
+
+async function stockCount(id) {
+  const isNew = id === 'new';
+  const [ingList, counts, menus] = await Promise.all([db.all('ingredients'), db.all('counts'), db.all('menus')]);
+  ingList.sort(byName);
+  const c = isNew ? { id: uid(), date: today(), lines: [] } : await db.get('counts', id);
+  if (!c) return go('#/stock');
+  const prev = counts.filter(x => x.id !== c.id && x.date < c.date).sort((a, b) => b.date.localeCompare(a.date))[0];
+  const was = new Map((c.lines ?? []).map(l => [l.ingredientId, l]));
+  const last = new Map((prev?.lines ?? []).map(l => [l.ingredientId, l.qty]));
+  // Every Pantry item, plus anything counted before and since deleted from the Pantry
+  const rows = [...ingList.map(i => ({ ingredientId: i.id, name: i.name, unit: i.unit, price: hasPrice(i) ? Number(i.price) : null, ...was.get(i.id) })),
+    ...(c.lines ?? []).filter(l => !ingList.some(i => i.id === l.ingredientId))];
+  page('pantry', isNew ? 'Count stock' : `Count, ${shortDate(c.date)}`, rows.length ? `
+    <div class="card stat-card"><p class="stat-label">Stock value</p><p class="stat" id="val"></p><p class="stat-sub" id="valSub"></p></div>
+    <form id="f">
+      <label>Date<input name="date" type="date" required value="${esc(c.date)}"></label>
+      <div class="bar"><input type="search" id="q" placeholder="Search ingredients" aria-label="Search ingredients"></div>
+      <div class="card"><ul class="order-rows">${rows.map((l, i) => `<li data-q="${esc(l.name.toLowerCase())}">
+        <div class="grow"><b>${esc(l.name)}</b><small>${l.price != null ? `${money(l.price)} per ${esc(l.unit)}` : '<span class="warn-text">No price</span>'}${last.has(l.ingredientId) ? `, last count ${fmtQty(last.get(l.ingredientId))}` : ''}</small>
+          <label class="have-field">Counted<input class="cnt" data-i="${i}" type="number" min="0" step="any" inputmode="decimal" placeholder="0" value="${esc(l.qty || '')}" aria-label="${esc(l.name)} counted in ${esc(l.unit)}"><span>${esc(l.unit)}</span></label></div></li>`).join('')}</ul></div>
+      ${prev ? `<h2>Since the last count (${esc(dateLabel(prev.date))})</h2>
+        <div class="row2"><label>Purchases ($)<input name="purchases" type="number" min="0" step="0.01" inputmode="decimal" placeholder="Invoices total" value="${esc(c.purchases)}"></label>
+          <label>Food sales ($)<input name="sales" type="number" min="0" step="0.01" inputmode="decimal" placeholder="Ex GST" value="${esc(c.sales)}"></label></div>
+        ${menus.length ? `<label>Compare with menu <small>(optional)</small><select name="menuId"><option value="">None</option>${menus.map(m => `<option value="${esc(m.id)}" ${m.id === c.menuId ? 'selected' : ''}>${esc(m.name)}</option>`).join('')}</select></label>` : ''}`
+        : '<p class="muted">This first count is your opening stock. From the next one, add purchases and sales to get your actual food cost.</p>'}
+      <p><small>Count in the purchase unit (kg, L, each). Values use today's Pantry prices and stay fixed once saved. Saving the latest count also fills On hand in the Order list.</small></p>
+      <div class="actions"><button type="submit">Save</button>${isNew ? '' : '<button type="button" class="danger" id="del">Delete</button>'}</div>
+    </form>` : '<div class="empty"><p>Add ingredients to the Pantry first.</p></div>', { back: '#/stock' });
+  const form = document.getElementById('f');
+  if (!form) return;
+  const read = () => rows.map((l, i) => ({ ...l, qty: num(form.querySelector(`.cnt[data-i="${i}"]`).value) })).filter(l => l.qty > 0);
+  const total = () => {
+    const lines = read(), v = stockValue(lines);
+    document.getElementById('val').textContent = money(v.value);
+    document.getElementById('valSub').innerHTML = `${lines.length} of ${rows.length} items counted${v.missing ? `, <span class="warn-text">${v.missing} without a price</span>` : ''}`;
+  };
+  form.addEventListener('input', e => { if (e.target.matches('.cnt')) total(); });
+  const q = document.getElementById('q');
+  q.addEventListener('input', () => form.querySelectorAll('.order-rows li').forEach(li => { li.hidden = !li.dataset.q.includes(q.value.toLowerCase()); }));
+  total();
+  form.onsubmit = async ev => {
+    ev.preventDefault();
+    const fd = new FormData(form), lines = read();
+    const next = { ...c, date: fd.get('date'), lines, purchases: num(fd.get('purchases')), sales: num(fd.get('sales')), menuId: fd.get('menuId') || null,
+      createdAt: c.createdAt ?? Date.now(), updatedAt: Date.now() };
+    await db.put('counts', next);
+    if (!counts.some(x => x.id !== c.id && x.date > next.date)) {
+      const plan = await db.get('settings', 'orderPlan');
+      await db.put('settings', { id: 'orderPlan', rows: plan?.rows ?? [], onHand: Object.fromEntries(lines.map(l => [l.ingredientId, l.qty])) });
+    }
+    go('#/stock');
+  };
+  document.getElementById('del')?.addEventListener('click', async () => {
+    if (confirm('Delete this count?')) { await db.del('counts', c.id); go('#/stock'); }
+  });
+}
+
+// ---------- Waste log ----------
+
+async function wasteList() {
+  const entries = (await db.all('waste')).sort((a, b) => b.date.localeCompare(a.date) || (b.createdAt ?? 0) - (a.createdAt ?? 0));
+  const since = n => { const d = new Date(); d.setDate(d.getDate() - n); return d.toLocaleDateString('en-CA'); };
+  const week = wasteSummary(entries.filter(w => w.date > since(7))), month = wasteSummary(entries.filter(w => w.date > since(30)));
+  const unpriced = entries.filter(w => w.cost == null).length;
+  page('pantry', 'Waste log', entries.length ? `
+    <div class="card stat-card"><p class="stat-label">Waste, last 7 days</p><p class="stat">${money(week.total)}</p>
+      <p class="stat-sub">Last 30 days <b>${money(month.total)}</b>${unpriced ? `, <span class="warn-text">${unpriced} without a price</span>` : ''}</p></div>
+    ${month.total ? `<div class="card"><h2>Why, last 30 days</h2><dl class="kv">${month.byReason.filter(x => x.cost).map(x => `<dt>${esc(WASTE_REASONS[x.key] ?? x.key)}</dt><dd>${money(x.cost)} <small class="muted">${Math.round(x.cost / month.total * 100)}%</small></dd>`).join('')}</dl>
+      <h2>Costing the most</h2><dl class="kv">${month.topItems.filter(x => x.cost).map(x => `<dt>${esc(x.key)}</dt><dd>${money(x.cost)}</dd>`).join('')}</dl></div>` : ''}
+    <h2 class="day">Logged</h2>
+    <ul class="list">${entries.slice(0, 60).map(w => `<li><a href="#/waste/${esc(w.id)}">
+      <div class="grow"><b>${esc(w.name)}</b><small>${fmtQty(w.qty)} ${esc(w.unit === 'portion' ? (Number(w.qty) === 1 ? 'portion' : 'portions') : w.unit)}, ${esc((WASTE_REASONS[w.reason] ?? '').toLowerCase())}</small></div>
+      <span class="trail">${w.cost != null ? money(w.cost) : '<span class="warn-text">No price</span>'}<small>${esc(shortDate(w.date))}</small></span></a></li>`).join('')}</ul>`
+    : '<div class="empty"><p>Nothing logged yet.</p><p>Log what goes in the bin and why. A week of it shows where the money goes.</p></div>',
+    { back: '#/pantry', action: newBtn('#/waste/new') });
+}
+
+async function wasteEdit(id) {
+  const isNew = id === 'new';
+  const [ingList, recipes] = await Promise.all([db.all('ingredients'), db.all('recipes')]);
+  ingList.sort(byName); recipes.sort(byName);
+  const ings = toMap(ingList), recs = toMap(recipes);
+  const w = isNew ? { id: uid(), date: today(), reason: 'spoiled', qty: null, unit: 'g' } : await db.get('waste', id);
+  if (!w) return go('#/waste');
+  const key = w.recipeId ? `r:${w.recipeId}` : w.ingredientId ? `i:${w.ingredientId}` : '';
+  const WUNITS = ['g', 'kg', 'ml', 'L', 'each', 'portion'];
+  page('pantry', isNew ? 'Log waste' : 'Waste', `<form id="f">
+    <label>What<select name="item" required><option value="">Choose…</option>
+      <optgroup label="Pantry">${ingList.map(i => `<option value="i:${esc(i.id)}" ${key === `i:${i.id}` ? 'selected' : ''}>${esc(i.name)}</option>`).join('')}</optgroup>
+      <optgroup label="Recipes">${recipes.map(r => `<option value="r:${esc(r.id)}" ${key === `r:${r.id}` ? 'selected' : ''}>${esc(r.name)}</option>`).join('')}</optgroup></select></label>
+    <div class="row2"><label>Amount<input name="qty" type="number" min="0" step="any" inputmode="decimal" required value="${esc(w.qty)}"></label>
+      <label>Unit<select name="unit">${opts(WUNITS, w.unit)}</select></label></div>
+    <p class="total-row" style="margin:0 0 var(--s4)"><span>Cost</span><b id="cost">-</b></p>
+    <h2>Why</h2>
+    <div class="checks">${Object.entries(WASTE_REASONS).map(([k, v]) => `<label><input type="radio" name="reason" value="${k}" ${k === w.reason ? 'checked' : ''}> ${v}</label>`).join('')}</div>
+    <label style="margin-top:16px">Date<input name="date" type="date" required value="${esc(w.date)}"></label>
+    <label>Note <small>(optional)</small><input name="note" placeholder="e.g. walk-in left open overnight" value="${esc(w.note)}"></label>
+    <div class="actions"><button type="submit">Save</button>${isNew ? '' : '<button type="button" class="danger" id="del">Delete</button>'}</div>
+  </form>`, { back: '#/waste' });
+  const form = document.getElementById('f');
+  const entry = () => {
+    const fd = new FormData(form), [kind, itemId] = (fd.get('item') || ':').split(':');
+    return { ...w, ingredientId: kind === 'i' ? itemId : null, recipeId: kind === 'r' ? itemId : null, qty: num(fd.get('qty')), unit: fd.get('unit'),
+      reason: fd.get('reason'), date: fd.get('date'), note: fd.get('note').trim(), name: kind === 'i' ? ings.get(itemId)?.name : recs.get(itemId)?.name };
+  };
+  const show = () => {
+    const e = entry(), c = e.qty > 0 && (e.ingredientId || e.recipeId) ? wasteCost(e, ings, recs) : NaN;
+    document.getElementById('cost').innerHTML = Number.isFinite(c) ? money(c) : e.qty > 0 && e.name ? '<span class="warn-text">Can\'t cost this</span>' : '-';
+  };
+  form.item.addEventListener('change', () => { // sensible unit for what was picked
+    const [kind, itemId] = form.item.value.split(':'), i = ings.get(itemId);
+    form.unit.value = kind === 'r' ? 'portion' : i?.unit === 'each' ? 'each' : i?.unit === 'L' ? 'ml' : 'g';
+  });
+  form.addEventListener('input', show);
+  form.addEventListener('change', show);
+  show();
+  form.onsubmit = async ev => {
+    ev.preventDefault();
+    const e = entry(), c = wasteCost(e, ings, recs);
+    await db.put('waste', { ...e, cost: Number.isFinite(c) ? Math.round(c * 100) / 100 : null, createdAt: w.createdAt ?? Date.now(), updatedAt: Date.now() });
+    go('#/waste');
+  };
+  document.getElementById('del')?.addEventListener('click', async () => {
+    if (confirm('Delete this entry?')) { await db.del('waste', w.id); go('#/waste'); }
+  });
 }
 
 // ---------- Log ----------
@@ -1821,7 +1981,7 @@ async function settingsView() {
     </form>
     <div class="card"><h2>Invite classmates</h2><p class="muted">Pinch is free. Share the link. Everyone gets their own private recipe book.</p>
       <button type="button" class="ghost" id="invite">Share Pinch</button> <span id="inviteMsg" class="muted"></span></div>
-    <p class="muted center"><small>Pinch v19</small></p>`);
+    <p class="muted center"><small>Pinch v20</small></p>`);
 
   const acct = document.getElementById('acct');
   drawAccount = () => {
@@ -2008,6 +2168,21 @@ async function loadDemo() {
   await db.put('menus', { id: 'd-menu', name: 'Pasta bar lunch', period: 'Last week', createdAt: t, updatedAt: t,
     items: [{ recipeId: 's-tag', price: 26, sold: 48 }, { recipeId: 's-pasta', price: 9, sold: 6 }, { recipeId: 's-pomo', price: 12, sold: 30 }] });
   await db.put('exams', { id: 'd-exam', title: 'Practical: fresh pasta and sauce', date: day(-9), type: 'practical', recipeIds: ['s-tag', 's-pasta'], target: 3, createdAt: t });
+  const ings = await ingMap(), recs = toMap(await db.all('recipes'));
+  const C = (id, n, qty, extra = {}) => db.put('counts', { id, date: day(n), createdAt: t - n, ...extra,
+    lines: Object.entries(qty).map(([ingredientId, q]) => { const i = ings.get(ingredientId); return { ingredientId, name: i.name, unit: i.unit, price: i.price, qty: q }; }) });
+  await C('d-c1', 14, { 's-tom': 12, 's-oil': 4, 's-gar': 0.8, 's-oni': 14, 's-bas': 6, 's-flo': 15, 's-egg': 60, 's-par': 3 });
+  await C('d-c2', 7, { 's-tom': 5.5, 's-oil': 2.5, 's-gar': 0.4, 's-oni': 10, 's-bas': 3, 's-flo': 9, 's-egg': 30, 's-par': 1.6 }, { purchases: 505, sales: 3400, menuId: 'd-menu' });
+  const W = (id, n, item, qty, unit, reason, note = '') => {
+    const e = { id, date: day(n), ...(recs.has(item) ? { recipeId: item, name: recs.get(item).name } : { ingredientId: item, name: ings.get(item).name }), qty, unit, reason, note, createdAt: t - n };
+    return db.put('waste', { ...e, cost: Math.round(wasteCost(e, ings, recs) * 100) / 100 });
+  };
+  await W('d-w1', 10, 's-bas', 2, 'each', 'spoiled', 'Wilted in the cool room');
+  await W('d-w2', 9, 's-pomo', 4, 'portion', 'over');
+  await W('d-w3', 8, 's-tag', 1, 'portion', 'mistake', 'Sent back: overcooked');
+  await W('d-w4', 4, 's-pomo', 3, 'portion', 'over');
+  await W('d-w5', 2, 's-par', 120, 'g', 'prep', 'Rind and dried edges');
+  await W('d-w6', 1, 's-bas', 1, 'each', 'spoiled');
   await db.put('settings', { ...(await settings()), id: 'settings', cookName: 'Demo Cook' });
   await db.put('settings', { id: 'orderPlan', rows: [{ recipeId: 's-tag', portions: 40 }, { recipeId: 's-pomo', portions: 10 }], onHand: { 's-tom': 5.5, 's-oni': 10 } });
   await db.put('settings', { id: 'portfolio', headline: 'Commis chef · Cert IV Kitchen Management', contact: 'demo@example.com',
@@ -2043,6 +2218,10 @@ const routes = [
   [/^#\/costwatch$/, costWatchView],
   [/^#\/yield(?:\/([^/]+))?$/, yieldView],
   [/^#\/ingredient\/([^/]+)\/edit$/, ingredientEdit],
+  [/^#\/stock$/, stockList],
+  [/^#\/stock\/([^/]+)$/, stockCount],
+  [/^#\/waste$/, wasteList],
+  [/^#\/waste\/([^/]+)$/, wasteEdit],
   [/^#\/log$/, logList],
   [/^#\/log\/([^/]+)\/edit$/, logEdit],
   [/^#\/portfolio$/, portfolioView],

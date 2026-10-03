@@ -398,3 +398,44 @@ export function examReadiness(exam, attempts) {
   });
   return { target, rows, ready: rows.filter(r => r.ready).length };
 }
+
+// ---- Stocktake and actual food cost
+// A count line is { qty, price } in the ingredient's purchase unit, with the price as it was on the day.
+// Lines without a price are counted as missing, never as $0.
+export function stockValue(lines) {
+  let value = 0, missing = 0;
+  for (const l of lines) if (Number(l.qty) > 0) { if (Number.isFinite(l.price)) value += l.qty * l.price; else missing++; }
+  return { value, missing };
+}
+
+// Each count after the first closes a period: food used = opening stock + purchases − closing stock,
+// actual food cost % = food used ÷ food sales (ex GST). Waste is summed from the day after the opening count.
+export function stockPeriods(counts, waste = []) {
+  const sorted = [...counts].sort((a, b) => a.date.localeCompare(b.date));
+  return sorted.slice(1).map((c, i) => {
+    const open = sorted[i], opening = stockValue(open.lines ?? []).value, closing = stockValue(c.lines ?? []).value;
+    const purchases = Number(c.purchases) || 0, sales = Number(c.sales) || 0;
+    const used = opening + purchases - closing;
+    const wasted = waste.filter(w => w.date > open.date && w.date <= c.date).reduce((n, w) => n + (Number(w.cost) || 0), 0);
+    return { count: c, from: open.date, to: c.date, opening, purchases, closing, used, sales,
+      pct: sales > 0 ? used / sales * 100 : NaN, waste: wasted, wastePct: used > 0 ? wasted / used * 100 : NaN };
+  }).reverse();
+}
+
+// ---- Waste
+export const WASTE_REASONS = { spoiled: 'Spoiled or out of date', over: 'Over-produced', prep: 'Prep and trim', mistake: 'Mistake or sent back', other: 'Other' };
+
+// Raw ingredients cost as bought (no trim gross-up); prepared food costs what the recipe costs.
+export function wasteCost(w, ings, recs = new Map()) {
+  if (w.recipeId) return itemCost({ recipeId: w.recipeId, qty: w.qty, unit: w.unit }, ings, recs).cost;
+  const ing = ings.get(w.ingredientId);
+  if (!ing || !hasPrice(ing)) return NaN;
+  return convertFor(Number(w.qty), w.unit, ing.unit, ing.name) * Number(ing.price);
+}
+
+// Total, by reason (largest first) and the items that cost the most.
+export function wasteSummary(entries) {
+  const sum = key => [...entries.reduce((m, w) => m.set(key(w), (m.get(key(w)) ?? 0) + (Number(w.cost) || 0)), new Map())]
+    .map(([k, cost]) => ({ key: k, cost })).sort((a, b) => b.cost - a.cost);
+  return { total: entries.reduce((n, w) => n + (Number(w.cost) || 0), 0), byReason: sum(w => w.reason), topItems: sum(w => w.name).slice(0, 3) };
+}

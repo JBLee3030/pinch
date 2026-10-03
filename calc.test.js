@@ -4,7 +4,7 @@ import { remoteWins } from './db.js';
 import { DECKS, ALL_CARDS, review, pickSession, isDue, isLearned } from './study.js';
 import { extractRecipe, safeUrl } from './supabase/functions/recipe-import/index.js';
 import { parseIngredientLine as P, matchIngredient, parsePriceList, packUnit, splitSteps, findDurations, fmtDuration } from './parse.js';
-import { convert, recipeCost, suggestedPrice, actualCostPct, recipeAllergens, orderList, fmtAmount, tempStatus, yieldTest, convertFor, densityFor, MEASURES, scaleFromIngredient, itemGrams, bakersPercent, bakersBase, fToC, cToF, prepBatches, niceAmount, withPriceHistory, costImpact, foodCostWatch, priceMoves, menuEngineering, daysUntil, examReadiness } from './calc.js';
+import { convert, recipeCost, suggestedPrice, actualCostPct, recipeAllergens, orderList, fmtAmount, tempStatus, yieldTest, convertFor, densityFor, MEASURES, scaleFromIngredient, itemGrams, bakersPercent, bakersBase, fToC, cToF, prepBatches, niceAmount, withPriceHistory, costImpact, foodCostWatch, priceMoves, menuEngineering, daysUntil, examReadiness, stockValue, stockPeriods, wasteCost, wasteSummary } from './calc.js';
 
 const close = (a, b) => assert.ok(Math.abs(a - b) < 1e-9, `${a} != ${b}`);
 
@@ -428,6 +428,33 @@ assert.equal(niceAmount(2, 'portion'), '2 portion');
   assert.deepEqual(r.rows.map(x => [x.recipeId, x.count, x.lastRating, x.ready]), [['tag', 2, 4, true], ['tira', 2, 2, false], ['risotto', 0, null, false]]);
   assert.equal(r.ready, 1);
   assert.equal(examReadiness({ recipeIds: [] }, []).target, 3);     // default target
+}
+
+// Stocktake and waste
+{
+  assert.deepEqual(stockValue([{ qty: 2, price: 4.5 }, { qty: 0, price: null }, { qty: 3, price: null }]), { value: 9, missing: 1 });
+  const counts = [
+    { date: '2026-09-21', lines: [{ qty: 10, price: 4 }, { qty: 2, price: 12 }] },                       // $64
+    { date: '2026-09-28', lines: [{ qty: 6, price: 4 }], purchases: 300, sales: 1000 },                   // $24
+    { date: '2026-09-14', lines: [{ qty: 5, price: 4 }] },                                                // first count: opening only
+  ];
+  const waste = [{ date: '2026-09-21', cost: 50 }, { date: '2026-09-25', cost: 20 }, { date: '2026-09-28', cost: 14 }];
+  const [latest, first] = stockPeriods(counts, waste);
+  assert.equal(stockPeriods(counts).length, 2);
+  assert.deepEqual([latest.from, latest.to, latest.opening, latest.closing, latest.used], ['2026-09-21', '2026-09-28', 64, 24, 340]);
+  close(latest.pct, 34);
+  assert.equal(latest.waste, 34);                                   // the opening day's waste belongs to the period before
+  close(latest.wastePct, 10);
+  assert.ok(Number.isNaN(first.pct));                              // no sales entered
+  const wings = new Map([['tom', { id: 'tom', name: 'Tomatoes', unit: 'kg', price: 4, yieldPct: 50 }], ['bas', { id: 'bas', name: 'Basil', unit: 'each', price: null }]]);
+  close(wasteCost({ ingredientId: 'tom', qty: 500, unit: 'g' }, wings), 2);   // as bought, not grossed up for trim
+  assert.ok(Number.isNaN(wasteCost({ ingredientId: 'bas', qty: 1, unit: 'each' }, wings)));
+  const sauce = { id: 'sauce', portions: 4, items: [{ ingredientId: 'tom', qty: 1, unit: 'kg' }] };   // $8 a batch, $2 a portion
+  close(wasteCost({ recipeId: 'sauce', qty: 3, unit: 'portion' }, wings, new Map([['sauce', sauce]])), 6);
+  const s = wasteSummary([{ name: 'Basil', reason: 'spoiled', cost: 7 }, { name: 'Ragù', reason: 'over', cost: 20 }, { name: 'Basil', reason: 'spoiled', cost: 3.5 }, { name: 'Bread', reason: 'over', cost: null }]);
+  close(s.total, 30.5);
+  assert.deepEqual(s.byReason.map(x => [x.key, x.cost]), [['over', 20], ['spoiled', 10.5]]);
+  assert.deepEqual(s.topItems.map(x => x.key), ['Ragù', 'Basil', 'Bread']);
 }
 
 console.log('calc ok');
