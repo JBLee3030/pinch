@@ -2252,6 +2252,8 @@ sync.onStatus(st => {
 });
 recovery = sync.readRecoveryHash();
 if (recovery) history.replaceState(null, '', location.pathname + location.search + '#/reset'); // drop tokens from the URL
-if (db.DEMO && !(await db.all('recipes')).length) await loadDemo();
+// Re-seed the demo when its sample data changes, so returning visitors see new features filled in
+const DEMO_DATA = 20;
+if (db.DEMO && (await db.get('settings', 'demo'))?.v !== DEMO_DATA) { await loadDemo(); await db.put('settings', { id: 'demo', v: DEMO_DATA }); }
 render();
 sync.sync();
