@@ -4,7 +4,7 @@ import { remoteWins } from './db.js';
 import { DECKS, ALL_CARDS, review, pickSession, isDue, isLearned } from './study.js';
 import { extractRecipe, safeUrl } from './supabase/functions/recipe-import/index.js';
 import { parseIngredientLine as P, matchIngredient, parsePriceList, packUnit, splitSteps, findDurations, fmtDuration } from './parse.js';
-import { convert, recipeCost, suggestedPrice, actualCostPct, recipeAllergens, orderList, fmtAmount, tempStatus, yieldTest, convertFor, densityFor, MEASURES, scaleFromIngredient, itemGrams, bakersPercent, bakersBase, fToC, cToF, prepBatches, niceAmount } from './calc.js';
+import { convert, recipeCost, suggestedPrice, actualCostPct, recipeAllergens, orderList, fmtAmount, tempStatus, yieldTest, convertFor, densityFor, MEASURES, scaleFromIngredient, itemGrams, bakersPercent, bakersBase, fToC, cToF, prepBatches, niceAmount, withPriceHistory, costImpact, foodCostWatch, priceMoves } from './calc.js';
 
 const close = (a, b) => assert.ok(Math.abs(a - b) < 1e-9, `${a} != ${b}`);
 
@@ -372,5 +372,28 @@ assert.equal(niceAmount(187.5, 'g'), '188 g');
 assert.equal(niceAmount(12.345, 'ml'), '12.3 ml');
 assert.equal(niceAmount(4.2666, 'each'), '4.27 each');
 assert.equal(niceAmount(2, 'portion'), '2 portion');
+
+// Food cost watch
+{
+  const g0 = { id: 'g', name: 'Garlic', unit: 'kg', price: 18, yieldPct: 100 };
+  let g1 = withPriceHistory(g0, { ...g0, price: 22 }, '2026-10-03');
+  assert.deepEqual(g1.priceHistory.map(h => h.price), [18, 22]);              // old price seeded, new one added
+  assert.equal(withPriceHistory(g1, { ...g1, name: 'Garlic, peeled' }, '2026-10-04').priceHistory.length, 2); // no price change, no entry
+  assert.equal(withPriceHistory(undefined, { name: 'New', unit: 'kg', price: null }, 'x').priceHistory.length, 0); // unpriced new item
+  const sauce = { id: 'sauce', name: 'Sauce', portions: 10, yieldQty: 1, yieldUnit: 'L', items: [{ ingredientId: 'g', qty: 100, unit: 'g' }] };
+  const dish = { id: 'dish', name: 'Dish', portions: 1, menuPrice: 11, targetCostPct: 30, items: [{ recipeId: 'sauce', qty: 500, unit: 'ml' }] };
+  const other = { id: 'other', name: 'Other', portions: 1, menuPrice: 11, items: [] };
+  const before = new Map([['g', g0]]), after = new Map([['g', g1]]);
+  const imp = costImpact([sauce, dish, other], before, after);
+  assert.deepEqual(imp.map(x => x.recipe.id), ['dish', 'sauce']);              // the dish changes through its sub-recipe; 'other' untouched
+  close(imp[0].before, 0.9); close(imp[0].after, 1.1);                         // half of a 1.8 -> 2.2 batch
+  close(imp[0].afterPct, 1.1 / 10 * 100);                                       // vs $10 ex GST
+  const w = foodCostWatch([sauce, dish, { ...other, items: [{ ingredientId: 'g', qty: 200, unit: 'g' }] }], after, 30);
+  assert.deepEqual(w.map(x => x.recipe.id), ['other', 'dish']);                // highest % first; only recipes with a menu price
+  assert.equal(w[0].over, true);                                                // 0.2 kg x $22 = $4.40 on $10 ex GST = 44%
+  assert.equal(w[1].over, false);
+  const moves = priceMoves(new Map([['g', g1]]));
+  close(moves[0].change, (22 - 18) / 18 * 100);
+}
 
 console.log('calc ok');

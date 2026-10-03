@@ -2,7 +2,7 @@ import * as db from './db.js';
 import * as sync from './sync.js';
 import { DECKS, ALL_CARDS, review, pickSession, isDue, isLearned } from './study.js';
 import { parseIngredientLine, matchIngredient, parsePriceList, splitSteps, findDurations, fmtDuration } from './parse.js';
-import { ALLERGENS, PURCHASE_UNITS, UNITS, recipeCost, itemCost, suggestedPrice, actualCostPct, recipeAllergens, usesRecipe, hasPrice, orderList, fmtAmount, TEMP_CHECKS, tempStatus, yieldTest, MEASURES, convertFor, densityFor, scaleFromIngredient, bakersPercent, bakersBase, fToC, cToF, prepBatches, niceAmount, niceParts, money, pct } from './calc.js';
+import { ALLERGENS, PURCHASE_UNITS, UNITS, recipeCost, itemCost, suggestedPrice, actualCostPct, recipeAllergens, usesRecipe, hasPrice, orderList, fmtAmount, TEMP_CHECKS, tempStatus, yieldTest, MEASURES, convertFor, densityFor, scaleFromIngredient, bakersPercent, bakersBase, fToC, cToF, prepBatches, niceAmount, niceParts, withPriceHistory, costImpact, foodCostWatch, priceMoves, money, pct } from './calc.js';
 
 const view = document.getElementById('view');
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -996,13 +996,35 @@ async function cookView(id) {
 
 // ---------- Pantry ----------
 
+// Saves ingredients with price history, then works out which recipe costs moved, shown once on Pantry.
+let priceNews = null;
+async function saveIngredients(nexts, title) {
+  const [before, recipes] = await Promise.all([ingMap(), db.all('recipes')]);
+  const after = new Map(before);
+  for (const n of nexts) {
+    const saved = withPriceHistory(before.get(n.id), n, today());
+    await db.put('ingredients', saved);
+    after.set(saved.id, saved);
+  }
+  const impacts = costImpact(recipes, before, after);
+  priceNews = impacts.length || title ? { title, impacts } : null;
+}
+
+const impactRows = impacts => `<ul class="list">${impacts.map(x => `<li><a href="#/recipe/${esc(x.recipe.id)}">
+  <div class="grow"><b>${esc(x.recipe.name)}</b><small>${Number.isFinite(x.afterPct) ? `Food cost ${pct(x.beforePct)} to <span class="${x.after > x.before ? 'alert-text' : 'ok-text'}">${pct(x.afterPct)}</span>` : 'Cost per portion'}</small></div>
+  <span class="trail">${money(x.before)} → ${money(x.after)}<small class="${x.after > x.before ? 'alert-text' : 'ok-text'}">${x.after > x.before ? '+' : ''}${money(x.after - x.before).replace('$-', '−$')}</small></span></a></li>`).join('')}</ul>`;
+
 async function pantryList() {
   const [ings, recipes] = await Promise.all([db.all('ingredients'), db.all('recipes')]);
   ings.sort(byName);
   const used = id => recipes.filter(r => r.items?.some(it => it.ingredientId === id)).length;
   const missing = ings.filter(i => !hasPrice(i));
+  const news = priceNews;
+  priceNews = null;
   page('pantry', 'Pantry', ings.length ? `
-    <div class="links" role="navigation" aria-label="Pantry tools"><a href="#/order">Order list</a><a href="#/yield">Yield test</a><a href="#/pantry/import">Import prices</a></div>
+    ${news ? `<div class="card news"><h2>${esc(news.title ?? 'Prices updated')}</h2>
+      ${news.impacts.length ? `<p class="muted">${news.impacts.length} recipe${news.impacts.length === 1 ? '' : 's'} changed cost:</p>${impactRows(news.impacts)}` : '<p class="muted">No recipe costs changed.</p>'}</div>` : ''}
+    <div class="links" role="navigation" aria-label="Pantry tools"><a href="#/order">Order list</a><a href="#/yield">Yield test</a><a href="#/pantry/import">Import prices</a><a href="#/costwatch">Food cost watch</a></div>
     ${missing.length ? `<div class="card"><h2>Needs price (${missing.length})</h2><div class="chips">${missing.map(i => `<a class="chip" href="#/ingredient/${esc(i.id)}/edit">${esc(i.name)}</a>`).join('')}</div></div>` : ''}
     <div class="bar"><input type="search" id="q" placeholder="Search ingredients" aria-label="Search ingredients"></div>
     <ul class="list">${ings.map(i => `<li data-q="${esc(i.name.toLowerCase())}"><a href="#/ingredient/${esc(i.id)}/edit">
@@ -1026,6 +1048,7 @@ async function ingredientEdit(id) {
       <label>Per<select name="unit">${opts(PURCHASE_UNITS, i.unit)}</select></label>
     </div>
     <label>Yield % <small>(usable after trimming/peeling)</small><input name="yieldPct" type="number" min="1" max="100" step="any" inputmode="decimal" required value="${esc(i.yieldPct)}"></label>
+    ${(i.priceHistory ?? []).length > 1 ? `<p><small>Price history: ${i.priceHistory.slice(-5).reverse().map(h => `${esc(new Date(h.date + 'T00:00').toLocaleDateString('en-AU', { day: 'numeric', month: 'short' }))} ${money(h.price)}/${esc(h.unit)}`).join(', ')}</small></p>` : ''}
     ${isNew ? '' : `<p><small>${i.lastYieldTest ? `Last yield test ${esc(new Date(i.lastYieldTest.date + 'T00:00').toLocaleDateString('en-AU'))}: ${pct(i.lastYieldTest.yieldPct)}. ` : ''}<a href="#/yield/${esc(i.id)}">Run a yield test</a></small></p>`}
     <h2>Allergens</h2>
     <div class="checks">${ALLERGENS.map(a => `<label><input type="checkbox" name="allergens" value="${a}" ${i.allergens?.includes(a) ? 'checked' : ''}> ${a}</label>`).join('')}</div>
@@ -1039,8 +1062,11 @@ async function ingredientEdit(id) {
   form.onsubmit = async e => {
     e.preventDefault();
     const fd = new FormData(form);
-    await db.put('ingredients', { ...i, name: fd.get('name').trim(), price: num(fd.get('price')), unit: fd.get('unit'),
-      yieldPct: num(fd.get('yieldPct')), allergens: fd.getAll('allergens'), updatedAt: Date.now() });
+    const next = { ...i, name: fd.get('name').trim(), price: num(fd.get('price')), unit: fd.get('unit'),
+      yieldPct: num(fd.get('yieldPct')), allergens: fd.getAll('allergens'), updatedAt: Date.now() };
+    const changed = !isNew && (next.price !== i.price || next.unit !== i.unit || next.yieldPct !== i.yieldPct);
+    await saveIngredients([next], changed ? `${next.name}: ${hasPrice(i) ? `${money(i.price)}/${i.unit} → ` : ''}${money(next.price)}/${next.unit}${next.yieldPct !== i.yieldPct ? `, yield ${next.yieldPct}%` : ''}` : null);
+    if (!changed) priceNews = null;
     go('#/pantry');
   };
   document.getElementById('del')?.addEventListener('click', async () => {
@@ -1049,6 +1075,29 @@ async function ingredientEdit(id) {
       await db.del('ingredients', i.id); go('#/pantry');
     }
   });
+}
+
+// ---------- Food cost watch ----------
+
+async function costWatchView() {
+  const [recipes, ings, s] = await Promise.all([db.all('recipes'), ingMap(), settings()]);
+  const rows = foodCostWatch(recipes, ings, s.targetCostPct);
+  const over = rows.filter(r => r.over), moves = priceMoves(ings).filter(m => Number.isFinite(m.change) && m.change !== 0).slice(0, 8);
+  const noPrice = recipes.filter(r => !(r.menuPrice > 0)).length;
+  page('pantry', 'Food cost watch', `
+    <div class="card stat-card">
+      <p class="stat-label">Over target</p>
+      <p class="stat ${over.length ? 'alert-text' : ''}">${over.length} of ${rows.length}</p>
+      <p class="stat-sub">${rows.length ? `Recipes with a menu price, compared with their target food cost (default ${pct(s.targetCostPct)}).` : 'Add a menu price to a recipe (More details) to track its food cost.'}</p>
+    </div>
+    ${rows.length ? `<ul class="list">${rows.map(x => `<li><a href="#/recipe/${esc(x.recipe.id)}">
+      <div class="grow"><b>${esc(x.recipe.name)}</b><small>${money(x.perPortion)} on a ${money(x.recipe.menuPrice)} menu price${x.incomplete ? ', <span class="warn-text">some prices missing</span>' : ''}</small></div>
+      <span class="trail"><span class="${x.over ? 'alert-text' : 'ok-text'}">${pct(x.actual)}</span><small>target ${pct(x.target)}</small></span></a></li>`).join('')}</ul>` : ''}
+    ${noPrice ? `<p class="muted center"><small>${noPrice} recipe${noPrice === 1 ? '' : 's'} without a menu price ${noPrice === 1 ? 'isn’t' : 'aren’t'} shown.</small></p>` : ''}
+    ${moves.length ? `<h2 class="day">Latest price changes</h2><ul class="list">${moves.map(m => `<li><a href="#/ingredient/${esc(m.ing.id)}/edit">
+      <div class="grow"><b>${esc(m.ing.name)}</b><small>${money(m.from.price)} → ${money(m.to.price)} per ${esc(m.ing.unit)}</small></div>
+      <span class="trail"><span class="${m.change > 0 ? 'alert-text' : 'ok-text'}">${m.change > 0 ? '+' : ''}${pct(m.change)}</span><small>${esc(new Date(m.to.date + 'T00:00').toLocaleDateString('en-AU', { day: 'numeric', month: 'short' }))}</small></span></a></li>`).join('')}</ul>` : ''}`,
+    { back: '#/pantry' });
 }
 
 // ---------- Import supplier prices ----------
@@ -1092,20 +1141,16 @@ async function importPrices() {
   out.addEventListener('click', async e => {
     if (e.target.id !== 'doImport') return;
     let added = 0, updated = 0;
+    const nexts = [];
     for (const el of out.querySelectorAll('.import-row')) {
       if (!el.querySelector('[name=use]')?.checked) continue;
       const r = rows[el.dataset.i], unit = el.querySelector('[name=unit]').value, target = el.querySelector('[name=target]').value;
       const existing = target && ings.find(x => x.id === target);
-      if (existing) {
-        await db.put('ingredients', { ...existing, price: r.price, unit, ...(r.yieldPct ? { yieldPct: r.yieldPct } : {}), updatedAt: Date.now() });
-        updated++;
-      } else {
-        await db.put('ingredients', { id: uid(), name: r.name, price: r.price, unit, yieldPct: r.yieldPct ?? 100, allergens: [], updatedAt: Date.now() });
-        added++;
-      }
+      if (existing) { nexts.push({ ...existing, price: r.price, unit, ...(r.yieldPct ? { yieldPct: r.yieldPct } : {}), updatedAt: Date.now() }); updated++; }
+      else { nexts.push({ id: uid(), name: r.name, price: r.price, unit, yieldPct: r.yieldPct ?? 100, allergens: [], updatedAt: Date.now() }); added++; }
     }
+    await saveIngredients(nexts, `Imported: ${updated} updated, ${added} added`);
     go('#/pantry');
-    setTimeout(() => document.querySelector('main')?.insertAdjacentHTML('afterbegin', `<p class="ok-text">Imported: ${updated} updated, ${added} added.</p>`), 150);
   });
 }
 
@@ -1596,7 +1641,7 @@ async function settingsView() {
     </form>
     <div class="card"><h2>Invite classmates</h2><p class="muted">Pinch is free. Share the link. Everyone gets their own private recipe book.</p>
       <button type="button" class="ghost" id="invite">Share Pinch</button> <span id="inviteMsg" class="muted"></span></div>
-    <p class="muted center"><small>Pinch v16</small></p>`);
+    <p class="muted center"><small>Pinch v17</small></p>`);
 
   const acct = document.getElementById('acct');
   drawAccount = () => {
@@ -1808,6 +1853,7 @@ const routes = [
   [/^#\/pantry$/, pantryList],
   [/^#\/order$/, orderView],
   [/^#\/pantry\/import$/, importPrices],
+  [/^#\/costwatch$/, costWatchView],
   [/^#\/yield(?:\/([^/]+))?$/, yieldView],
   [/^#\/ingredient\/([^/]+)\/edit$/, ingredientEdit],
   [/^#\/log$/, logList],

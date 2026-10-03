@@ -313,3 +313,41 @@ export function niceParts(q, unit) {
   return [String(r), u];
 }
 export const niceAmount = (q, unit) => niceParts(q, unit).join(' ');
+
+// ---- Food cost watch
+
+// Price history kept on the ingredient: a new entry only when price or unit actually changes (newest last, max 24).
+export function withPriceHistory(old, next, date) {
+  const hist = [...(old?.priceHistory ?? [])];
+  if (!hist.length && old && hasPrice(old)) hist.push({ date: old.priceDate ?? date, price: Number(old.price), unit: old.unit });
+  const last = hist.at(-1);
+  if (hasPrice(next) && (!last || last.price !== Number(next.price) || last.unit !== next.unit)) hist.push({ date, price: Number(next.price), unit: next.unit });
+  return { ...next, priceHistory: hist.slice(-24) };
+}
+
+// Recipes whose cost per portion changes between two ingredient maps (sub-recipes included).
+export function costImpact(recipes, before, after) {
+  const recs = new Map(recipes.map(r => [r.id, r]));
+  return recipes.map(r => {
+    const a = recipeCost(r, before, recs).perPortion, b = recipeCost(r, after, recs).perPortion;
+    return { recipe: r, before: a, after: b, beforePct: actualCostPct(a, r.menuPrice), afterPct: actualCostPct(b, r.menuPrice) };
+  }).filter(x => Number.isFinite(x.before) && Number.isFinite(x.after) && Math.abs(x.after - x.before) >= 0.005)
+    .sort((x, y) => Math.abs(y.after - y.before) - Math.abs(x.after - x.before));
+}
+
+// Recipes with a menu price, by actual food cost %, flagged when above their target.
+export function foodCostWatch(recipes, ings, defaultTarget) {
+  const recs = new Map(recipes.map(r => [r.id, r]));
+  return recipes.filter(r => r.menuPrice > 0).map(r => {
+    const c = recipeCost(r, ings, recs), target = r.targetCostPct || defaultTarget, actual = actualCostPct(c.perPortion, r.menuPrice);
+    return { recipe: r, perPortion: c.perPortion, actual, target, over: actual > target, incomplete: c.problems.length > 0 };
+  }).sort((a, b) => b.actual - a.actual);
+}
+
+// Latest change for each ingredient with history: { ing, from, to, change % }
+export const priceMoves = ings => [...ings.values()].map(ing => {
+  const h = (ing.priceHistory ?? []).filter(x => x.unit === ing.unit);
+  if (h.length < 2) return null;
+  const from = h.at(-2), to = h.at(-1);
+  return { ing, from, to, change: from.price > 0 ? (to.price - from.price) / from.price * 100 : NaN };
+}).filter(Boolean).sort((a, b) => b.change - a.change);

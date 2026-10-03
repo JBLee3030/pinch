@@ -38,6 +38,7 @@ I built Pinch while studying Commercial Cookery and Kitchen Management in Melbou
 - Sub-recipes (a sauce or dough inside a dish) by portion or by weight/volume; cost and allergens roll up through every level, and circular references are blocked
 - Cost per portion, suggested menu price from a target food cost %, actual food cost % against the menu price (GST-aware)
 - Yield test: bought vs usable weight (and reusable trim) gives yield % and the real cost per usable kg, saved to the Pantry in one tap
+- Food cost watch: price history per ingredient; after any price change or import, the recipes whose cost moved (through sub-recipes too) with before and after; recipes over their target food cost; latest price rises
 - Pantry of ingredient prices per kg / L / each with trim yield %; type a new ingredient straight into a recipe and price it later — missing prices are flagged, never counted as $0
 - Costed standard recipe card, printable to A4 / PDF
 - Practice log per recipe: rating, photo, how it went and what to change next time; the last note shows when you start cooking, and finishing cooking mode asks how it went
