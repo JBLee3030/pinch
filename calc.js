@@ -351,3 +351,34 @@ export const priceMoves = ings => [...ings.values()].map(ing => {
   const from = h.at(-2), to = h.at(-1);
   return { ing, from, to, change: from.price > 0 ? (to.price - from.price) / from.price * 100 : NaN };
 }).filter(Boolean).sort((a, b) => b.change - a.change);
+
+// ---- Menu engineering (Kasavana & Smith)
+// items: [{ recipeId, price (inc GST; falls back to the recipe's menu price), sold }]
+// Contribution margin = price ex GST - food cost. Popular: menu mix >= 70% of an even share.
+// Profitable: CM >= the sales-weighted average CM. Star / Plowhorse / Puzzle / Dog.
+export const MENU_CLASSES = {
+  star: { label: 'Star', advice: 'Popular and profitable. Keep it, feature it, protect the recipe.' },
+  plowhorse: { label: 'Plowhorse', advice: 'Popular, low margin. Trim the cost or portion, or nudge the price up.' },
+  puzzle: { label: 'Puzzle', advice: 'Profitable but slow. Move it up the menu, rename it, have staff recommend it.' },
+  dog: { label: 'Dog', advice: 'Slow and low margin. Replace it or rework it.' },
+};
+
+export function menuEngineering(items, ings, recs) {
+  const rows = items.filter(x => recs.get(x.recipeId)).map(x => {
+    const r = recs.get(x.recipeId);
+    const price = Number(x.price) > 0 ? Number(x.price) : Number(r.menuPrice) || 0;
+    const c = recipeCost(r, ings, recs);
+    return { recipe: r, price, sold: Math.max(0, Number(x.sold) || 0), cost: c.perPortion, cm: price / (1 + GST) - c.perPortion,
+      foodCost: actualCostPct(c.perPortion, price), incomplete: c.problems.length > 0 || !(price > 0) };
+  });
+  const totalSold = rows.reduce((n, x) => n + x.sold, 0);
+  const avgCm = totalSold ? rows.reduce((n, x) => n + x.cm * x.sold, 0) / totalSold : NaN;
+  const popThreshold = rows.length ? 0.7 / rows.length : NaN;
+  for (const x of rows) {
+    x.mix = totalSold ? x.sold / totalSold : 0;
+    x.class = totalSold ? (x.mix >= popThreshold ? (x.cm >= avgCm ? 'star' : 'plowhorse') : (x.cm >= avgCm ? 'puzzle' : 'dog')) : null;
+  }
+  const revenue = rows.reduce((n, x) => n + x.price / (1 + GST) * x.sold, 0);
+  const foodCost = rows.reduce((n, x) => n + x.cost * x.sold, 0);
+  return { rows, totalSold, avgCm, popThreshold, revenue, totalCm: revenue - foodCost, foodCostPct: revenue ? foodCost / revenue * 100 : NaN };
+}

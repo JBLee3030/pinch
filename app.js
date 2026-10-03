@@ -2,7 +2,7 @@ import * as db from './db.js';
 import * as sync from './sync.js';
 import { DECKS, ALL_CARDS, review, pickSession, isDue, isLearned } from './study.js';
 import { parseIngredientLine, matchIngredient, parsePriceList, splitSteps, findDurations, fmtDuration } from './parse.js';
-import { ALLERGENS, PURCHASE_UNITS, UNITS, recipeCost, itemCost, suggestedPrice, actualCostPct, recipeAllergens, usesRecipe, hasPrice, orderList, fmtAmount, TEMP_CHECKS, tempStatus, yieldTest, MEASURES, convertFor, densityFor, scaleFromIngredient, bakersPercent, bakersBase, fToC, cToF, prepBatches, niceAmount, niceParts, withPriceHistory, costImpact, foodCostWatch, priceMoves, money, pct } from './calc.js';
+import { ALLERGENS, PURCHASE_UNITS, UNITS, recipeCost, itemCost, suggestedPrice, actualCostPct, recipeAllergens, usesRecipe, hasPrice, orderList, fmtAmount, TEMP_CHECKS, tempStatus, yieldTest, MEASURES, convertFor, densityFor, scaleFromIngredient, bakersPercent, bakersBase, fToC, cToF, prepBatches, niceAmount, niceParts, withPriceHistory, costImpact, foodCostWatch, priceMoves, menuEngineering, MENU_CLASSES, money, pct } from './calc.js';
 
 const view = document.getElementById('view');
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -81,7 +81,7 @@ async function recipeList() {
   page('recipes', 'Recipes', recipes.length ? `
     <div class="bar"><input type="search" id="q" placeholder="Search recipes or ingredients" aria-label="Search recipes or ingredients">
       <select id="cat" aria-label="Category"><option value="">All</option>${opts(cats)}</select></div>
-    <div class="links" role="navigation" aria-label="Recipe tools"><a href="#/allergens">Allergen chart</a><a href="#/calc">Kitchen calculator</a><a href="#/timers">Timers</a><a href="#/prep">Prep list</a></div>
+    <div class="links" role="navigation" aria-label="Recipe tools"><a href="#/allergens">Allergen chart</a><a href="#/calc">Kitchen calculator</a><a href="#/timers">Timers</a><a href="#/prep">Prep list</a><a href="#/menus">Menus</a></div>
     <ul class="list">${recipes.map(r => `<li data-q="${esc([r.name, ...(r.items ?? []).map(it => it.recipeId ? recs.get(it.recipeId)?.name : ings.get(it.ingredientId)?.name)].filter(Boolean).join(' ').toLowerCase())}" data-cat="${esc(r.category)}"><a href="#/recipe/${esc(r.id)}">
       ${r.photo ? `<img src="${esc(r.photo)}" alt="">` : '<span class="ph" aria-hidden="true"></span>'}
       <div class="grow"><b>${esc(r.name)}</b><small>${esc(r.category || 'Uncategorised')}</small></div>
@@ -484,6 +484,99 @@ async function attemptEdit(recipeId, attemptId) {
   document.getElementById('del')?.addEventListener('click', async () => {
     if (confirm('Delete this attempt?')) { await db.del('attempts', a.id); go(`#/recipe/${r.id}`); }
   });
+}
+
+// ---------- Menus: group dishes, menu engineering, allergen menu ----------
+
+async function menusView() {
+  const menus = (await db.all('menus')).sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0));
+  page('recipes', 'Menus', menus.length ? `<ul class="list">${menus.map(m => `<li><a href="#/menu/${esc(m.id)}">
+      <div class="grow"><b>${esc(m.name || 'Untitled menu')}</b><small>${esc([m.period, `${(m.items ?? []).length} dish${(m.items ?? []).length === 1 ? '' : 'es'}`].filter(Boolean).join(' · '))}</small></div></a></li>`).join('')}</ul>`
+    : '<div class="empty"><p>No menus yet.</p><p>Group dishes into a menu, add what each sold, and see which to keep, push, re-cost or drop.</p></div>',
+    { back: '#/recipes', action: newBtn('#/menu/new') });
+}
+
+async function menuView(id) {
+  const [recipes, ings] = await Promise.all([db.all('recipes'), ingMap()]);
+  recipes.sort(byName);
+  const recs = toMap(recipes);
+  let m = id === 'new' ? { id: uid(), name: '', period: '', items: [{}], createdAt: Date.now() } : await db.get('menus', id);
+  if (!m) return go('#/menus');
+  const isNew = id === 'new';
+  const dishRow = (x = {}) => `<div class="dish-row">
+    <select name="recipe" aria-label="Dish"><option value="">Choose dish…</option>
+      ${recipes.map(r => `<option value="${esc(r.id)}" ${r.id === x.recipeId ? 'selected' : ''}>${esc(r.name)}</option>`).join('')}</select>
+    <label>Price inc GST<input name="price" type="number" min="0" step="0.01" inputmode="decimal" value="${esc(x.price)}"></label>
+    <label>Sold<input name="sold" type="number" min="0" step="1" inputmode="numeric" value="${esc(x.sold)}"></label>
+    <button type="button" class="x" aria-label="Remove">×</button></div>`;
+
+  // A saved menu leads with its analysis; while building a new one, results sit below so the form doesn't jump.
+  page('recipes', isNew ? 'New menu' : m.name || 'Menu', `
+    ${isNew ? '' : '<div id="me"></div>'}
+    <form class="card" id="mf" onsubmit="return false">
+      <label>Menu name<input name="name" placeholder="e.g. Lunch, Week 3 Italian" value="${esc(m.name)}"></label>
+      <label>Sales period <small>(optional)</small><input name="period" placeholder="e.g. 1 to 7 Oct" value="${esc(m.period)}"></label>
+      <h2>Dishes</h2>
+      <div id="dishes">${(m.items?.length ? m.items : [{}]).map(dishRow).join('')}</div>
+      <button type="button" class="ghost" id="addDish">+ Add dish</button>
+      <p><small>Price defaults to the recipe's menu price. Sold is how many went out in the period.</small></p>
+    </form>
+    ${isNew ? '<div id="me"></div>' : ''}
+    ${isNew ? '' : '<div class="stack no-print"><a class="btn ghost" id="allergenMenu" href="#/menu/' + esc(m.id) + '/allergens">Allergen menu to print</a><button type="button" class="danger" id="delMenu">Delete menu</button></div>'}`,
+    { back: '#/menus' });
+
+  const form = document.getElementById('mf'), dishes = document.getElementById('dishes'), me = document.getElementById('me');
+  const read = () => ({ ...m, name: form.name.value.trim(), period: form.period.value.trim(),
+    items: [...dishes.querySelectorAll('.dish-row')].map(el => ({ recipeId: el.querySelector('[name=recipe]').value, price: num(el.querySelector('[name=price]').value), sold: num(el.querySelector('[name=sold]').value) })),
+    updatedAt: Date.now() });
+  const draw = async () => {
+    m = read();
+    if (m.name || m.items.some(x => x.recipeId)) await db.put('menus', { ...m, items: m.items.filter(x => x.recipeId) });
+    // placeholders show each dish's own menu price
+    dishes.querySelectorAll('.dish-row').forEach(el => { const r = recs.get(el.querySelector('[name=recipe]').value); el.querySelector('[name=price]').placeholder = r?.menuPrice ? fmtQty(r.menuPrice) : ''; });
+    const e = menuEngineering(m.items, ings, recs);
+    if (!e.rows.length) { me.innerHTML = ''; return; }
+    const by = c => e.rows.filter(x => x.class === c);
+    const tile = c => `<div class="mx ${c}"><b>${MENU_CLASSES[c].label}</b><span>${by(c).map(x => esc(x.recipe.name)).join(', ') || '-'}</span></div>`;
+    me.innerHTML = `<div class="card stat-card">
+        <p class="stat-label">Food cost on sales</p><p class="stat">${pct(e.foodCostPct)}</p>
+        <p class="stat-sub">${e.totalSold ? `${e.totalSold} sold, ${money(e.revenue)} ex GST, ${money(e.totalCm)} contribution margin` : 'Add how many of each dish sold to see the analysis.'}</p></div>
+      ${e.totalSold ? `<div class="card"><h2>Menu engineering</h2>
+        <div class="matrix4"><span class="ax ax-y">More profitable →</span>${tile('puzzle')}${tile('star')}${tile('dog')}${tile('plowhorse')}<span class="ax ax-x">More popular →</span></div>
+        <p><small>Average margin ${money(e.avgCm)}. Popular means at least ${pct(e.popThreshold * 100)} of sales.</small></p></div>` : ''}
+      <ul class="list">${e.rows.map(x => `<li><a href="#/recipe/${esc(x.recipe.id)}">
+        <div class="grow"><b>${esc(x.recipe.name)}</b><small>${x.class ? esc(MENU_CLASSES[x.class].advice) : `${money(x.cost)} cost`}${x.incomplete ? ' <span class="warn-text">Check prices.</span>' : ''}</small></div>
+        <span class="trail">${x.class ? `<span class="badge ${x.class}">${MENU_CLASSES[x.class].label}</span>` : ''}<small>${money(x.cm)} margin · ${pct(x.foodCost)}</small></span></a></li>`).join('')}</ul>`;
+  };
+  document.getElementById('addDish').onclick = () => { dishes.insertAdjacentHTML('beforeend', dishRow()); dishes.lastElementChild.querySelector('select').focus(); };
+  dishes.addEventListener('click', e => { if (e.target.matches('.x')) { e.target.closest('.dish-row').remove(); draw(); } });
+  form.addEventListener('input', draw);
+  form.addEventListener('change', draw);
+  document.getElementById('delMenu')?.addEventListener('click', async () => {
+    if (confirm(`Delete "${m.name || 'this menu'}"? The recipes stay.`)) { await db.del('menus', m.id); go('#/menus'); }
+  });
+  if (isNew) history.replaceState(null, '', `#/menu/${m.id}`); // later edits update the same menu
+  draw();
+}
+
+async function allergenMenuView(id) {
+  const [m, recipes, ings] = await Promise.all([db.get('menus', id), db.all('recipes'), ingMap()]);
+  if (!m) return go('#/menus');
+  const recs = toMap(recipes);
+  const dishes = (m.items ?? []).map(x => recs.get(x.recipeId)).filter(Boolean);
+  page('recipes', 'Allergen menu', `
+    <div class="sheet-wrap"><article class="sheet" id="sheet">
+      <div class="sheet-head"><div><p class="eyebrow">Allergen information</p><h1>${esc(m.name || 'Menu')}</h1>
+        <p class="muted">${esc(new Date().toLocaleDateString('en-AU'))}</p></div></div>
+      <table><thead><tr><th>Dish</th><th>Contains</th></tr></thead><tbody>
+        ${dishes.map(r => { const a = recipeAllergens(r, ings, recs); return `<tr><td><b>${esc(r.name)}</b></td><td>${a.length ? a.map(x => `<b class="alert-text">${x}</b>`).join(', ') : 'None of the declared allergens'}</td></tr>`; }).join('')}
+      </tbody></table>
+      <p class="sheet-foot">Please tell your server about any allergy before ordering. This list covers the allergens Australian law requires us to declare, based on the ingredients we record. Our kitchen handles all of these allergens, so cross-contact can occur.</p>
+    </article></div>
+    <div class="cta-bar no-print"><button id="print">Print or save as PDF</button></div>`, { back: `#/menu/${esc(m.id)}` });
+  const sheet = document.getElementById('sheet');
+  sheet.style.zoom = Math.min(1, sheet.parentElement.clientWidth / sheet.offsetWidth).toFixed(3);
+  document.getElementById('print').onclick = () => window.print();
 }
 
 // ---------- Prep list for a service ----------
@@ -1641,7 +1734,7 @@ async function settingsView() {
     </form>
     <div class="card"><h2>Invite classmates</h2><p class="muted">Pinch is free. Share the link. Everyone gets their own private recipe book.</p>
       <button type="button" class="ghost" id="invite">Share Pinch</button> <span id="inviteMsg" class="muted"></span></div>
-    <p class="muted center"><small>Pinch v17</small></p>`);
+    <p class="muted center"><small>Pinch v18</small></p>`);
 
   const acct = document.getElementById('acct');
   drawAccount = () => {
@@ -1825,6 +1918,8 @@ async function loadDemo() {
     notes: 'Pasta slightly overcooked, sauce a bit thin.', next: 'Pull the pasta at 90 seconds and finish it in the sauce.' });
   await db.put('attempts', { id: 'd-a2', recipeId: 's-tag', date: day(3), rating: 4, photo: DEMO_ART.tag, createdAt: t - 3,
     notes: 'Much better texture. Chef liked the gloss on the sauce.', next: 'Season the pasta water more; it tasted flat.' });
+  await db.put('menus', { id: 'd-menu', name: 'Pasta bar lunch', period: 'Last week', createdAt: t, updatedAt: t,
+    items: [{ recipeId: 's-tag', price: 26, sold: 48 }, { recipeId: 's-pasta', price: 9, sold: 6 }, { recipeId: 's-pomo', price: 12, sold: 30 }] });
   await db.put('settings', { ...(await settings()), id: 'settings', cookName: 'Demo Cook' });
   await db.put('settings', { id: 'orderPlan', rows: [{ recipeId: 's-tag', portions: 40 }, { recipeId: 's-pomo', portions: 10 }], onHand: { 's-tom': 5.5, 's-oni': 10 } });
   await db.put('settings', { id: 'portfolio', headline: 'Commis chef · Cert IV Kitchen Management', contact: 'demo@example.com',
@@ -1847,6 +1942,9 @@ const routes = [
   [/^#\/calc$/, calcView],
   [/^#\/timers$/, timersView],
   [/^#\/prep$/, prepView],
+  [/^#\/menus$/, menusView],
+  [/^#\/menu\/([^/]+)$/, menuView],
+  [/^#\/menu\/([^/]+)\/allergens$/, allergenMenuView],
   [/^#\/study$/, studyHome],
   [/^#\/study\/deck\/([^/]+)$/, deckView],
   [/^#\/study\/go(?:\/([^/]+))?$/, id => studySession(id === 'undefined' ? null : id)],

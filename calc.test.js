@@ -4,7 +4,7 @@ import { remoteWins } from './db.js';
 import { DECKS, ALL_CARDS, review, pickSession, isDue, isLearned } from './study.js';
 import { extractRecipe, safeUrl } from './supabase/functions/recipe-import/index.js';
 import { parseIngredientLine as P, matchIngredient, parsePriceList, packUnit, splitSteps, findDurations, fmtDuration } from './parse.js';
-import { convert, recipeCost, suggestedPrice, actualCostPct, recipeAllergens, orderList, fmtAmount, tempStatus, yieldTest, convertFor, densityFor, MEASURES, scaleFromIngredient, itemGrams, bakersPercent, bakersBase, fToC, cToF, prepBatches, niceAmount, withPriceHistory, costImpact, foodCostWatch, priceMoves } from './calc.js';
+import { convert, recipeCost, suggestedPrice, actualCostPct, recipeAllergens, orderList, fmtAmount, tempStatus, yieldTest, convertFor, densityFor, MEASURES, scaleFromIngredient, itemGrams, bakersPercent, bakersBase, fToC, cToF, prepBatches, niceAmount, withPriceHistory, costImpact, foodCostWatch, priceMoves, menuEngineering } from './calc.js';
 
 const close = (a, b) => assert.ok(Math.abs(a - b) < 1e-9, `${a} != ${b}`);
 
@@ -394,6 +394,24 @@ assert.equal(niceAmount(2, 'portion'), '2 portion');
   assert.equal(w[1].over, false);
   const moves = priceMoves(new Map([['g', g1]]));
   close(moves[0].change, (22 - 18) / 18 * 100);
+}
+
+// Menu engineering: textbook four-dish example
+{
+  const unit = new Map([['u', { name: 'Cost unit', unit: 'each', price: 1, yieldPct: 100 }]]);
+  const dish = (id, cost, menuPrice) => ({ id, name: id, portions: 1, menuPrice, items: [{ ingredientId: 'u', qty: cost, unit: 'each' }] });
+  const R = new Map([dish('A', 9, 33), dish('B', 8, 22), dish('C', 6, 33), dish('D', 12, 22)].map(r => [r.id, r]));
+  const m = menuEngineering([{ recipeId: 'A', sold: 50 }, { recipeId: 'B', sold: 60 }, { recipeId: 'C', sold: 10 }, { recipeId: 'D', sold: 5 }, { recipeId: 'gone', sold: 9 }], unit, R);
+  assert.equal(m.rows.length, 4);                                   // deleted recipe ignored
+  close(m.avgCm, (21 * 50 + 12 * 60 + 24 * 10 + 8 * 5) / 125);     // 16.4
+  close(m.popThreshold, 0.175);
+  assert.deepEqual(m.rows.map(x => x.class), ['star', 'plowhorse', 'puzzle', 'dog']);
+  close(m.revenue, 30 * 50 + 20 * 60 + 30 * 10 + 20 * 5);
+  close(m.foodCostPct, (9 * 50 + 8 * 60 + 6 * 10 + 12 * 5) / 3100 * 100);
+  // price override beats the recipe's menu price; no sales yet -> no classes
+  const m2 = menuEngineering([{ recipeId: 'A', price: 44, sold: 0 }], unit, R);
+  close(m2.rows[0].cm, 40 - 9);
+  assert.equal(m2.rows[0].class, null);
 }
 
 console.log('calc ok');

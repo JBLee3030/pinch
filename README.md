@@ -55,6 +55,7 @@ I built Pinch while studying Commercial Cookery and Kitchen Management in Melbou
 **Kitchen operations**
 - Prep list for a service: recipes and portions become ordered task cards (stocks and sauces before the dishes that use them, longest jobs first) with weigh-out and method checklists, step timers and saved ticks
 - Order list: choose recipes and portions → sub-recipes expand to raw ingredients, grossed up for trim yield, minus stock on hand, with estimated cost; share as text or print
+- Menus with menu engineering (Kasavana & Smith): price and sales per dish give contribution margin, food cost on sales and a Star / Plowhorse / Puzzle / Dog matrix with advice; a printable customer allergen menu per menu
 - Allergen chart across all recipes (Australian mandatory allergens)
 - Food safety temperature log: fridge, freezer, deliveries, hot holding, cooking and 2-stage cooling (60 → 21 °C within 2 h → 5 °C within 6 h), each marked PASS / FAIL / OPEN with corrective actions
 
