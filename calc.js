@@ -382,3 +382,19 @@ export function menuEngineering(items, ings, recs) {
   const foodCost = rows.reduce((n, x) => n + x.cost * x.sold, 0);
   return { rows, totalSold, avgCm, popThreshold, revenue, totalCm: revenue - foodCost, foodCostPct: revenue ? foodCost / revenue * 100 : NaN };
 }
+
+// ---- Exams and assessments
+
+// Whole days from `today` to `date` (both 'YYYY-MM-DD'); negative when past.
+export const daysUntil = (date, today) => Math.round((Date.parse(date + 'T00:00:00Z') - Date.parse(today + 'T00:00:00Z')) / 86400000);
+
+// Practice readiness per recipe: ready when practised `target` times and the last attempt rated 3+.
+export function examReadiness(exam, attempts) {
+  const target = Math.max(1, Number(exam.target) || 3);
+  const rows = (exam.recipeIds ?? []).map(recipeId => {
+    const mine = attempts.filter(a => a.recipeId === recipeId).sort((a, b) => b.date.localeCompare(a.date) || (b.createdAt ?? 0) - (a.createdAt ?? 0));
+    const lastRating = mine.find(a => a.rating)?.rating ?? null;
+    return { recipeId, count: mine.length, lastRating, ready: mine.length >= target && (lastRating ?? 0) >= 3 };
+  });
+  return { target, rows, ready: rows.filter(r => r.ready).length };
+}

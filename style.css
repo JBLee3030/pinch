@@ -525,7 +525,7 @@ fieldset.rating:has(input[value="5"]:checked) label:nth-of-type(-n+5) svg { fill
 .preset-grid button { width: 100%; }
 
 /* Study */
-.links .count { margin-left: auto; margin-right: var(--s3); font: 500 14px/1 var(--font); color: var(--text-3); }
+.links .count { margin-left: auto; margin-right: var(--s3); font: 500 14px/1 var(--font); color: var(--text-3); white-space: nowrap; flex-shrink: 0; }
 dl.ref { margin: 0; }
 dl.ref dt { font: var(--t-row); margin-top: var(--s4); }
 dl.ref dt:first-child { margin-top: 0; }
@@ -573,3 +573,5 @@ dl.ref dd { margin: var(--s1) 0 0; color: var(--text-2); }
 .mx.puzzle, .badge.puzzle { background: var(--fill); color: var(--text); }
 .mx.dog, .badge.dog { background: var(--danger-weak); color: var(--danger); }
 .mx span { color: var(--text-2); }
+.today .links { margin-bottom: var(--s4); }
+.today h2.day { margin-top: 0; }

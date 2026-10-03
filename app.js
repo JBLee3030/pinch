@@ -2,7 +2,7 @@ import * as db from './db.js';
 import * as sync from './sync.js';
 import { DECKS, ALL_CARDS, review, pickSession, isDue, isLearned } from './study.js';
 import { parseIngredientLine, matchIngredient, parsePriceList, splitSteps, findDurations, fmtDuration } from './parse.js';
-import { ALLERGENS, PURCHASE_UNITS, UNITS, recipeCost, itemCost, suggestedPrice, actualCostPct, recipeAllergens, usesRecipe, hasPrice, orderList, fmtAmount, TEMP_CHECKS, tempStatus, yieldTest, MEASURES, convertFor, densityFor, scaleFromIngredient, bakersPercent, bakersBase, fToC, cToF, prepBatches, niceAmount, niceParts, withPriceHistory, costImpact, foodCostWatch, priceMoves, menuEngineering, MENU_CLASSES, money, pct } from './calc.js';
+import { ALLERGENS, PURCHASE_UNITS, UNITS, recipeCost, itemCost, suggestedPrice, actualCostPct, recipeAllergens, usesRecipe, hasPrice, orderList, fmtAmount, TEMP_CHECKS, tempStatus, yieldTest, MEASURES, convertFor, densityFor, scaleFromIngredient, bakersPercent, bakersBase, fToC, cToF, prepBatches, niceAmount, niceParts, withPriceHistory, costImpact, foodCostWatch, priceMoves, menuEngineering, MENU_CLASSES, daysUntil, examReadiness, money, pct } from './calc.js';
 
 const view = document.getElementById('view');
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -74,11 +74,13 @@ const photoValue = async (fd, old) => fd.get('rmPhoto') ? null : (await readPhot
 const costLine = c => `${money(c.perPortion)}<small>${c.problems.length ? '<span class="warn-text">Incomplete</span>' : 'per portion'}</small>`;
 
 async function recipeList() {
-  const [recipes, ings] = await Promise.all([db.all('recipes'), ingMap()]);
+  const [recipes, ings, todo] = await Promise.all([db.all('recipes'), ingMap(), todayItems()]);
   recipes.sort(byName);
   const recs = toMap(recipes);
   const cats = [...new Set(recipes.map(r => r.category).filter(Boolean))].sort();
   page('recipes', 'Recipes', recipes.length ? `
+    ${todo.length ? `<div class="today"><h2 class="day">Today</h2><div class="links" role="navigation" aria-label="Today">${todo.map(([href, label, value, alert]) =>
+      `<a href="${href}"><span>${esc(label)}</span><span class="count ${alert ? 'alert-text' : ''}">${esc(value)}</span></a>`).join('')}</div></div>` : ''}
     <div class="bar"><input type="search" id="q" placeholder="Search recipes or ingredients" aria-label="Search recipes or ingredients">
       <select id="cat" aria-label="Category"><option value="">All</option>${opts(cats)}</select></div>
     <div class="links" role="navigation" aria-label="Recipe tools"><a href="#/allergens">Allergen chart</a><a href="#/calc">Kitchen calculator</a><a href="#/timers">Timers</a><a href="#/prep">Prep list</a><a href="#/menus">Menus</a></div>
@@ -698,8 +700,14 @@ async function timersView() {
 
 const studyState = async () => (await db.get('settings', 'study'))?.cards ?? {};
 
+const EXAM_TYPES = { practical: 'Practical', theory: 'Theory', assignment: 'Assignment' };
+const dLabel = n => (n === 0 ? 'Today' : n === 1 ? 'Tomorrow' : n > 0 ? `${n} days` : `${-n} days ago`);
+
 async function studyHome() {
-  const st = await studyState(), now = Date.now();
+  const [st, exams, attempts] = await Promise.all([studyState(), db.all('exams'), db.all('attempts')]);
+  const now = Date.now();
+  const upcoming = exams.filter(e => daysUntil(e.date, today()) >= 0).sort((a, b) => a.date.localeCompare(b.date));
+  const past = exams.length - upcoming.length;
   const due = ALL_CARDS.filter(c => isDue(st, c.id, now)).length;
   const fresh = ALL_CARDS.filter(c => !st[c.id]).length;
   const learned = ALL_CARDS.filter(c => isLearned(st, c.id)).length;
@@ -711,6 +719,15 @@ async function studyHome() {
       <div class="progress"><i style="width:${learned / ALL_CARDS.length * 100}%"></i></div>
       ${due || fresh ? '<a class="btn wide" href="#/study/go">Study 10 cards</a>' : ''}
     </div>
+    <h2 class="day">Coming up</h2>
+    ${upcoming.length ? `<ul class="list">${upcoming.map(e => {
+      const r = examReadiness(e, attempts), d = daysUntil(e.date, today());
+      return `<li><a href="#/exam/${esc(e.id)}/edit"><div class="grow"><b>${esc(e.title)}</b>
+        <small>${esc(EXAM_TYPES[e.type] ?? '')}, ${esc(dateLabel(e.date))}${r.rows.length ? ` · ${r.ready} of ${r.rows.length} dish${r.rows.length === 1 ? '' : 'es'} ready` : ''}</small></div>
+        <span class="trail"><span class="${d <= 3 ? 'warn-text' : ''}">${esc(dLabel(d))}</span></span></a></li>`;
+    }).join('')}</ul>` : ''}
+    <a class="btn ghost wide" href="#/exam/new/edit" style="margin:0 0 var(--s3)">Add an exam or assessment</a>
+    ${past ? `<p class="muted center"><small>${past} past exam${past === 1 ? '' : 's'} kept in your records.</small></p>` : ''}
     <h2 class="day">Decks</h2>
     <div class="links" role="navigation" aria-label="Decks">${DECKS.map(d => `<a href="#/study/deck/${d.id}"><span>${esc(d.title)}</span>
       <span class="count">${d.cards.filter(c => isLearned(st, c.id)).length}/${d.cards.length}</span></a>`).join('')}</div>
@@ -776,6 +793,76 @@ async function studySession(deckId) {
     if (e.target.id === 'got') answer(true);
   });
   show(false);
+}
+
+// ---------- Exams and assessments ----------
+
+async function examEdit(id) {
+  const isNew = id === 'new';
+  const [recipes, attempts] = await Promise.all([db.all('recipes'), db.all('attempts')]);
+  recipes.sort(byName);
+  const e = isNew ? { id: uid(), title: '', date: today(), type: 'practical', recipeIds: [], target: 3 } : await db.get('exams', id);
+  if (!e) return go('#/study');
+  const r = examReadiness(e, attempts), d = daysUntil(e.date, today());
+  const byId = toMap(recipes);
+  page('study', isNew ? 'New exam' : e.title || 'Exam', `
+    ${!isNew && r.rows.length ? `<div class="card stat-card">
+      <p class="stat-label">${esc(EXAM_TYPES[e.type] ?? 'Exam')}, ${esc(dateLabel(e.date))}</p>
+      <p class="stat">${esc(dLabel(d))}</p>
+      <p class="stat-sub">${r.ready} of ${r.rows.length} dish${r.rows.length === 1 ? '' : 'es'} ready (practised ${r.target}× with a last rating of 3+)</p>
+      <div class="progress"><i style="width:${r.ready / r.rows.length * 100}%"></i></div></div>
+    <ul class="list">${r.rows.map(x => { const rec = byId.get(x.recipeId); return rec ? `<li><a href="#/recipe/${esc(rec.id)}">
+      <div class="grow"><b>${esc(rec.name)}</b><small>${x.count} of ${r.target} practices${x.lastRating ? `, last rated ${x.lastRating}/5` : ''}</small></div>
+      <span class="trail"><span class="badge ${x.ready ? 'pass' : 'pending'}">${x.ready ? 'Ready' : 'Practise'}</span></span></a></li>` : ''; }).join('')}</ul>` : ''}
+    <form id="f">
+      <label>Title<input name="title" required placeholder="e.g. Practical: pasta and sauces" value="${esc(e.title)}"></label>
+      <div class="row2"><label>Date<input name="date" type="date" required value="${esc(e.date)}"></label>
+        <label>Type<select name="type">${Object.entries(EXAM_TYPES).map(([k, v]) => `<option value="${k}" ${k === e.type ? 'selected' : ''}>${v}</option>`).join('')}</select></label></div>
+      <h2>Dishes to practise</h2>
+      ${recipes.length ? `<div class="checks">${recipes.map(rec => `<label><input type="checkbox" name="recipeIds" value="${esc(rec.id)}" ${e.recipeIds?.includes(rec.id) ? 'checked' : ''}> ${esc(rec.name)}</label>`).join('')}</div>`
+        : '<p class="muted">Add the recipes first, then pick them here.</p>'}
+      <label style="margin-top:16px">Practise each dish<select name="target">${[1, 2, 3, 4, 5].map(n => `<option value="${n}" ${n === Number(e.target || 3) ? 'selected' : ''}>${n} time${n === 1 ? '' : 's'}</option>`).join('')}</select></label>
+      <label>Notes <small>(optional)</small><textarea name="notes" placeholder="What's assessed, equipment, time limit…">${esc(e.notes)}</textarea></label>
+      <div class="actions"><button type="submit">Save</button>${isNew ? '' : '<button type="button" class="danger" id="del">Delete</button>'}</div>
+    </form>`, { back: '#/study' });
+  const form = document.getElementById('f');
+  form.onsubmit = async ev => {
+    ev.preventDefault();
+    const fd = new FormData(form);
+    await db.put('exams', { ...e, title: fd.get('title').trim(), date: fd.get('date'), type: fd.get('type'), recipeIds: fd.getAll('recipeIds'),
+      target: num(fd.get('target')), notes: fd.get('notes').trim(), createdAt: e.createdAt ?? Date.now(), updatedAt: Date.now() });
+    go('#/study');
+  };
+  document.getElementById('del')?.addEventListener('click', async () => {
+    if (confirm('Delete this exam? Practice records stay.')) { await db.del('exams', e.id); go('#/study'); }
+  });
+}
+
+// ---------- Today: what needs doing, gathered from every part of the app ----------
+
+async function todayItems() {
+  const [exams, attempts, st, temps, prep, logs, recipes, ings, s] = await Promise.all([db.all('exams'), db.all('attempts'), studyState(), db.all('temps'),
+    db.get('settings', 'prepPlan'), db.all('logs'), db.all('recipes'), ingMap(), settings()]);
+  const items = [], t = today();
+  const next = exams.filter(e => daysUntil(e.date, t) >= 0).sort((a, b) => a.date.localeCompare(b.date))[0];
+  if (next) {
+    const r = examReadiness(next, attempts), d = daysUntil(next.date, t), behind = r.rows.length - r.ready;
+    items.push([`#/exam/${next.id}/edit`, behind ? `${next.title}, ${behind} to practise` : next.title, dLabel(d), d <= 3 && behind]);
+  }
+  const due = ALL_CARDS.filter(c => isDue(st, c.id)).length;
+  if (due) items.push(['#/study/go', 'Study cards to review', String(due)]);
+  const open = temps.filter(x => tempStatus(x).status === 'pending').length;
+  if (open) items.push(['#/temps', 'Temperature check still open', String(open), true]);
+  if (prep?.rows?.some(r => r.recipeId && r.portions > 0)) {
+    const { tasks } = prepBatches(prep.rows, toMap(recipes));
+    const total = tasks.reduce((n, x) => n + (x.recipe.items?.length ?? 0) + splitSteps(x.recipe.method).length, 0);
+    const done = (prep.done ?? []).length;
+    if (total && done < total) items.push(['#/prep', 'Prep list', `${done} / ${total}`]);
+  }
+  if (logs.length && !logs.some(l => l.date === t && l.period === periodNow())) items.push(['#/log/new/edit', `Log today's ${periodNow().toLowerCase()} service`, '']);
+  const over = foodCostWatch(recipes, ings, s.targetCostPct).filter(x => x.over).length;
+  if (over) items.push(['#/costwatch', 'Over target food cost', String(over), true]);
+  return items;
 }
 
 // ---------- Scaling: by portions, from an ingredient you have, baker's % ----------
@@ -1734,7 +1821,7 @@ async function settingsView() {
     </form>
     <div class="card"><h2>Invite classmates</h2><p class="muted">Pinch is free. Share the link. Everyone gets their own private recipe book.</p>
       <button type="button" class="ghost" id="invite">Share Pinch</button> <span id="inviteMsg" class="muted"></span></div>
-    <p class="muted center"><small>Pinch v18</small></p>`);
+    <p class="muted center"><small>Pinch v19</small></p>`);
 
   const acct = document.getElementById('acct');
   drawAccount = () => {
@@ -1920,6 +2007,7 @@ async function loadDemo() {
     notes: 'Much better texture. Chef liked the gloss on the sauce.', next: 'Season the pasta water more; it tasted flat.' });
   await db.put('menus', { id: 'd-menu', name: 'Pasta bar lunch', period: 'Last week', createdAt: t, updatedAt: t,
     items: [{ recipeId: 's-tag', price: 26, sold: 48 }, { recipeId: 's-pasta', price: 9, sold: 6 }, { recipeId: 's-pomo', price: 12, sold: 30 }] });
+  await db.put('exams', { id: 'd-exam', title: 'Practical: fresh pasta and sauce', date: day(-9), type: 'practical', recipeIds: ['s-tag', 's-pasta'], target: 3, createdAt: t });
   await db.put('settings', { ...(await settings()), id: 'settings', cookName: 'Demo Cook' });
   await db.put('settings', { id: 'orderPlan', rows: [{ recipeId: 's-tag', portions: 40 }, { recipeId: 's-pomo', portions: 10 }], onHand: { 's-tom': 5.5, 's-oni': 10 } });
   await db.put('settings', { id: 'portfolio', headline: 'Commis chef · Cert IV Kitchen Management', contact: 'demo@example.com',
@@ -1941,6 +2029,7 @@ const routes = [
   [/^#\/attempt\/([^/]+)\/edit$/, id => attemptEdit(null, id)],
   [/^#\/calc$/, calcView],
   [/^#\/timers$/, timersView],
+  [/^#\/exam\/([^/]+)\/edit$/, examEdit],
   [/^#\/prep$/, prepView],
   [/^#\/menus$/, menusView],
   [/^#\/menu\/([^/]+)$/, menuView],

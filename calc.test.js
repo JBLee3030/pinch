@@ -4,7 +4,7 @@ import { remoteWins } from './db.js';
 import { DECKS, ALL_CARDS, review, pickSession, isDue, isLearned } from './study.js';
 import { extractRecipe, safeUrl } from './supabase/functions/recipe-import/index.js';
 import { parseIngredientLine as P, matchIngredient, parsePriceList, packUnit, splitSteps, findDurations, fmtDuration } from './parse.js';
-import { convert, recipeCost, suggestedPrice, actualCostPct, recipeAllergens, orderList, fmtAmount, tempStatus, yieldTest, convertFor, densityFor, MEASURES, scaleFromIngredient, itemGrams, bakersPercent, bakersBase, fToC, cToF, prepBatches, niceAmount, withPriceHistory, costImpact, foodCostWatch, priceMoves, menuEngineering } from './calc.js';
+import { convert, recipeCost, suggestedPrice, actualCostPct, recipeAllergens, orderList, fmtAmount, tempStatus, yieldTest, convertFor, densityFor, MEASURES, scaleFromIngredient, itemGrams, bakersPercent, bakersBase, fToC, cToF, prepBatches, niceAmount, withPriceHistory, costImpact, foodCostWatch, priceMoves, menuEngineering, daysUntil, examReadiness } from './calc.js';
 
 const close = (a, b) => assert.ok(Math.abs(a - b) < 1e-9, `${a} != ${b}`);
 
@@ -412,6 +412,22 @@ assert.equal(niceAmount(2, 'portion'), '2 portion');
   const m2 = menuEngineering([{ recipeId: 'A', price: 44, sold: 0 }], unit, R);
   close(m2.rows[0].cm, 40 - 9);
   assert.equal(m2.rows[0].class, null);
+}
+
+// Exams
+{
+  assert.equal(daysUntil('2026-10-15', '2026-10-03'), 12);
+  assert.equal(daysUntil('2026-10-03', '2026-10-03'), 0);
+  assert.equal(daysUntil('2026-10-01', '2026-10-03'), -2);
+  assert.equal(daysUntil('2027-04-05', '2027-04-02'), 3);            // across the April DST change in Melbourne
+  const at = (recipeId, date, rating) => ({ recipeId, date, rating });
+  const r = examReadiness({ recipeIds: ['tag', 'tira', 'risotto'], target: 2 }, [
+    at('tag', '2026-10-01', 4), at('tag', '2026-09-20', 2),          // 2 practices, last 4 stars -> ready
+    at('tira', '2026-10-02', 2), at('tira', '2026-09-28', 5),        // 2 practices, last only 2 stars -> not ready
+  ]);
+  assert.deepEqual(r.rows.map(x => [x.recipeId, x.count, x.lastRating, x.ready]), [['tag', 2, 4, true], ['tira', 2, 2, false], ['risotto', 0, null, false]]);
+  assert.equal(r.ready, 1);
+  assert.equal(examReadiness({ recipeIds: [] }, []).target, 3);     // default target
 }
 
 console.log('calc ok');

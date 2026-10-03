@@ -1,7 +1,7 @@
 // All storage goes through here. IndexedDB is the source of truth; sync.js mirrors it to the cloud.
 // Every local write stamps `_ts` (edit time, last write wins) and `_dirty` (not yet pushed).
 // Deletes keep a tombstone `{ id, _deleted }` so other devices learn about them; reads hide tombstones.
-export const STORES = ['ingredients', 'recipes', 'logs', 'settings', 'temps', 'attempts', 'menus'];
+export const STORES = ['ingredients', 'recipes', 'logs', 'settings', 'temps', 'attempts', 'menus', 'exams'];
 // ?demo opens a separate database filled with sample data, so a visitor (or you) can explore
 // without touching real data. Sync is off in demo mode.
 export const DEMO = new URLSearchParams(globalThis.location?.search ?? '').has('demo');
@@ -9,8 +9,8 @@ let dbp;
 
 function open() {
   return dbp ??= new Promise((res, rej) => {
-    // v2 added 'temps', v3 'attempts', v4 'menus'. Upgrades only create missing stores, so existing data is untouched.
-    const r = indexedDB.open(DEMO ? 'pinch-demo' : 'pinch', 4);
+    // v2 added 'temps', v3 'attempts', v4 'menus', v5 'exams'. Upgrades only create missing stores, so existing data is untouched.
+    const r = indexedDB.open(DEMO ? 'pinch-demo' : 'pinch', 5);
     r.onupgradeneeded = () => STORES.forEach(s => r.result.objectStoreNames.contains(s) || r.result.createObjectStore(s, { keyPath: 'id' }));
     r.onsuccess = () => {
       r.result.onversionchange = () => r.result.close(); // let a newer version in another tab upgrade
