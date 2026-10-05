@@ -57,6 +57,8 @@ I built Pinch while studying Commercial Cookery and Kitchen Management in Melbou
 - Order list: choose recipes and portions → sub-recipes expand to raw ingredients, grossed up for trim yield, minus stock on hand, with estimated cost; share as text or print
 - Menus with menu engineering (Kasavana & Smith): price and sales per dish give contribution margin, food cost on sales and a Star / Plowhorse / Puzzle / Dog matrix with advice; a printable customer allergen menu per menu
 - Stocktake: count stock by purchase unit, valued at the day's prices; each count closes a period with actual food cost % (opening + purchases − closing ÷ sales), shown against your target and what a menu costs on paper. The latest count fills On hand in the order list
+- Par levels and storage areas: each ingredient can have a par level and a place (fridge, freezer, dry store); stocktakes are grouped by area in walking order, and the order list can top everything up to par (ordering whichever is more, the plan's need or par)
+- Checklists: opening, closing and weekly cleaning lists to start from (editable, add your own); ticks are saved by date, so they double as cleaning records, and the next unfinished list shows on Home
 - Waste log: what went in the bin, how much and why (spoiled, over-produced, prep and trim, mistakes), costed as bought or at recipe cost; totals by reason and the items costing the most, and waste as a share of food used per stocktake period
 - Allergen chart across all recipes (Australian mandatory allergens)
 - Food safety temperature log: fridge, freezer, deliveries, hot holding, cooking and 2-stage cooling (60 → 21 °C within 2 h → 5 °C within 6 h), each marked PASS / FAIL / OPEN with corrective actions

@@ -608,3 +608,10 @@ main > .btn.ghost, main > .actions > :is(button, .btn).ghost { background: var(-
 /* Forms inside a card (sign-in on Settings) keep their buttons in place, side by side */
 body.sub .card form .actions:has(> button[type=submit]) { position: static; margin: var(--s4) 0 0; padding: 0; background: none; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
 body.sub .card form .actions > button[type=submit] { min-height: var(--h-md); font-size: 16px; border-radius: var(--r-control); }
+
+/* ---- v23: par levels, storage areas, checklists ---- */
+.list li .row-static { display: flex; align-items: center; gap: var(--s3); min-height: 56px; padding: var(--s2) var(--s5); }
+.have-field .par { margin-left: auto; color: var(--text-3); font: 500 13px/1 var(--font); }
+.par-toggle { margin: 0 0 var(--s4); padding-bottom: var(--s4); border-bottom: 1px solid var(--line); font-weight: 600; }
+.card.area h2 { margin-bottom: 0; }
+.card > .checklist:first-child { margin-top: calc(var(--s2) * -1); margin-bottom: calc(var(--s2) * -1); }

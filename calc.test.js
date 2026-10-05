@@ -5,7 +5,7 @@ import { tr } from './i18n.js';
 import { DECKS, ALL_CARDS, review, pickSession, isDue, isLearned } from './study.js';
 import { extractRecipe, safeUrl } from './supabase/functions/recipe-import/index.js';
 import { parseIngredientLine as P, matchIngredient, parsePriceList, packUnit, splitSteps, findDurations, fmtDuration } from './parse.js';
-import { convert, recipeCost, suggestedPrice, actualCostPct, recipeAllergens, orderList, fmtAmount, tempStatus, yieldTest, convertFor, densityFor, MEASURES, scaleFromIngredient, itemGrams, bakersPercent, bakersBase, fToC, cToF, prepBatches, niceAmount, withPriceHistory, costImpact, foodCostWatch, priceMoves, menuEngineering, daysUntil, examReadiness, stockValue, stockPeriods, wasteCost, wasteSummary } from './calc.js';
+import { convert, recipeCost, suggestedPrice, actualCostPct, recipeAllergens, orderList, fmtAmount, tempStatus, yieldTest, convertFor, densityFor, MEASURES, scaleFromIngredient, itemGrams, bakersPercent, bakersBase, fToC, cToF, prepBatches, niceAmount, withPriceHistory, costImpact, foodCostWatch, priceMoves, menuEngineering, daysUntil, examReadiness, stockValue, stockPeriods, wasteCost, wasteSummary, periodKey, checkProgress } from './calc.js';
 
 const close = (a, b) => assert.ok(Math.abs(a - b) < 1e-9, `${a} != ${b}`);
 
@@ -456,6 +456,24 @@ assert.equal(niceAmount(2, 'portion'), '2 portion');
   close(s.total, 30.5);
   assert.deepEqual(s.byReason.map(x => [x.key, x.cost]), [['over', 20], ['spoiled', 10.5]]);
   assert.deepEqual(s.topItems.map(x => x.key), ['Ragù', 'Basil', 'Bread']);
+}
+
+// Par levels, checklists
+{
+  const ings = new Map([['flo', { id: 'flo', name: 'Flour', unit: 'kg', price: 2, yieldPct: 100, par: 10 }], ['oil', { id: 'oil', name: 'Oil', unit: 'L', price: 12, yieldPct: 100 }],
+    ['egg', { id: 'egg', name: 'Eggs', unit: 'each', price: 0.5, yieldPct: 100, par: 30 }]]);
+  const recs = new Map([['dough', { id: 'dough', portions: 1, items: [{ ingredientId: 'flo', qty: 2, unit: 'kg' }, { ingredientId: 'oil', qty: 0.5, unit: 'L' }] }]]);
+  const plan = [{ recipeId: 'dough', portions: 1 }];
+  assert.deepEqual(orderList(plan, ings, recs, { flo: 3 }).lines.map(l => [l.id, l.order]), [['flo', 0], ['oil', 0.5]]);   // no par: 2 needed, 3 on hand
+  const o = orderList(plan, ings, recs, { flo: 3, egg: 12 }, true);
+  assert.deepEqual(o.lines.map(l => [l.id, l.order, l.par]), [['egg', 18, 30], ['flo', 7, 10], ['oil', 0.5, 0]]);         // max(2, 10) − 3; eggs by par alone
+  assert.equal(orderList([{ recipeId: 'dough', portions: 8 }], ings, recs, { flo: 3 }, true).lines.find(l => l.id === 'flo').order, 13); // a big plan beats par: 16 − 3
+  assert.equal(orderList([], ings, recs, {}, true).lines.length, 2);                                                       // par works with nothing planned
+  assert.equal(periodKey('day', '2026-10-07'), '2026-10-07');
+  assert.equal(periodKey('week', '2026-10-07'), '2026-10-05');                                                             // Wednesday -> Monday
+  assert.equal(periodKey('week', '2026-10-05'), '2026-10-05');
+  assert.equal(periodKey('week', '2026-10-11'), '2026-10-05');                                                             // Sunday belongs to the week before
+  assert.deepEqual(checkProgress({ items: ['a', 'b', 'c'] }, { done: ['a', 'c', 'gone'] }), { done: 2, total: 3 });
 }
 
 // Korean UI

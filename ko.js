@@ -28,6 +28,18 @@ export const KO = {
   'Home': '홈', 'Tools': '도구', 'To do': '할 일', 'All done for now': '지금은 할 일이 없어요', 'Nothing needs doing. Nice work.': '모두 끝냈어요. 잘했어요.',
   'Calculator': '계산기', 'Prep': '프렙', 'Temps': '온도', 'Order': '발주', 'Stock count': '재고 실사', 'Costs': '원가', 'Allergy chart': '알레르기 표',
 
+  // Checklists, par levels, storage areas
+  'Checklists': '체크리스트', 'Every day': '매일', 'Every week': '매주', 'this week': '이번 주', 'today': '오늘', 'This week': '이번 주', 'Earlier': '지난 기록',
+  'Ticks are saved with the date, so the lists double as your cleaning records.': '체크는 날짜와 함께 저장돼서 청소 기록으로도 쓸 수 있어요.',
+  'No checklists.': '체크리스트가 없어요.', 'Make one for opening, closing or cleaning.': '오픈, 마감, 청소용으로 만들어 보세요.',
+  'New checklist': '새 체크리스트', 'Edit checklist': '체크리스트 수정', 'e.g. Closing, Pastry section': '예: 마감, 페이스트리 파트', 'How often': '주기',
+  'Items, one per line': '항목 (한 줄에 하나씩)', 'Opening': '오픈', 'Closing': '마감', 'Weekly clean': '주간 청소',
+  'Stored in': '보관 위치', 'Par level': '적정 재고 (Par)', 'Optional': '선택', 'Dry store': '건식 창고',
+  'Par is how much you want on the shelf, in the purchase unit. The order list can top up to it.': '적정 재고는 늘 있어야 할 양이에요(구매 단위). 발주 리스트가 이만큼 채워 줘요.',
+  'Top up to par levels': '적정 재고까지 채우기', 'par levels': '적정 재고', 'Set a par level on an ingredient to order by par too.': '재료에 적정 재고를 정하면 그 기준으로도 발주할 수 있어요.',
+  'Add recipes, or set par levels in Pantry, to make an order list.': '레시피를 추가하거나 팬트리에서 적정 재고를 정하면 발주 리스트를 만들 수 있어요.',
+  'Order = need ÷ trim yield, or par if that’s more, − on hand. Count stock in the purchase unit (kg, L, each).': '발주량 = 필요량 ÷ 수율과 적정 재고 중 큰 값 − 보유량. 재고는 구매 단위(kg, L, 개)로 세요.',
+
   // Recipes tab
   'Recipe tools': '레시피 도구', 'Allergen chart': '알레르기 표', 'Kitchen calculator': '주방 계산기', 'Timers': '타이머', 'Prep list': '프렙 리스트', 'Menus': '메뉴',
   'Temperature check still open': '마치지 않은 온도 체크', 'Study cards to review': '복습할 카드', 'Over target food cost': '목표 원가율 초과',
@@ -363,8 +375,12 @@ export const KO_PATTERNS = [
   [/^([\d.]+ \S+) at (\S+)$/, '$1 ($2)'],
   [/^Use (\S+) for (.+)$/, '$2에 $1 적용'],
   [/^Saved\. (.+) now uses (\S+) yield in every recipe\.$/, '저장했어요. 이제 모든 레시피에서 $1의 수율은 $2예요.'],
-  [/^For: (.+)$/, '대상: $1'],
-  [/^Need (.+?)(?:, yield (\S+))?$/, (q, y) => `필요량 ${q}${y ? `, 수율 ${y}` : ''}`],
+  [/^For: (.+?)(, par levels)?$/, (f, p) => `대상: ${f}${p ? ', 적정 재고' : ''}`],
+  [/^Need (.+?)(?:, yield (\S+?))?(?:, par (.+))?$/, (q, y, p) => `필요량 ${q}${y ? `, 수율 ${y}` : ''}${p ? `, 적정 ${p}` : ''}`],
+  [/^Par (.+)$/, '적정 재고 $1'],
+  [/^par (.+)$/, '적정 $1'],
+  [/^Week of (.+)$/, '$1 주'],
+  [/^Delete "(.+)"\? Its past records go too\.$/, '"$1"을(를) 삭제할까요? 지난 기록도 함께 지워져요.'],
   [/^(.+) on hand in (\S+)$/, '$1 보유량 ($2)'],
 
   // Stocktake

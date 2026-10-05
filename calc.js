@@ -143,20 +143,23 @@ export function ingredientNeeds(recipe, factor, ings, recs, needs = new Map(), p
 
 // plan: [{ recipeId, portions }]; onHand: { ingredientId: qty in purchase unit }.
 // gross = need grossed up for trim yield; order = gross - on hand (min 0); 'each' rounds up.
-export function orderList(plan, ings, recs, onHand = {}) {
+// usePar: never leave an ingredient below its par level either: order up to whichever is more, the need or par.
+export function orderList(plan, ings, recs, onHand = {}, usePar = false) {
   const needs = new Map(), problems = [];
   for (const { recipeId, portions } of plan) {
     const r = recs.get(recipeId);
     if (r && portions > 0) ingredientNeeds(r, portions / Math.max(1, Number(r.portions) || 1), ings, recs, needs, problems);
   }
+  if (usePar) for (const ing of ings.values()) if (Number(ing.par) > 0 && !needs.has(ing.id)) needs.set(ing.id, 0);
   const lines = [...needs].map(([id, usable]) => {
     const ing = ings.get(id);
-    const gross = usable / ((Number(ing.yieldPct) || 100) / 100);
+    const par = usePar ? Math.max(0, Number(ing.par) || 0) : 0;
+    const gross = Math.max(usable / ((Number(ing.yieldPct) || 100) / 100), par);
     const have = Math.max(0, Number(onHand[id]) || 0);
     let order = Math.max(0, gross - have);
     if (ing.unit === 'each') order = Math.ceil(order - 1e-9);
     if (order > 0 && !hasPrice(ing)) problems.push(`Price missing: ${ing.name}`);
-    return { id, ing, usable, gross, have, order, cost: hasPrice(ing) ? order * Number(ing.price) : order > 0 ? NaN : 0 };
+    return { id, ing, usable, par, gross, have, order, cost: hasPrice(ing) ? order * Number(ing.price) : order > 0 ? NaN : 0 };
   }).sort((a, b) => a.ing.name.localeCompare(b.ing.name));
   const total = lines.reduce((n, l) => n + (Number.isFinite(l.cost) ? l.cost : 0), 0);
   return { lines, total, problems: [...new Set(problems)] };
@@ -439,3 +442,20 @@ export function wasteSummary(entries) {
     .map(([k, cost]) => ({ key: k, cost })).sort((a, b) => b.cost - a.cost);
   return { total: entries.reduce((n, w) => n + (Number(w.cost) || 0), 0), byReason: sum(w => w.reason), topItems: sum(w => w.name).slice(0, 3) };
 }
+
+// ---- Storage areas and checklists
+export const AREAS = { fridge: 'Fridge / cool room', freezer: 'Freezer', dry: 'Dry store', other: 'Other' };
+
+// The record a checklist tick belongs to: the day, or the Monday of the week for weekly lists.
+export function periodKey(every, date) {
+  if (every !== 'week') return date;
+  const d = new Date(date + 'T00:00:00Z');
+  d.setUTCDate(d.getUTCDate() - (d.getUTCDay() + 6) % 7);
+  return d.toISOString().slice(0, 10);
+}
+
+// Ticks are stored by item text, so renaming or removing an item never counts a stale tick.
+export const checkProgress = (list, record) => {
+  const done = new Set(record?.done ?? []);
+  return { done: (list.items ?? []).filter(x => done.has(x)).length, total: (list.items ?? []).length };
+};

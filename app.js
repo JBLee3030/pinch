@@ -3,7 +3,7 @@ import * as sync from './sync.js';
 import { LANG, locale, setLang } from './i18n.js';
 import { DECKS, ALL_CARDS, review, pickSession, isDue, isLearned } from './study.js';
 import { parseIngredientLine, matchIngredient, parsePriceList, splitSteps, findDurations, fmtDuration } from './parse.js';
-import { ALLERGENS, PURCHASE_UNITS, UNITS, recipeCost, itemCost, suggestedPrice, actualCostPct, recipeAllergens, usesRecipe, hasPrice, orderList, fmtAmount, TEMP_CHECKS, tempStatus, yieldTest, MEASURES, convertFor, densityFor, scaleFromIngredient, bakersPercent, bakersBase, fToC, cToF, prepBatches, niceAmount, niceParts, withPriceHistory, costImpact, foodCostWatch, priceMoves, menuEngineering, MENU_CLASSES, daysUntil, examReadiness, stockValue, stockPeriods, WASTE_REASONS, wasteCost, wasteSummary, money, pct } from './calc.js';
+import { ALLERGENS, PURCHASE_UNITS, UNITS, recipeCost, itemCost, suggestedPrice, actualCostPct, recipeAllergens, usesRecipe, hasPrice, orderList, fmtAmount, TEMP_CHECKS, tempStatus, yieldTest, MEASURES, convertFor, densityFor, scaleFromIngredient, bakersPercent, bakersBase, fToC, cToF, prepBatches, niceAmount, niceParts, withPriceHistory, costImpact, foodCostWatch, priceMoves, menuEngineering, MENU_CLASSES, daysUntil, examReadiness, AREAS, periodKey, checkProgress, stockValue, stockPeriods, WASTE_REASONS, wasteCost, wasteSummary, money, pct } from './calc.js';
 
 const view = document.getElementById('view');
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -46,14 +46,16 @@ const ICON = {
   briefcase: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7m0 2a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v9a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2z"/><path d="M8 7v-2a2 2 0 0 1 2 -2h4a2 2 0 0 1 2 2v2"/><path d="M12 12l0 .01"/><path d="M3 13a20 20 0 0 0 18 0"/></svg>',
   resize: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 4l4 0l0 4"/><path d="M14 10l6 -6"/><path d="M8 20l-4 0l0 -4"/><path d="M4 20l6 -6"/><path d="M16 20l4 0l0 -4"/><path d="M14 14l6 6"/><path d="M8 4l-4 0l0 4"/><path d="M4 4l6 6"/></svg>',
   printer: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 17h2a2 2 0 0 0 2 -2v-4a2 2 0 0 0 -2 -2h-14a2 2 0 0 0 -2 2v4a2 2 0 0 0 2 2h2"/><path d="M17 9v-4a2 2 0 0 0 -2 -2h-6a2 2 0 0 0 -2 2v4"/><path d="M7 13m0 2a2 2 0 0 1 2 -2h6a2 2 0 0 1 2 2v4a2 2 0 0 1 -2 2h-6a2 2 0 0 1 -2 -2z"/></svg>',
+  checkbox: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 11l3 3l8 -8"/><path d="M20 12v6a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h9"/></svg>',
   pencil: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4"/><path d="M13.5 6.5l4 4"/></svg>',
 };
 
 // Every tool lives on Home, so each tab stays about one thing.
 const TOOLS = [
-  ['#/timers', 'Timers', 'timer'], ['#/calc', 'Calculator', 'calculator'], ['#/prep', 'Prep', 'prep'], ['#/temps', 'Temps', 'temp'],
-  ['#/order', 'Order', 'truck'], ['#/stock', 'Stock count', 'count'], ['#/waste', 'Waste', 'trash'], ['#/menus', 'Menus', 'menu'],
-  ['#/costwatch', 'Costs', 'trend'], ['#/yield', 'Yield', 'scaleIc'], ['#/allergens', 'Allergy chart', 'alert'], ['#/portfolio', 'Portfolio', 'briefcase'],
+  ['#/checks', 'Checklists', 'checkbox'], ['#/temps', 'Temps', 'temp'], ['#/prep', 'Prep', 'prep'], ['#/timers', 'Timers', 'timer'],
+  ['#/order', 'Order', 'truck'], ['#/stock', 'Stock count', 'count'], ['#/waste', 'Waste', 'trash'], ['#/costwatch', 'Costs', 'trend'],
+  ['#/menus', 'Menus', 'menu'], ['#/yield', 'Yield', 'scaleIc'], ['#/calc', 'Calculator', 'calculator'], ['#/allergens', 'Allergy chart', 'alert'],
+  ['#/portfolio', 'Portfolio', 'briefcase'],
 ];
 
 // Tab roots get a large title; sub pages get a compact bar with a back button and no tab bar.
@@ -883,6 +885,109 @@ async function examEdit(id) {
   });
 }
 
+
+// ---------- Checklists: opening, closing, weekly cleaning ----------
+
+const DEFAULT_CHECKLISTS = {
+  en: [
+    ['Opening', 'day', ['Hands washed, apron and hat on', 'Fridge and freezer temperatures checked', 'Sanitiser made up and test strip checked', 'Benches and boards cleaned and sanitised',
+      'Hand basin stocked with soap and paper towel', 'Deliveries checked and put away', 'Prep list checked']],
+    ['Closing', 'day', ['Food covered, labelled and dated', 'Fridges closed and at 5 °C or below', 'Benches, boards and equipment cleaned and sanitised', 'Floors swept and mopped',
+      'Bins emptied and cleaned', 'Gas, ovens and equipment off', 'Hand basin restocked']],
+    ['Weekly clean', 'week', ['Fridge shelves and door seals cleaned', 'Oven and grill degreased', 'Extraction filters cleaned', 'Dry store checked for pests and use-by dates',
+      'Freezer checked for frost and damaged seals', 'Floor drains cleaned']],
+  ],
+  ko: [
+    ['오픈', 'day', ['손 씻기, 앞치마와 모자 착용', '냉장·냉동 온도 확인', '소독제 준비, 테스트 스트립 확인', '작업대와 도마 세척·소독', '손 세정대에 비누와 페이퍼 타월 채우기', '입고 물품 확인 후 정리', '프렙 리스트 확인']],
+    ['마감', 'day', ['음식 덮고 라벨과 날짜 붙이기', '냉장고 문 닫힘, 5 °C 이하 확인', '작업대·도마·장비 세척·소독', '바닥 쓸고 닦기', '쓰레기통 비우고 세척', '가스, 오븐, 장비 끄기', '손 세정대 다시 채우기']],
+    ['주간 청소', 'week', ['냉장고 선반과 문 고무패킹 청소', '오븐과 그릴 기름때 제거', '후드 필터 청소', '건식 창고 해충과 유통기한 점검', '냉동고 성에와 패킹 점검', '바닥 배수구 청소']],
+  ],
+};
+
+// First visit: start from the usual kitchen lists (in the app's language). Deleting them all doesn't bring them back.
+async function checklists() {
+  let lists = await db.all('checklists');
+  if (!lists.length && !(await db.get('settings', 'seeded'))?.checklists) {
+    const t = Date.now();
+    lists = DEFAULT_CHECKLISTS[LANG].map(([name, every, items], n) => ({ id: uid(), name, every, items, order: n, createdAt: t }));
+    for (const l of lists) await db.put('checklists', l);
+    await db.put('settings', { ...(await db.get('settings', 'seeded')), id: 'seeded', checklists: true });
+  }
+  return lists.sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || (a.createdAt ?? 0) - (b.createdAt ?? 0));
+}
+const checkRecordId = (list, date = today()) => `${list.id}:${periodKey(list.every, date)}`;
+const EVERY = { day: 'Every day', week: 'Every week' };
+
+async function checklistsView() {
+  const [lists, days] = await Promise.all([checklists(), db.all('checkdays')]);
+  const rec = new Map(days.map(d => [d.id, d]));
+  page('home', 'Checklists', lists.length ? `<ul class="list">${lists.map(l => {
+    const p = checkProgress(l, rec.get(checkRecordId(l)));
+    return `<li><a href="#/check/${esc(l.id)}"><div class="grow"><b>${esc(l.name)}</b><small>${EVERY[l.every]}</small></div>
+      <span class="trail"><span class="${p.done === p.total ? 'ok-text' : ''}">${p.done} / ${p.total}</span><small>${l.every === 'week' ? 'this week' : 'today'}</small></span></a></li>`;
+  }).join('')}</ul>
+    <p class="muted center"><small>Ticks are saved with the date, so the lists double as your cleaning records.</small></p>`
+    : '<div class="empty"><p>No checklists.</p><p>Make one for opening, closing or cleaning.</p></div>',
+    { back: '#/home', action: newBtn('#/check/new/edit') });
+}
+
+async function checklistDay(id) {
+  const [l, days] = await Promise.all([db.get('checklists', id), db.all('checkdays')]);
+  if (!l) return go('#/checks');
+  const rid = checkRecordId(l);
+  let record = days.find(d => d.id === rid) ?? { id: rid, listId: l.id, period: periodKey(l.every, today()), done: [] };
+  const history = days.filter(d => d.listId === l.id && d.id !== rid).sort((a, b) => b.period.localeCompare(a.period)).slice(0, 8);
+  page('home', l.name, `
+    <div class="card stat-card prep-progress" id="prog"></div>
+    <div class="card"><ul class="checklist">${(l.items ?? []).map((x, i) => `<li><label class="${record.done.includes(x) ? 'got' : ''}">
+      <input type="checkbox" data-i="${i}" ${record.done.includes(x) ? 'checked' : ''}><span class="grow">${esc(x)}</span></label></li>`).join('')}</ul></div>
+    ${history.length ? `<h2 class="day">Earlier</h2><ul class="list">${history.map(d => { const p = checkProgress(l, d); return `<li><div class="row-static">
+      <div class="grow"><b>${esc(l.every === 'week' ? `Week of ${shortDate(d.period)}` : dateLabel(d.period))}</b></div>
+      <span class="trail"><span class="${p.done === p.total ? 'ok-text' : 'warn-text'}">${p.done} / ${p.total}</span></span></div></li>`; }).join('')}</ul>` : ''}`,
+    { back: '#/checks', action: `<a class="btn sm tint" href="#/check/${esc(l.id)}/edit">Edit</a>` });
+  const prog = () => {
+    const p = checkProgress(l, record);
+    document.getElementById('prog').innerHTML = `<p class="stat-label">${l.every === 'week' ? 'This week' : 'Today'}</p><p class="stat ${p.done === p.total ? 'ok-text' : ''}">${p.done} / ${p.total}</p>
+      <div class="progress"><i style="width:${p.total ? p.done / p.total * 100 : 0}%"></i></div>`;
+  };
+  document.querySelector('.checklist').addEventListener('change', async e => {
+    const x = l.items[Number(e.target.dataset.i)];
+    const done = new Set(record.done);
+    if (e.target.checked) done.add(x); else done.delete(x);
+    record = { ...record, done: l.items.filter(i => done.has(i)), updatedAt: Date.now() };
+    e.target.closest('label').classList.toggle('got', e.target.checked);
+    prog();
+    await db.put('checkdays', record);
+  });
+  prog();
+}
+
+async function checklistEdit(id) {
+  const isNew = id === 'new';
+  const l = isNew ? { id: uid(), name: '', every: 'day', items: [], order: Date.now(), createdAt: Date.now() } : await db.get('checklists', id);
+  if (!l) return go('#/checks');
+  page('home', isNew ? 'New checklist' : 'Edit checklist', `<form id="f">
+    <label>Name<input name="name" required placeholder="e.g. Closing, Pastry section" value="${esc(l.name)}"></label>
+    <label>How often<select name="every">${Object.entries(EVERY).map(([k, v]) => `<option value="${k}" ${k === l.every ? 'selected' : ''}>${v}</option>`).join('')}</select></label>
+    <label>Items, one per line<textarea name="items" required rows="9">${esc((l.items ?? []).join('\n'))}</textarea></label>
+    <div class="actions"><button type="submit">Save</button>${isNew ? '' : '<button type="button" class="danger" id="del">Delete</button>'}</div>
+  </form>`, { back: isNew ? '#/checks' : `#/check/${esc(l.id)}` });
+  const form = document.getElementById('f');
+  form.onsubmit = async e => {
+    e.preventDefault();
+    const fd = new FormData(form);
+    const items = [...new Set(fd.get('items').split(/\r?\n/).map(x => x.trim()).filter(Boolean))];
+    await db.put('checklists', { ...l, name: fd.get('name').trim(), every: fd.get('every'), items, updatedAt: Date.now() });
+    go(`#/check/${l.id}`);
+  };
+  document.getElementById('del')?.addEventListener('click', async () => {
+    if (confirm(`Delete "${l.name}"? Its past records go too.`)) {
+      for (const d of (await db.all('checkdays')).filter(d => d.listId === l.id)) await db.del('checkdays', d.id);
+      await db.del('checklists', l.id); go('#/checks');
+    }
+  });
+}
+
 // ---------- Today: what needs doing, gathered from every part of the app ----------
 
 async function todayItems() {
@@ -907,6 +1012,14 @@ async function todayItems() {
   if (logs.length && !logs.some(l => l.date === t && l.period === periodNow())) items.push(['#/log/new/edit', `Log today's ${periodNow().toLowerCase()} service`, '']);
   const over = foodCostWatch(recipes, ings, s.targetCostPct).filter(x => x.over).length;
   if (over) items.push(['#/costwatch', 'Over target food cost', String(over), true]);
+  // Checklists, once you use them: the next unfinished daily list (opening, then closing) and this week's
+  const days = await db.all('checkdays');
+  if (days.length) {
+    const lists = await checklists(), rec = new Map(days.map(d => [d.id, d]));
+    const rows = ['day', 'week'].map(every => lists.find(x => x.every === every && (y => y.done < y.total)(checkProgress(x, rec.get(checkRecordId(x)))))).filter(Boolean)
+      .map(l => { const p = checkProgress(l, rec.get(checkRecordId(l))); return [`#/check/${l.id}`, l.name, `${p.done} / ${p.total}`]; });
+    items.unshift(...rows);
+  }
   return items;
 }
 
@@ -1273,6 +1386,11 @@ async function ingredientEdit(id) {
       <label>Per<select name="unit">${opts(PURCHASE_UNITS, i.unit)}</select></label>
     </div>
     <label>Yield % <small>(usable after trimming/peeling)</small><input name="yieldPct" type="number" min="1" max="100" step="any" inputmode="decimal" required value="${esc(i.yieldPct)}"></label>
+    <div class="row2">
+      <label>Stored in<select name="area">${Object.entries(AREAS).map(([k, v]) => `<option value="${k}" ${k === (i.area ?? 'other') ? 'selected' : ''}>${v}</option>`).join('')}</select></label>
+      <label>Par level<input name="par" type="number" min="0" step="any" inputmode="decimal" placeholder="Optional" value="${esc(i.par)}"></label>
+    </div>
+    <p><small>Par is how much you want on the shelf, in the purchase unit. The order list can top up to it.</small></p>
     ${(i.priceHistory ?? []).length > 1 ? `<p><small>Price history: ${i.priceHistory.slice(-5).reverse().map(h => `${esc(new Date(h.date + 'T00:00').toLocaleDateString(locale, { day: 'numeric', month: 'short' }))} ${money(h.price)}/${esc(h.unit)}`).join(', ')}</small></p>` : ''}
     ${isNew ? '' : `<p><small>${i.lastYieldTest ? `Last yield test ${esc(dateLabel(i.lastYieldTest.date))}: ${pct(i.lastYieldTest.yieldPct)}. ` : ''}<a href="#/yield/${esc(i.id)}">Run a yield test</a></small></p>`}
     <h2>Allergens</h2>
@@ -1288,7 +1406,7 @@ async function ingredientEdit(id) {
     e.preventDefault();
     const fd = new FormData(form);
     const next = { ...i, name: fd.get('name').trim(), price: num(fd.get('price')), unit: fd.get('unit'),
-      yieldPct: num(fd.get('yieldPct')), allergens: fd.getAll('allergens'), updatedAt: Date.now() };
+      yieldPct: num(fd.get('yieldPct')), area: fd.get('area'), par: num(fd.get('par')), allergens: fd.getAll('allergens'), updatedAt: Date.now() };
     const changed = !isNew && (next.price !== i.price || next.unit !== i.unit || next.yieldPct !== i.yieldPct);
     await saveIngredients([next], changed ? `${next.name}: ${hasPrice(i) ? `${money(i.price)}/${i.unit} → ` : ''}${money(next.price)}/${next.unit}${next.yieldPct !== i.yieldPct ? `, yield ${next.yieldPct}%` : ''}` : null);
     if (!changed) priceNews = null;
@@ -1462,30 +1580,35 @@ async function orderView() {
   const [recipes, ings, saved] = await Promise.all([db.all('recipes'), ingMap(), db.get('settings', 'orderPlan')]);
   recipes.sort(byName);
   const recs = toMap(recipes);
+  const hasPar = [...ings.values()].some(i => Number(i.par) > 0);
+  let usePar = hasPar && (saved?.usePar ?? true);
   const planRow = (p = {}) => `<div class="plan-row">
     <select name="recipe" aria-label="Recipe"><option value="">Choose recipe…</option>
       ${recipes.map(r => `<option value="${esc(r.id)}" ${r.id === p.recipeId ? 'selected' : ''}>${esc(r.name)}</option>`).join('')}</select>
     <input name="portions" type="number" min="0" step="1" inputmode="numeric" placeholder="Portions" aria-label="Portions" value="${esc(p.portions)}">
     <button type="button" class="x" aria-label="Remove">×</button></div>`;
-  page('pantry', 'Order list', recipes.length ? `
-    <div class="card no-print"><h2>What are you cooking?</h2>
+  page('pantry', 'Order list', recipes.length || hasPar ? `
+    <div class="card no-print">
+      ${hasPar ? `<label class="inline par-toggle"><input type="checkbox" id="usePar" ${usePar ? 'checked' : ''}> Top up to par levels</label>` : ''}
+      <h2>What are you cooking?</h2>
       <div id="plan">${(saved?.rows?.length ? saved.rows : [{}]).map(planRow).join('')}</div>
-      <button type="button" class="ghost" id="addPlan">+ Add recipe</button></div>
-    <div class="card" id="out"></div>` : '<p class="empty">Add recipes first.</p>', { back: '#/home' });
-  if (!recipes.length) return;
+      <button type="button" class="ghost" id="addPlan">+ Add recipe</button>
+      ${hasPar ? '' : '<p class="muted"><small>Set a par level on an ingredient to order by par too.</small></p>'}</div>
+    <div class="card" id="out"></div>` : '<p class="empty">Add recipes, or set par levels in Pantry, to make an order list.</p>', { back: '#/home' });
+  if (!recipes.length && !hasPar) return;
 
   const planEl = document.getElementById('plan'), out = document.getElementById('out');
   let onHand = { ...(saved?.onHand ?? {}) }; // ingredientId -> qty in purchase unit
   const readPlan = () => [...planEl.querySelectorAll('.plan-row')].map(el => ({
     recipeId: el.querySelector('[name=recipe]').value, portions: num(el.querySelector('[name=portions]').value),
   }));
-  const save = () => db.put('settings', { id: 'orderPlan', rows: readPlan(), onHand });
-  const forLine = plan => plan.filter(p => recs.has(p.recipeId) && p.portions > 0).map(p => `${recs.get(p.recipeId).name} ×${p.portions}`).join(', ');
+  const save = () => db.put('settings', { id: 'orderPlan', rows: readPlan(), onHand, usePar });
+  const forLine = plan => [...plan.filter(p => recs.has(p.recipeId) && p.portions > 0).map(p => `${recs.get(p.recipeId).name} ×${p.portions}`), ...(usePar ? ['par levels'] : [])].join(', ');
   let shareText = '';
 
   // Figures that depend on stock are patched in place, so the stock inputs keep focus while typing.
   const update = () => {
-    const plan = readPlan(), o = orderList(plan, ings, recs, onHand);
+    const plan = readPlan(), o = orderList(plan, ings, recs, onHand, usePar);
     for (const l of o.lines) {
       const tr = out.querySelector(`li[data-id="${CSS.escape(l.id)}"]`);
       if (!tr) continue;
@@ -1502,22 +1625,23 @@ async function orderView() {
 
   const draw = () => {
     save();
-    const plan = readPlan(), o = orderList(plan, ings, recs, onHand);
+    const plan = readPlan(), o = orderList(plan, ings, recs, onHand, usePar);
     if (!o.lines.length) { out.innerHTML = '<p class="muted">Choose recipes and portions to see what to order.</p>'; return; }
     out.innerHTML = `<h2>To order</h2><p class="muted">For: ${esc(forLine(plan))}</p>
       <ul class="order-rows">${o.lines.map(l => `<li data-id="${esc(l.id)}">
         <div class="grow"><b>${esc(l.ing.name)}</b>
-          <small>Need ${fmtAmount(l.usable, l.ing.unit)}${Number(l.ing.yieldPct) < 100 ? `, yield ${esc(l.ing.yieldPct)}%` : ''}</small>
+          <small>${l.usable > 0 ? `Need ${fmtAmount(l.usable, l.ing.unit)}${Number(l.ing.yieldPct) < 100 ? `, yield ${esc(l.ing.yieldPct)}%` : ''}${l.par ? `, par ${fmtAmount(l.par, l.ing.unit)}` : ''}` : `Par ${fmtAmount(l.par, l.ing.unit)}`}</small>
           <label class="have-field">On hand<input class="have" type="number" min="0" step="any" inputmode="decimal" placeholder="0" value="${esc(l.have || '')}" aria-label="${esc(l.ing.name)} on hand in ${esc(l.ing.unit)}"><span>${esc(l.ing.unit)}</span></label></div>
         <div class="trail"><span class="order"></span><small class="cost"></small></div></li>`).join('')}</ul>
       <div class="total-row"><span>Estimated total</span><b class="total"></b></div>
       <div class="warns"></div>
-      <p><small>Order = need ÷ trim yield − on hand. Count stock in the purchase unit (kg, L, each).</small></p>
+      <p><small>${usePar ? 'Order = need ÷ trim yield, or par if that’s more, − on hand.' : 'Order = need ÷ trim yield − on hand.'} Count stock in the purchase unit (kg, L, each).</small></p>
       <div class="actions no-print"><button type="button" id="share">Share list</button><button type="button" class="ghost" id="print">Print</button><button type="button" class="ghost" id="resetHave">Reset on hand</button></div>`;
     update();
   };
 
   document.getElementById('addPlan').addEventListener('click', () => { planEl.insertAdjacentHTML('beforeend', planRow()); planEl.lastElementChild.querySelector('select').focus(); });
+  document.getElementById('usePar')?.addEventListener('change', e => { usePar = e.target.checked; draw(); });
   planEl.addEventListener('click', e => { if (e.target.matches('.x')) { e.target.closest('.plan-row').remove(); draw(); } });
   planEl.addEventListener('input', draw);
   planEl.addEventListener('change', draw);
@@ -1586,16 +1710,20 @@ async function stockCount(id) {
   const was = new Map((c.lines ?? []).map(l => [l.ingredientId, l]));
   const last = new Map((prev?.lines ?? []).map(l => [l.ingredientId, l.qty]));
   // Every Pantry item, plus anything counted before and since deleted from the Pantry
-  const rows = [...ingList.map(i => ({ ingredientId: i.id, name: i.name, unit: i.unit, price: hasPrice(i) ? Number(i.price) : null, ...was.get(i.id) })),
-    ...(c.lines ?? []).filter(l => !ingList.some(i => i.id === l.ingredientId))];
+  const order = Object.keys(AREAS);
+  const rows = [...ingList.map(i => ({ ingredientId: i.id, name: i.name, unit: i.unit, price: hasPrice(i) ? Number(i.price) : null, area: i.area, par: i.par, ...was.get(i.id) })),
+    ...(c.lines ?? []).filter(l => !ingList.some(i => i.id === l.ingredientId))]
+    .map(l => ({ ...l, area: AREAS[l.area] ? l.area : 'other' }))
+    .sort((a, b) => order.indexOf(a.area) - order.indexOf(b.area) || a.name.localeCompare(b.name));
+  const areas = order.filter(a => rows.some(l => l.area === a));
   page('pantry', isNew ? 'Count stock' : `Count, ${shortDate(c.date)}`, rows.length ? `
     <div class="card stat-card"><p class="stat-label">Stock value</p><p class="stat" id="val"></p><p class="stat-sub" id="valSub"></p></div>
     <form id="f">
       <label>Date<input name="date" type="date" required value="${esc(c.date)}"></label>
       <div class="bar"><input type="search" id="q" placeholder="Search ingredients" aria-label="Search ingredients"></div>
-      <div class="card"><ul class="order-rows">${rows.map((l, i) => `<li data-q="${esc(l.name.toLowerCase())}">
+      ${areas.map(a => `<div class="card area"><h2>${AREAS[a]}</h2><ul class="order-rows">${rows.map((l, i) => l.area !== a ? '' : `<li data-q="${esc(l.name.toLowerCase())}">
         <div class="grow"><b>${esc(l.name)}</b><small>${l.price != null ? `${money(l.price)} per ${esc(l.unit)}` : '<span class="warn-text">No price</span>'}${last.has(l.ingredientId) ? `, last count ${fmtQty(last.get(l.ingredientId))}` : ''}</small>
-          <label class="have-field">Counted<input class="cnt" data-i="${i}" type="number" min="0" step="any" inputmode="decimal" placeholder="0" value="${esc(l.qty || '')}" aria-label="${esc(l.name)} counted in ${esc(l.unit)}"><span>${esc(l.unit)}</span></label></div></li>`).join('')}</ul></div>
+          <label class="have-field">Counted<input class="cnt" data-i="${i}" type="number" min="0" step="any" inputmode="decimal" placeholder="0" value="${esc(l.qty || '')}" aria-label="${esc(l.name)} counted in ${esc(l.unit)}"><span>${esc(l.unit)}</span>${Number(l.par) > 0 ? `<small class="par">par ${fmtQty(l.par)}</small>` : ''}</label></div></li>`).join('')}</ul></div>`).join('')}
       ${prev ? `<h2>Since the last count (${esc(dateLabel(prev.date))})</h2>
         <div class="row2"><label>Purchases ($)<input name="purchases" type="number" min="0" step="0.01" inputmode="decimal" placeholder="Invoices total" value="${esc(c.purchases)}"></label>
           <label>Food sales ($)<input name="sales" type="number" min="0" step="0.01" inputmode="decimal" placeholder="Ex GST" value="${esc(c.sales)}"></label></div>
@@ -1606,7 +1734,7 @@ async function stockCount(id) {
     </form>` : '<div class="empty"><p>Add ingredients to the Pantry first.</p></div>', { back: '#/stock' });
   const form = document.getElementById('f');
   if (!form) return;
-  const read = () => rows.map((l, i) => ({ ...l, qty: num(form.querySelector(`.cnt[data-i="${i}"]`).value) })).filter(l => l.qty > 0);
+  const read = () => rows.map(({ area, par, ...l }, i) => ({ ...l, qty: num(form.querySelector(`.cnt[data-i="${i}"]`).value) })).filter(l => l.qty > 0);
   const total = () => {
     const lines = read(), v = stockValue(lines);
     document.getElementById('val').textContent = money(v.value);
@@ -1614,7 +1742,10 @@ async function stockCount(id) {
   };
   form.addEventListener('input', e => { if (e.target.matches('.cnt')) total(); });
   const q = document.getElementById('q');
-  q.addEventListener('input', () => form.querySelectorAll('.order-rows li').forEach(li => { li.hidden = !li.dataset.q.includes(q.value.toLowerCase()); }));
+  q.addEventListener('input', () => {
+    form.querySelectorAll('.order-rows li').forEach(li => { li.hidden = !li.dataset.q.includes(q.value.toLowerCase()); });
+    form.querySelectorAll('.card.area').forEach(c => { c.hidden = !c.querySelector('li:not([hidden])'); });
+  });
   total();
   form.onsubmit = async ev => {
     ev.preventDefault();
@@ -2025,7 +2156,7 @@ async function settingsView() {
       <button type="submit" class="ghost">Send feedback</button> <span id="fbMsg" class="muted"></span>
     </form>
     <div class="actions"><button type="button" class="ghost" id="invite">Invite classmates</button></div><p id="inviteMsg" class="muted center"></p>
-    <p class="muted center"><small>Pinch v22</small></p>`, { back: '#/home' });
+    <p class="muted center"><small>Pinch v23</small></p>`, { back: '#/home' });
 
   document.querySelector('[data-lang]').parentElement.onclick = e => { const l = e.target.closest('[data-lang]')?.dataset.lang; if (l && l !== LANG) setLang(l); };
   const acct = document.getElementById('acct');
@@ -2141,16 +2272,16 @@ async function settingsView() {
 // ---------- Sample data ----------
 
 async function loadSample() {
-  const I = (id, name, unit, price, yieldPct, allergens = []) => db.put('ingredients', { id, name, unit, price, yieldPct, allergens });
+  const I = (id, name, unit, price, yieldPct, allergens, area, par) => db.put('ingredients', { id, name, unit, price, yieldPct, allergens, area, par });
   await Promise.all([
-    I('s-tom', 'Tomatoes, canned whole', 'kg', 4.2, 100),
-    I('s-oil', 'Olive oil, extra virgin', 'L', 12, 100),
-    I('s-gar', 'Garlic', 'kg', 18, 85),
-    I('s-oni', 'Onion, brown', 'kg', 3, 90),
-    I('s-bas', 'Basil, bunch', 'each', 3.5, 70),
-    I('s-flo', 'Flour, tipo 00', 'kg', 2.8, 100, ['Gluten', 'Wheat']),
-    I('s-egg', 'Eggs, free range', 'each', 0.6, 100, ['Egg']),
-    I('s-par', 'Parmigiano Reggiano', 'kg', 45, 90, ['Milk']),
+    I('s-tom', 'Tomatoes, canned whole', 'kg', 4.2, 100, [], 'dry', 12),
+    I('s-oil', 'Olive oil, extra virgin', 'L', 12, 100, [], 'dry', 4),
+    I('s-gar', 'Garlic', 'kg', 18, 85, [], 'dry', 1),
+    I('s-oni', 'Onion, brown', 'kg', 3, 90, [], 'dry', 10),
+    I('s-bas', 'Basil, bunch', 'each', 3.5, 70, [], 'fridge', 6),
+    I('s-flo', 'Flour, tipo 00', 'kg', 2.8, 100, ['Gluten', 'Wheat'], 'dry', 15),
+    I('s-egg', 'Eggs, free range', 'each', 0.6, 100, ['Egg'], 'fridge', 60),
+    I('s-par', 'Parmigiano Reggiano', 'kg', 45, 90, ['Milk'], 'fridge', 2),
   ]);
   const t = Date.now();
   await db.put('recipes', { id: 's-pomo', name: 'Pomodoro sauce', category: 'Sauce', source: 'school', portions: 10, targetCostPct: null, menuPrice: null, yieldQty: 2.2, yieldUnit: 'L',
@@ -2230,6 +2361,10 @@ async function loadDemo() {
   await W('d-w4', 4, 's-pomo', 3, 'portion', 'over');
   await W('d-w5', 2, 's-par', 120, 'g', 'prep', 'Rind and dried edges');
   await W('d-w6', 1, 's-bas', 1, 'each', 'spoiled');
+  const [opening, closing] = await checklists();
+  await db.put('checkdays', { id: checkRecordId(opening), listId: opening.id, period: today(), done: opening.items.slice(0, 4), updatedAt: t });
+  await db.put('checkdays', { id: checkRecordId(closing, day(1)), listId: closing.id, period: day(1), done: closing.items, updatedAt: t });
+  await db.put('checkdays', { id: checkRecordId(opening, day(1)), listId: opening.id, period: day(1), done: opening.items, updatedAt: t });
   await db.put('settings', { ...(await settings()), id: 'settings', cookName: 'Demo Cook' });
   await db.put('settings', { id: 'orderPlan', rows: [{ recipeId: 's-tag', portions: 40 }, { recipeId: 's-pomo', portions: 10 }], onHand: { 's-tom': 5.5, 's-oni': 10 } });
   await db.put('settings', { id: 'portfolio', headline: 'Commis chef · Cert IV Kitchen Management', contact: 'demo@example.com',
@@ -2241,6 +2376,9 @@ async function loadDemo() {
 
 const routes = [
   [/^#\/home$/, homeView],
+  [/^#\/checks$/, checklistsView],
+  [/^#\/check\/([^/]+)$/, checklistDay],
+  [/^#\/check\/([^/]+)\/edit$/, checklistEdit],
   [/^#\/recipes$/, recipeList],
   [/^#\/allergens$/, allergenChart],
   [/^#\/recipe\/([^/]+)$/, recipeView],
@@ -2301,7 +2439,7 @@ sync.onStatus(st => {
 recovery = sync.readRecoveryHash();
 if (recovery) history.replaceState(null, '', location.pathname + location.search + '#/reset'); // drop tokens from the URL
 // Re-seed the demo when its sample data changes, so returning visitors see new features filled in
-const DEMO_DATA = 20;
+const DEMO_DATA = 23;
 if (db.DEMO && (await db.get('settings', 'demo'))?.v !== DEMO_DATA) { await loadDemo(); await db.put('settings', { id: 'demo', v: DEMO_DATA }); }
 render();
 sync.sync();
