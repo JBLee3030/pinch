@@ -64,7 +64,7 @@ I built Pinch while studying Commercial Cookery and Kitchen Management in Melbou
 **Study**
 - Reference decks with flash cards: knife cuts, food safety temperatures (FSANZ), steak doneness, mother sauces, ratios and kitchen terms; spaced repetition (1, 3, 7, 14, 30 days), progress synced
 - Exam and assessment planner: date, type and the dishes being assessed; each dish shows how often it's been practised and its last rating, so you can see what still needs work before the day
-- Today, at the top of Recipes: the next exam, cards due, open temperature checks, prep progress, today's service to log and recipes over target food cost
+- Home: what needs doing today (the next exam, cards due, open temperature checks, prep progress, today's service to log and recipes over target food cost) and every tool in one grid
 
 **Career**
 - Log today's service in two taps (venue, station, hours and the current service filled in)

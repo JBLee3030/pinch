@@ -2,7 +2,7 @@
   "name": "Pinch",
   "short_name": "Pinch",
   "description": "Recipes, costing, allergens and service log for cooks.",
-  "start_url": "./#/recipes",
+  "start_url": "./#/home",
   "scope": "./",
   "display": "standalone",
   "background_color": "#F2F4F6",

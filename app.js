@@ -31,7 +31,30 @@ const toMap = list => new Map(list.map(x => [x.id, x]));
 const ICON = {
   back: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6l6 6"/></svg>',
   plus: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5l0 14"/><path d="M5 12l14 0"/></svg>',
+  settings: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10.325 4.317c.426 -1.756 2.924 -1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543 -.94 3.31 .826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756 .426 1.756 2.924 0 3.35a1.724 1.724 0 0 0 -1.066 2.573c.94 1.543 -.826 3.31 -2.37 2.37a1.724 1.724 0 0 0 -2.572 1.065c-.426 1.756 -2.924 1.756 -3.35 0a1.724 1.724 0 0 0 -2.573 -1.066c-1.543 .94 -3.31 -.826 -2.37 -2.37a1.724 1.724 0 0 0 -1.065 -2.572c-1.756 -.426 -1.756 -2.924 0 -3.35a1.724 1.724 0 0 0 1.066 -2.573c-.94 -1.543 .826 -3.31 2.37 -2.37c1 .608 2.296 .07 2.572 -1.065z"/><path d="M9 12a3 3 0 1 0 6 0a3 3 0 0 0 -6 0"/></svg>',
+  timer: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 13m-7 0a7 7 0 1 0 14 0a7 7 0 1 0 -14 0"/><path d="M12 10l0 3l2 0"/><path d="M7 4l-2.75 2"/><path d="M17 4l2.75 2"/></svg>',
+  calculator: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 3m0 2a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v14a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2z"/><path d="M8 7m0 1a1 1 0 0 1 1 -1h6a1 1 0 0 1 1 1v1a1 1 0 0 1 -1 1h-6a1 1 0 0 1 -1 -1z"/><path d="M8 14l0 .01"/><path d="M12 14l0 .01"/><path d="M16 14l0 .01"/><path d="M8 17l0 .01"/><path d="M12 17l0 .01"/><path d="M16 17l0 .01"/></svg>',
+  prep: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 5.5l1.5 1.5l2.5 -2.5"/><path d="M3.5 11.5l1.5 1.5l2.5 -2.5"/><path d="M3.5 17.5l1.5 1.5l2.5 -2.5"/><path d="M11 6l9 0"/><path d="M11 12l9 0"/><path d="M11 18l9 0"/></svg>',
+  temp: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 13.5a4 4 0 1 0 4 0v-8.5a2 2 0 0 0 -4 0v8.5"/><path d="M10 9l4 0"/></svg>',
+  truck: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"/><path d="M17 17m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"/><path d="M5 17h-2v-11a1 1 0 0 1 1 -1h9v12m-4 0h6m4 0h2v-6h-8m0 -5h5l3 5"/></svg>',
+  count: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5h-2a2 2 0 0 0 -2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-12a2 2 0 0 0 -2 -2h-2"/><path d="M9 3m0 2a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v0a2 2 0 0 1 -2 2h-2a2 2 0 0 1 -2 -2z"/><path d="M9 12l.01 0"/><path d="M13 12l2 0"/><path d="M9 16l.01 0"/><path d="M13 16l2 0"/></svg>',
+  trash: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7l16 0"/><path d="M10 11l0 6"/><path d="M14 11l0 6"/><path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2 -2l1 -12"/><path d="M9 7v-3a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v3"/></svg>',
+  menu: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 3v12h-5c-.023 -3.681 .184 -7.406 5 -12zm0 12v6h-1v-3m-10 -14v17m-3 -17v3a3 3 0 1 0 6 0v-3"/></svg>',
+  trend: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17l6 -6l4 4l8 -8"/><path d="M14 7l7 0l0 7"/></svg>',
+  scaleIc: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 20l10 0"/><path d="M6 6l6 -1l6 1"/><path d="M12 3l0 17"/><path d="M9 12l-3 -6l-3 6a3 3 0 0 0 6 0"/><path d="M21 12l-3 -6l-3 6a3 3 0 0 0 6 0"/></svg>',
+  alert: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 9v4"/><path d="M10.363 3.591l-8.106 13.534a1.914 1.914 0 0 0 1.636 2.871h16.214a1.914 1.914 0 0 0 1.636 -2.87l-8.106 -13.536a1.914 1.914 0 0 0 -3.274 0z"/><path d="M12 16h.01"/></svg>',
+  briefcase: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7m0 2a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v9a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2z"/><path d="M8 7v-2a2 2 0 0 1 2 -2h4a2 2 0 0 1 2 2v2"/><path d="M12 12l0 .01"/><path d="M3 13a20 20 0 0 0 18 0"/></svg>',
+  resize: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 4l4 0l0 4"/><path d="M14 10l6 -6"/><path d="M8 20l-4 0l0 -4"/><path d="M4 20l6 -6"/><path d="M16 20l4 0l0 -4"/><path d="M14 14l6 6"/><path d="M8 4l-4 0l0 4"/><path d="M4 4l6 6"/></svg>',
+  printer: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 17h2a2 2 0 0 0 2 -2v-4a2 2 0 0 0 -2 -2h-14a2 2 0 0 0 -2 2v4a2 2 0 0 0 2 2h2"/><path d="M17 9v-4a2 2 0 0 0 -2 -2h-6a2 2 0 0 0 -2 2v4"/><path d="M7 13m0 2a2 2 0 0 1 2 -2h6a2 2 0 0 1 2 2v4a2 2 0 0 1 -2 2h-6a2 2 0 0 1 -2 -2z"/></svg>',
+  pencil: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4"/><path d="M13.5 6.5l4 4"/></svg>',
 };
+
+// Every tool lives on Home, so each tab stays about one thing.
+const TOOLS = [
+  ['#/timers', 'Timers', 'timer'], ['#/calc', 'Calculator', 'calculator'], ['#/prep', 'Prep', 'prep'], ['#/temps', 'Temps', 'temp'],
+  ['#/order', 'Order', 'truck'], ['#/stock', 'Stock count', 'count'], ['#/waste', 'Waste', 'trash'], ['#/menus', 'Menus', 'menu'],
+  ['#/costwatch', 'Costs', 'trend'], ['#/yield', 'Yield', 'scaleIc'], ['#/allergens', 'Allergy chart', 'alert'], ['#/portfolio', 'Portfolio', 'briefcase'],
+];
 
 // Tab roots get a large title; sub pages get a compact bar with a back button and no tab bar.
 function page(tab, title, body, { back, action = '' } = {}) {
@@ -70,21 +93,33 @@ const photoField = cur => `<label>Photo<input type="file" name="photo" accept="i
   ${cur ? `<img class="hero" src="${esc(cur)}" alt=""><label class="inline"><input type="checkbox" name="rmPhoto"> Remove photo</label>` : ''}`;
 const photoValue = async (fd, old) => fd.get('rmPhoto') ? null : (await readPhoto(fd.get('photo'))) ?? old ?? null;
 
+// ---------- Home: what needs doing today, and every tool ----------
+
+async function homeView() {
+  const todo = await todayItems();
+  page('home', 'Today', `
+    <p class="muted home-date">${esc(new Date().toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'long' }))}</p>
+    ${todo.length ? `<div class="links" role="navigation" aria-label="To do">${todo.map(([href, label, value, alert]) =>
+      `<a href="${href}"><span>${esc(label)}</span><span class="count ${alert ? 'alert-text' : ''}">${esc(value)}</span></a>`).join('')}</div>`
+      : '<div class="card all-done"><b>All done for now</b><small>Nothing needs doing. Nice work.</small></div>'}
+    <h2 class="day">Tools</h2>
+    <div class="tiles" role="navigation" aria-label="Tools">${TOOLS.map(([href, label, icon]) =>
+      `<a href="${href}"><span class="tile-ic">${ICON[icon]}</span><span>${label}</span></a>`).join('')}</div>`,
+    { action: `<a class="icon-btn" href="#/settings" aria-label="Settings">${ICON.settings}</a>` });
+}
+
 // ---------- Recipes ----------
 
 const costLine = c => `${money(c.perPortion)}<small>${c.problems.length ? '<span class="warn-text">Incomplete</span>' : 'per portion'}</small>`;
 
 async function recipeList() {
-  const [recipes, ings, todo] = await Promise.all([db.all('recipes'), ingMap(), todayItems()]);
+  const [recipes, ings] = await Promise.all([db.all('recipes'), ingMap()]);
   recipes.sort(byName);
   const recs = toMap(recipes);
   const cats = [...new Set(recipes.map(r => r.category).filter(Boolean))].sort();
   page('recipes', 'Recipes', recipes.length ? `
-    ${todo.length ? `<div class="today"><h2 class="day">Today</h2><div class="links" role="navigation" aria-label="Today">${todo.map(([href, label, value, alert]) =>
-      `<a href="${href}"><span>${esc(label)}</span><span class="count ${alert ? 'alert-text' : ''}">${esc(value)}</span></a>`).join('')}</div></div>` : ''}
     <div class="bar"><input type="search" id="q" placeholder="Search recipes or ingredients" aria-label="Search recipes or ingredients">
       <select id="cat" aria-label="Category"><option value="">All</option>${opts(cats)}</select></div>
-    <div class="links" role="navigation" aria-label="Recipe tools"><a href="#/allergens">Allergen chart</a><a href="#/calc">Kitchen calculator</a><a href="#/timers">Timers</a><a href="#/prep">Prep list</a><a href="#/menus">Menus</a></div>
     <ul class="list">${recipes.map(r => `<li data-q="${esc([r.name, ...(r.items ?? []).map(it => it.recipeId ? recs.get(it.recipeId)?.name : ings.get(it.ingredientId)?.name)].filter(Boolean).join(' ').toLowerCase())}" data-cat="${esc(r.category)}"><a href="#/recipe/${esc(r.id)}">
       ${r.photo ? `<img src="${esc(r.photo)}" alt="">` : '<span class="ph" aria-hidden="true"></span>'}
       <div class="grow"><b>${esc(r.name)}</b><small>${esc(r.category || 'Uncategorised')}</small></div>
@@ -128,41 +163,44 @@ async function recipeView(id) {
     ${r.photo ? `<img class="hero" src="${esc(r.photo)}" alt="">` : ''}
     <p class="muted">${esc(r.category || 'Uncategorised')} · ${/^https?:\/\//.test(r.sourceUrl ?? '') ? `From <a href="${esc(r.sourceUrl)}" target="_blank" rel="noopener">${esc(new URL(r.sourceUrl).hostname.replace(/^www\./, ''))}</a>` : esc({ school: 'From school', work: 'From work', own: 'My own', web: 'From the web' }[r.source] || '')}${r.yieldQty ? ` · Yields ${esc(r.yieldQty)} ${esc(r.yieldUnit)}` : ''}</p>
     ${usedIn.length ? `<p class="muted">Used in: ${usedIn.map(x => `<a href="#/recipe/${esc(x.id)}">${esc(x.name)}</a>`).join(', ')}</p>` : ''}
+    <div class="quick" role="navigation" aria-label="Recipe tools">
+      <a href="#/recipe/${esc(r.id)}/scale">${ICON.resize}<span>Scale</span></a>
+      <a href="#/recipe/${esc(r.id)}/card">${ICON.printer}<span>Recipe card</span></a>
+      <a href="#/recipe/${esc(r.id)}/attempt">${ICON.pencil}<span>Log practice</span></a>
+    </div>
     <div class="card stat-card">
       <p class="stat-label">Cost per portion</p>
       <p class="stat">${money(c.perPortion)}</p>
       <p class="stat-sub">${r.menuPrice
         ? `Food cost <b>${pct(actualCostPct(c.perPortion, r.menuPrice))}</b> at ${money(r.menuPrice)}`
         : `Sell at <b>${money(price.inc)}</b> for ${pct(target)} food cost`}</p>
-      ${c.problems.length ? `<p class="warn">⚠ ${c.problems.length === 1 ? esc(c.problems[0]) : `${c.problems.length} things to fix below`}</p>` : ''}
+      ${c.problems.length ? `<p class="warn">⚠ ${c.problems.length === 1 ? esc(c.problems[0]) : `${c.problems.length} things to fix in Costing`}</p>` : ''}
+      <div class="chips stat-chips">${allergens.length ? allergens.map(a => `<span class="chip alert">${a}</span>`).join('') : '<span class="chip">No allergens recorded</span>'}</div>
     </div>
-    <div class="card"><h2>Allergens</h2>${allergens.length
-      ? `<div class="chips">${allergens.map(a => `<span class="chip alert">${a}</span>`).join('')}</div>`
-      : '<p class="muted">None declared in Pantry.</p>'}
-      <small>Based on Pantry data. Always check supplier labels.</small></div>
-    <div class="card"><h2>Costing</h2><dl class="kv">
-      <dt>Batch cost (${esc(portionsLabel(r.portions))})</dt><dd>${money(c.total)}</dd>
-      <dt>Target food cost</dt><dd>${pct(target)}</dd>
-      <dt>Suggested price ex GST</dt><dd>${money(price.ex)}</dd>
-      <dt>Suggested price inc GST</dt><dd>${money(price.inc)}</dd>
-      ${r.menuPrice ? `<dt>Menu price inc GST</dt><dd>${money(r.menuPrice)}</dd><dt>Actual food cost</dt><dd>${pct(actualCostPct(c.perPortion, r.menuPrice))}</dd>` : ''}
-    </dl>${c.problems.map(p => `<p class="warn">⚠ ${esc(p)}</p>`).join('')}
-      <a class="btn ghost wide" href="#/recipe/${esc(r.id)}/card">Costed recipe card (PDF)</a></div>
-    <div class="card"><h2>Ingredients</h2>
-      <label class="inline">Scale to <input type="number" id="scale" min="1" step="1" inputmode="numeric" value="${esc(r.portions)}"> portions</label>
-      <table><tbody id="items"></tbody></table>
-      <a class="btn ghost wide" href="#/recipe/${esc(r.id)}/scale">Scale by ingredient or baker's %</a></div>
+    <details class="more"><summary>Costing</summary>
+      <dl class="kv">
+        <dt>Batch cost (${esc(portionsLabel(r.portions))})</dt><dd>${money(c.total)}</dd>
+        <dt>Target food cost</dt><dd>${pct(target)}</dd>
+        <dt>Suggested price ex GST</dt><dd>${money(price.ex)}</dd>
+        <dt>Suggested price inc GST</dt><dd>${money(price.inc)}</dd>
+        ${r.menuPrice ? `<dt>Menu price inc GST</dt><dd>${money(r.menuPrice)}</dd><dt>Actual food cost</dt><dd>${pct(actualCostPct(c.perPortion, r.menuPrice))}</dd>` : ''}
+      </dl>${c.problems.map(p => `<p class="warn">⚠ ${esc(p)}</p>`).join('')}
+      <p><small>Allergens come from Pantry data. Always check supplier labels.</small></p></details>
+    <div class="card"><div class="card-head"><h2>Ingredients</h2>
+        <div class="stepper"><button type="button" class="ghost" data-step="-1" aria-label="Fewer portions">−</button>
+          <input type="number" id="scale" min="1" step="1" inputmode="numeric" value="${esc(r.portions)}" aria-label="Portions">
+          <button type="button" class="ghost" data-step="1" aria-label="More portions">+</button></div></div>
+      <table><tbody id="items"></tbody></table></div>
     ${r.method ? `<div class="card"><h2>Method</h2><div class="method">${esc(r.method)}</div></div>` : ''}
     <div class="card practice"><h2>Practice</h2>
       ${attempts.length ? `
         <p class="practice-sum">${stars(avg)}<span class="muted">${rated.length ? `${fmtQty(avg)} average, ` : ''}${attempts.length} attempt${attempts.length === 1 ? '' : 's'}</span></p>
         ${lastNext ? `<p class="tip"><small><b>Next time:</b> ${esc(lastNext)}</small></p>` : ''}
-        <ul class="list">${attempts.map(a => `<li><a href="#/attempt/${esc(a.id)}/edit">
+        <ul class="list">${attempts.slice(0, 3).map(a => `<li><a href="#/attempt/${esc(a.id)}/edit">
           ${a.photo ? `<img src="${esc(a.photo)}" alt="">` : '<span class="ph" aria-hidden="true"></span>'}
           <div class="grow"><b>${esc(dateLabel(a.date))}</b><small>${esc(a.notes || a.next || 'No notes')}</small></div>
           <span class="trail">${stars(a.rating)}</span></a></li>`).join('')}</ul>`
-        : '<p class="muted">Each time you cook this, note how it went and what to change. Your notes show up when you start cooking.</p>'}
-      <a class="btn ghost wide" href="#/recipe/${esc(r.id)}/attempt">Log an attempt</a></div>
+        : '<p class="muted">Each time you cook this, note how it went and what to change. Your notes show up when you start cooking.</p>'}</div>
     <div class="cta-bar"><a class="btn" href="#/recipe/${esc(r.id)}/cook">Start cooking</a></div>`,
     { back: '#/recipes', action: `<a class="btn sm tint" href="#/recipe/${esc(r.id)}/edit">Edit</a>` });
 
@@ -180,6 +218,12 @@ async function recipeView(id) {
     }).join('') + `<tr><th>Total</th><td></td><td class="n"><b>${money(total)}</b></td></tr>`;
   };
   scale.addEventListener('input', drawItems);
+  document.querySelector('.stepper').addEventListener('click', e => {
+    const d = Number(e.target.closest('[data-step]')?.dataset.step);
+    if (!d) return;
+    scale.value = Math.max(1, (Number(scale.value) || r.portions) + d);
+    drawItems();
+  });
   drawItems();
 }
 
@@ -453,7 +497,7 @@ async function allergenChart() {
       return `<tr><td><a href="#/recipe/${esc(r.id)}">${esc(r.name)}</a></td>${ALLERGENS.map(a => `<td class="c">${has.includes(a) ? '<span class="dot" aria-label="contains">●</span>' : ''}</td>`).join('')}</tr>`;
     }).join('')}</tbody></table></div>
     <p><small>Based on Pantry data. Always check supplier labels.</small></p>`
-    : '<p class="empty">No recipes yet.</p>', { back: '#/recipes' });
+    : '<p class="empty">No recipes yet.</p>', { back: '#/home' });
 }
 
 // ---------- Practice attempts ----------
@@ -496,7 +540,7 @@ async function menusView() {
   page('recipes', 'Menus', menus.length ? `<ul class="list">${menus.map(m => `<li><a href="#/menu/${esc(m.id)}">
       <div class="grow"><b>${esc(m.name || 'Untitled menu')}</b><small>${esc([m.period, `${(m.items ?? []).length} dish${(m.items ?? []).length === 1 ? '' : 'es'}`].filter(Boolean).join(' · '))}</small></div></a></li>`).join('')}</ul>`
     : '<div class="empty"><p>No menus yet.</p><p>Group dishes into a menu, add what each sold, and see which to keep, push, re-cost or drop.</p></div>',
-    { back: '#/recipes', action: newBtn('#/menu/new') });
+    { back: '#/home', action: newBtn('#/menu/new') });
 }
 
 async function menuView(id) {
@@ -602,7 +646,7 @@ async function prepView() {
       <div id="plan">${(saved?.rows?.length ? saved.rows : [{}]).map(planRow).join('')}</div>
       <div class="actions"><button type="button" class="ghost" id="addPlan">+ Add recipe</button>${hasOrder ? '<button type="button" class="ghost" id="fromOrder">Use order list</button>' : ''}</div>
     </div>
-    <div id="out"></div>` : '<p class="empty">Add recipes first.</p>', { back: '#/recipes' });
+    <div id="out"></div>` : '<p class="empty">Add recipes first.</p>', { back: '#/home' });
   if (!recipes.length) return;
 
   const planEl = document.getElementById('plan'), out = document.getElementById('out');
@@ -682,7 +726,7 @@ async function timersView() {
         <label>Seconds<input name="sec" type="number" min="0" max="59" step="1" inputmode="numeric" placeholder="0"></label></div>
       <button type="submit">Start timer</button>
     </form>
-    <p class="muted center"><small>Timers keep running while you use the rest of Pinch. Keep the app open: a locked phone can't ring.</small></p>`, { back: '#/recipes' });
+    <p class="muted center"><small>Timers keep running while you use the rest of Pinch. Keep the app open: a locked phone can't ring.</small></p>`, { back: '#/home' });
   document.querySelector('.preset-grid').addEventListener('click', e => {
     const m = Number(e.target.closest('[data-min]')?.dataset.min);
     if (m) startTimer(`${m} min`, m * 60, null);
@@ -978,7 +1022,7 @@ async function calcView() {
       <div class="row2"><label>lb<input data-k="lb" type="number" inputmode="decimal"></label><label>kg<input data-k="kg" type="number" inputmode="decimal"></label></div>
       <div class="row2"><label>fl oz (US)<input data-k="floz" type="number" inputmode="decimal"></label><label>ml<input data-k="ml" type="number" inputmode="decimal"></label></div>
     </form>
-    <p class="muted center"><small>Cup weights are approximate (spooned and levelled). Weigh when it matters.</small></p>`, { back: '#/recipes' });
+    <p class="muted center"><small>Cup weights are approximate (spooned and levelled). Weigh when it matters.</small></p>`, { back: '#/home' });
 
   // "1 1/2", "½", "0.5" all work in the amount box
   const amount = v => { const p = parseIngredientLine(`${v} x`); return p?.qty ?? NaN; };
@@ -1205,13 +1249,13 @@ async function pantryList() {
   page('pantry', 'Pantry', ings.length ? `
     ${news ? `<div class="card news"><h2>${esc(news.title ?? 'Prices updated')}</h2>
       ${news.impacts.length ? `<p class="muted">${news.impacts.length} recipe${news.impacts.length === 1 ? '' : 's'} changed cost:</p>${impactRows(news.impacts)}` : '<p class="muted">No recipe costs changed.</p>'}</div>` : ''}
-    <div class="links" role="navigation" aria-label="Pantry tools"><a href="#/order">Order list</a><a href="#/yield">Yield test</a><a href="#/pantry/import">Import prices</a><a href="#/costwatch">Food cost watch</a><a href="#/stock">Stocktake</a><a href="#/waste">Waste log</a></div>
     ${missing.length ? `<div class="card"><h2>Needs price (${missing.length})</h2><div class="chips">${missing.map(i => `<a class="chip" href="#/ingredient/${esc(i.id)}/edit">${esc(i.name)}</a>`).join('')}</div></div>` : ''}
     <div class="bar"><input type="search" id="q" placeholder="Search ingredients" aria-label="Search ingredients"></div>
     <ul class="list">${ings.map(i => `<li data-q="${esc(i.name.toLowerCase())}"><a href="#/ingredient/${esc(i.id)}/edit">
-      <div class="grow"><b>${esc(i.name)}</b><small>Yield ${esc(i.yieldPct)}%, in ${used(i.id)} recipe${used(i.id) === 1 ? '' : 's'}${i.allergens?.length ? `<br><span class="alert-text">${i.allergens.map(esc).join(', ')}</span>` : ''}</small></div>
-      <span class="trail">${hasPrice(i) ? money(i.price) : '<span class="warn-text">No price</span>'}<small>${i.unit === 'each' ? 'each' : `per ${esc(i.unit)}`}</small></span></a></li>`).join('')}</ul>`
-    : '<div class="empty"><p>No ingredients yet.</p><p>Add what you buy, with price per kg, litre or each.</p></div>',
+      <div class="grow"><b>${esc(i.name)}</b><small>Yield ${esc(i.yieldPct)}%, in ${used(i.id)} recipe${used(i.id) === 1 ? '' : 's'}</small></div>
+      <span class="trail">${hasPrice(i) ? money(i.price) : '<span class="warn-text">No price</span>'}<small>${i.unit === 'each' ? 'each' : `per ${esc(i.unit)}`}</small></span></a></li>`).join('')}</ul>
+    <a class="btn ghost wide" href="#/pantry/import">Import prices</a>`
+    : '<div class="empty"><p>No ingredients yet.</p><p>Add what you buy, with price per kg, litre or each.</p></div><a class="btn ghost wide" href="#/pantry/import">Import prices</a>',
     { action: newBtn('#/ingredient/new/edit') });
   const q = document.getElementById('q');
   q?.addEventListener('input', () => document.querySelectorAll('.list li').forEach(li => { li.hidden = !li.dataset.q.includes(q.value.toLowerCase()); }));
@@ -1278,7 +1322,7 @@ async function costWatchView() {
     ${moves.length ? `<h2 class="day">Latest price changes</h2><ul class="list">${moves.map(m => `<li><a href="#/ingredient/${esc(m.ing.id)}/edit">
       <div class="grow"><b>${esc(m.ing.name)}</b><small>${money(m.from.price)} → ${money(m.to.price)} per ${esc(m.ing.unit)}</small></div>
       <span class="trail"><span class="${m.change > 0 ? 'alert-text' : 'ok-text'}">${m.change > 0 ? '+' : ''}${pct(m.change)}</span><small>${esc(shortDate(m.to.date))}</small></span></a></li>`).join('')}</ul>` : ''}`,
-    { back: '#/pantry' });
+    { back: '#/home' });
 }
 
 // ---------- Import supplier prices ----------
@@ -1360,7 +1404,7 @@ async function yieldView(id) {
       <div id="trims">${trimRow()}</div>
       <button type="button" class="ghost" id="addTrim">+ Add trim</button>
     </form>
-    <div id="result"></div>`, { back: ing ? `#/ingredient/${esc(ing.id)}/edit` : '#/pantry' });
+    <div id="result"></div>`, { back: ing ? `#/ingredient/${esc(ing.id)}/edit` : '#/home' });
 
   const form = document.getElementById('yt'), out = document.getElementById('result');
   const read = () => ({
@@ -1427,7 +1471,7 @@ async function orderView() {
     <div class="card no-print"><h2>What are you cooking?</h2>
       <div id="plan">${(saved?.rows?.length ? saved.rows : [{}]).map(planRow).join('')}</div>
       <button type="button" class="ghost" id="addPlan">+ Add recipe</button></div>
-    <div class="card" id="out"></div>` : '<p class="empty">Add recipes first.</p>', { back: '#/pantry' });
+    <div class="card" id="out"></div>` : '<p class="empty">Add recipes first.</p>', { back: '#/home' });
   if (!recipes.length) return;
 
   const planEl = document.getElementById('plan'), out = document.getElementById('out');
@@ -1529,7 +1573,7 @@ async function stockList() {
       <span class="trail">${money(v.value)}<small>stock value</small></span></a></li>`; }).join('')}</ul>`
     : '<div class="empty"><p>No stocktakes yet.</p><p>Count what\'s in the fridges, freezers and dry store. Pinch values it at your Pantry prices.</p></div>'}
     <p class="muted center"><small>Actual food cost = (opening stock + purchases − closing stock) ÷ food sales. Compare it with what the recipes say it should be: the gap is waste, over-portioning or price changes.</small></p>
-    <div class="cta-bar"><a class="btn" href="#/stock/new">Count stock</a></div>`, { back: '#/pantry' });
+    <div class="cta-bar"><a class="btn" href="#/stock/new">Count stock</a></div>`, { back: '#/home' });
 }
 
 async function stockCount(id) {
@@ -1606,7 +1650,7 @@ async function wasteList() {
       <div class="grow"><b>${esc(w.name)}</b><small>${fmtQty(w.qty)} ${esc(w.unit === 'portion' ? (Number(w.qty) === 1 ? 'portion' : 'portions') : w.unit)}, ${esc((WASTE_REASONS[w.reason] ?? '').toLowerCase())}</small></div>
       <span class="trail">${w.cost != null ? money(w.cost) : '<span class="warn-text">No price</span>'}<small>${esc(shortDate(w.date))}</small></span></a></li>`).join('')}</ul>`
     : '<div class="empty"><p>Nothing logged yet.</p><p>Log what goes in the bin and why. A week of it shows where the money goes.</p></div>',
-    { back: '#/pantry', action: newBtn('#/waste/new') });
+    { back: '#/home', action: newBtn('#/waste/new') });
 }
 
 async function wasteEdit(id) {
@@ -1677,7 +1721,6 @@ async function logList() {
       <span class="grow"><b>${doneNow ? `${periodNow()} logged. Log another` : `Log today’s ${periodNow().toLowerCase()} service`}</b>
         <small>${last ? esc([last.venue, last.station].filter(Boolean).join(' · ') || 'Same as last time') : 'Takes a few seconds'}</small></span>
       <span class="btn sm">${ICON.plus}Log</span></a>
-    <div class="links" role="navigation" aria-label="Log tools"><a href="#/temps">Temp log</a><a href="#/portfolio">Portfolio</a></div>
     <div class="card"><div class="row2">
       <div><small>School service periods</small><div class="big">${school} / ${esc(s.logTarget)}</div>
         <div class="progress"><i style="width:${Math.min(100, school / s.logTarget * 100)}%"></i></div></div>
@@ -1762,7 +1805,7 @@ async function tempList() {
       }).join('')}</ul>`).join('')
       : '<p class="empty">Record fridge, freezer, delivery, hot-holding, cooking and cooling temperatures. Each check is marked PASS or FAIL against food safety limits.</p>'}
     ${temps.length ? '<div class="actions no-print"><button type="button" class="ghost" id="print">Print</button></div>' : ''}`,
-    { back: '#/log', action: newBtn('#/temp/new/edit') });
+    { back: '#/home', action: newBtn('#/temp/new/edit') });
   document.getElementById('print')?.addEventListener('click', () => window.print());
 }
 
@@ -1876,7 +1919,7 @@ async function portfolioView() {
         <label class="inline" style="margin-top:12px"><input type="checkbox" name="showCosting" ${pf.showCosting ? 'checked' : ''}> Show costing on dishes</label>
       </form></details>
     <div class="sheet-wrap"><article class="sheet portfolio" id="sheet"></article></div>
-    <div class="cta-bar no-print"><button id="print">Print or save as PDF</button></div>`, { back: '#/log' });
+    <div class="cta-bar no-print"><button id="print">Print or save as PDF</button></div>`, { back: '#/home' });
 
   const sheet = document.getElementById('sheet'), form = document.getElementById('pf');
   const dish = r => {
@@ -1923,14 +1966,14 @@ let recovery = null;
 async function resetView() {
   if (!recovery) return go('#/settings');
   if (recovery.error) {
-    page('settings', 'Reset password', `<div class="card"><p class="warn">⚠ ${esc(recovery.error)}</p>
-      <p>Reset links work once and expire after a while. Request a new one from <a href="#/settings">Settings → Forgot password?</a></p></div>`);
+    page('home', 'Reset password', `<div class="card"><p class="warn">⚠ ${esc(recovery.error)}</p>
+      <p>Reset links work once and expire after a while. Request a new one from <a href="#/settings">Settings → Forgot password?</a></p></div>`, { back: '#/settings' });
     return;
   }
-  page('settings', 'Reset password', `<form class="card" id="rp">
+  page('home', 'Reset password', `<form class="card" id="rp">
     <label>New password <small>(8+ characters)</small><input name="p1" type="password" autocomplete="new-password" minlength="8" required></label>
     <label>Repeat new password<input name="p2" type="password" autocomplete="new-password" minlength="8" required></label>
-    <button type="submit">Set new password</button> <p id="rpMsg" class="muted"></p></form>`);
+    <button type="submit">Set new password</button> <p id="rpMsg" class="muted"></p></form>`, { back: '#/settings' });
   const f = document.getElementById('rp'), msg = document.getElementById('rpMsg');
   f.onsubmit = async e => {
     e.preventDefault();
@@ -1961,31 +2004,28 @@ let drawAccount = () => {};
 async function settingsView() {
   const s = await settings();
   const est = await navigator.storage?.estimate?.().catch(() => null);
-  page('settings', 'Settings', `
+  page('home', 'Settings', `
     <div class="card"><h2>Language</h2>
       <div class="seg" role="tablist" aria-label="Language" translate="no" style="margin:0">${[['en', 'English'], ['ko', '한국어']].map(([k, l]) =>
         `<button type="button" role="tab" data-lang="${k}" aria-selected="${k === LANG}">${l}</button>`).join('')}</div></div>
     <div class="card" id="acct"></div>
     <form id="f" class="card">
-      <h2>You</h2>
+      <h2>You <small id="saved" class="ok-text"></small></h2>
       <label>Your name <small>(shown on recipe cards)</small><input name="cookName" autocomplete="name" value="${esc(s.cookName)}"></label>
       <label>Default target food cost %<input name="targetCostPct" type="number" min="1" max="100" step="any" inputmode="decimal" required value="${esc(s.targetCostPct)}"></label>
       <label>School service periods required<input name="logTarget" type="number" min="1" step="1" inputmode="numeric" required value="${esc(s.logTarget)}"></label>
-      <button type="submit">Save</button> <span id="saved" class="muted"></span>
     </form>
     <div class="card"><h2>Backup</h2>
-      <p class="muted">A backup file is a copy you keep yourself, in Files, Drive or email.</p>
-      <p>Last backup: <b>${s.lastBackup ? esc(new Date(s.lastBackup).toLocaleString(locale)) : 'never'}</b>${est ? ` · Using ${(est.usage / 1e6).toFixed(1)} MB` : ''}</p>
-      <div class="actions"><button id="export">Export backup</button><label class="btn ghost">Import<input type="file" id="import" accept="application/json,.json" hidden></label></div>
+      <p class="muted">Last backup: <b>${s.lastBackup ? esc(new Date(s.lastBackup).toLocaleString(locale)) : 'never'}</b>${est ? ` · Using ${(est.usage / 1e6).toFixed(1)} MB` : ''}</p>
+      <div class="actions"><button class="ghost" id="export">Export backup</button><label class="btn ghost">Import<input type="file" id="import" accept="application/json,.json" hidden></label></div>
     </div>
     <form class="card" id="fb">
       <h2>Feedback</h2>
       <label>What's missing, confusing or broken?<textarea name="message" maxlength="2000" required placeholder="e.g. I'd like to…"></textarea></label>
-      <button type="submit">Send feedback</button> <span id="fbMsg" class="muted"></span>
+      <button type="submit" class="ghost">Send feedback</button> <span id="fbMsg" class="muted"></span>
     </form>
-    <div class="card"><h2>Invite classmates</h2><p class="muted">Pinch is free. Share the link. Everyone gets their own private recipe book.</p>
-      <button type="button" class="ghost" id="invite">Share Pinch</button> <span id="inviteMsg" class="muted"></span></div>
-    <p class="muted center"><small>Pinch v21</small></p>`);
+    <div class="actions"><button type="button" class="ghost" id="invite">Invite classmates</button></div><p id="inviteMsg" class="muted center"></p>
+    <p class="muted center"><small>Pinch v22</small></p>`, { back: '#/home' });
 
   document.querySelector('[data-lang]').parentElement.onclick = e => { const l = e.target.closest('[data-lang]')?.dataset.lang; if (l && l !== LANG) setLang(l); };
   const acct = document.getElementById('acct');
@@ -2061,12 +2101,14 @@ async function settingsView() {
   };
 
   const form = document.getElementById('f');
-  form.onsubmit = async e => {
-    e.preventDefault();
+  // Saves as you go: no Save button to forget
+  form.onsubmit = e => e.preventDefault();
+  form.addEventListener('change', async () => {
+    if (!form.checkValidity()) return form.reportValidity();
     const fd = new FormData(form);
-    await db.put('settings', { ...s, id: 'settings', targetCostPct: num(fd.get('targetCostPct')), logTarget: num(fd.get('logTarget')), cookName: fd.get('cookName').trim() });
+    await db.put('settings', { ...(await settings()), id: 'settings', targetCostPct: num(fd.get('targetCostPct')), logTarget: num(fd.get('logTarget')), cookName: fd.get('cookName').trim() });
     document.getElementById('saved').textContent = 'Saved';
-  };
+  });
 
   document.getElementById('export').onclick = async () => {
     const file = new File([JSON.stringify(await db.exportAll())], `pinch-backup-${today()}.json`, { type: 'application/json' });
@@ -2198,6 +2240,7 @@ async function loadDemo() {
 // ---------- Router ----------
 
 const routes = [
+  [/^#\/home$/, homeView],
   [/^#\/recipes$/, recipeList],
   [/^#\/allergens$/, allergenChart],
   [/^#\/recipe\/([^/]+)$/, recipeView],
@@ -2243,7 +2286,7 @@ async function render() {
     const m = h.match(re);
     if (m) return fn(...m.slice(1).map(decodeURIComponent));
   }
-  go('#/recipes');
+  go('#/home');
 }
 
 window.addEventListener('hashchange', render);

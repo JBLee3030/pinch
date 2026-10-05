@@ -581,3 +581,30 @@ dl.ref dd { margin: var(--s1) 0 0; color: var(--text-2); }
 
 /* Narrow phones: less side padding so two-up button labels fit without an ellipsis */
 @media (max-width: 380px) { .btn:not(.sm), button:not(.sm, .x, .link) { padding-inline: var(--s3); } }
+
+/* ---- v22: Home, tool tiles, recipe quick actions, portion stepper ---- */
+.home-date { margin: calc(var(--s2) * -1) 0 var(--s4); }
+.all-done { display: flex; flex-direction: column; gap: 2px; }
+.all-done small { color: var(--text-3); font: var(--t-sub); }
+.tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--s1); padding: var(--s3) var(--s2); margin: 0 0 var(--s4); background: var(--surface); border-radius: var(--r-card); }
+.tiles a, .quick a { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; min-height: 84px; padding: var(--s2) 2px;
+  border-radius: var(--r-control); color: var(--text); text-decoration: none; font: 500 13px/1.25 var(--font); text-align: center; transition: background var(--dur-press) var(--ease); }
+.tiles a:active, .quick a:active { background: var(--fill); }
+.tile-ic { display: grid; place-items: center; width: 48px; height: 48px; border-radius: 16px; background: var(--accent-weak); color: var(--accent); }
+.tile-ic svg { width: 26px; height: 26px; stroke-width: 1.8; }
+.quick { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--s2); margin: 0 0 var(--s3); }
+.quick a { background: var(--surface); border-radius: var(--r-card); font: 600 14px/1.25 var(--font); }
+.quick svg { width: 26px; height: 26px; color: var(--accent); stroke-width: 1.8; }
+.stat-chips { margin: var(--s4) 0 0; }
+.card-head { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); margin-bottom: var(--s2); }
+.card-head h2 { margin: 0; }
+.stepper { display: flex; align-items: center; gap: var(--s1); }
+.stepper button { width: 44px; min-height: 44px; padding: 0; border-radius: var(--r-pill); font: 500 22px/1 var(--font); }
+.stepper input { width: 56px; min-height: 44px; margin: 0; padding: 0; text-align: center; font-weight: 700; -moz-appearance: textfield; }
+.stepper input::-webkit-inner-spin-button, .stepper input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.stat-card + details.more { margin: 0 0 var(--s3); }
+/* Secondary buttons straight on the grey canvas are white, like cards, so they don't vanish */
+main > .btn.ghost, main > .actions > :is(button, .btn).ghost { background: var(--surface); }
+/* Forms inside a card (sign-in on Settings) keep their buttons in place, side by side */
+body.sub .card form .actions:has(> button[type=submit]) { position: static; margin: var(--s4) 0 0; padding: 0; background: none; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+body.sub .card form .actions > button[type=submit] { min-height: var(--h-md); font-size: 16px; border-radius: var(--r-control); }

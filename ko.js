@@ -24,6 +24,10 @@ export const KO = {
   'Peanut': '땅콩', 'Tree nuts': '견과류', 'Sesame': '참깨', 'Soy': '대두', 'Lupin': '루핀', 'Sulphites': '아황산염',
   'contains': '포함', 'Recipe card': '레시피 카드', 'Allergens': '알레르기 유발 성분', 'Based on Pantry data. Always check supplier labels.': '팬트리 정보 기준이에요. 공급업체 라벨을 꼭 확인하세요.',
 
+  // Home
+  'Home': '홈', 'Tools': '도구', 'To do': '할 일', 'All done for now': '지금은 할 일이 없어요', 'Nothing needs doing. Nice work.': '모두 끝냈어요. 잘했어요.',
+  'Calculator': '계산기', 'Prep': '프렙', 'Temps': '온도', 'Order': '발주', 'Stock count': '재고 실사', 'Costs': '원가', 'Allergy chart': '알레르기 표',
+
   // Recipes tab
   'Recipe tools': '레시피 도구', 'Allergen chart': '알레르기 표', 'Kitchen calculator': '주방 계산기', 'Timers': '타이머', 'Prep list': '프렙 리스트', 'Menus': '메뉴',
   'Temperature check still open': '마치지 않은 온도 체크', 'Study cards to review': '복습할 카드', 'Over target food cost': '목표 원가율 초과',
@@ -40,7 +44,8 @@ export const KO = {
   'Cost per portion': '1인분 원가', 'Food cost': '원가율', 'Costing': '원가 계산', 'Target food cost': '목표 원가율',
   'Suggested price ex GST': '권장 가격 (GST 제외)', 'Suggested price inc GST': '권장 가격 (GST 포함)', 'Menu price inc GST': '메뉴 가격 (GST 포함)',
   'Actual food cost': '실제 원가율', 'Costed recipe card (PDF)': '원가 레시피 카드 (PDF)', 'Scale to': '', 'portions': '인분 기준으로 보기',
-  'Sub-recipe': '서브 레시피', "Scale by ingredient or baker's %": "재료 양이나 베이커스 %로 조정", 'Practice': '연습', 'Next time:': '다음엔:',
+  'Sub-recipe': '서브 레시피', 'Log practice': '연습 기록', 'No allergens recorded': '알레르기 성분 없음', 'Fewer portions': '인분 줄이기', 'More portions': '인분 늘리기',
+  'Allergens come from Pantry data. Always check supplier labels.': '알레르기 성분은 팬트리 정보 기준이에요. 공급업체 라벨을 꼭 확인하세요.', "Scale by ingredient or baker's %": "재료 양이나 베이커스 %로 조정", 'Practice': '연습', 'Next time:': '다음엔:',
   'No notes': '메모 없음', 'Log an attempt': '연습 기록하기', 'Start cooking': '요리 시작', 'Used in:': '사용처:', 'Sell at': '',
   'None declared in Pantry.': '팬트리에 등록된 성분이 없어요.', 'Not rated': '평가 없음',
   'Each time you cook this, note how it went and what to change. Your notes show up when you start cooking.': '만들 때마다 어땠는지, 다음엔 뭘 바꿀지 적어 두세요. 다음에 요리를 시작하면 그 메모가 보여요.',
@@ -281,7 +286,7 @@ export const KO_PATTERNS = [
   [/^· Yields (.+)$/, '· 완성량 $1'],
   [/^for ([\d.]+%) food cost$/, '~에 팔면 원가율 $1'],
   [/^at (\$\S+)$/, '(메뉴 가격 $1)'],
-  [/^(\d+) things to fix below$/, '아래에서 고칠 것 $1개'],
+  [/^(\d+) things to fix in Costing$/, '원가 계산에서 고칠 것 $1개'],
   [/^Batch cost \((.+)\)$/, '배치 원가 ($1)'],
   [/^([\d.]+) average, (\d+) attempts?$/, '평균 $1점, $2회 연습'],
   [/^(\d+) attempts?$/, '$1회 연습'],
