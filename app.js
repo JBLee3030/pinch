@@ -1,5 +1,6 @@
 import * as db from './db.js';
 import * as sync from './sync.js';
+import { LANG, locale, setLang } from './i18n.js';
 import { DECKS, ALL_CARDS, review, pickSession, isDue, isLearned } from './study.js';
 import { parseIngredientLine, matchIngredient, parsePriceList, splitSteps, findDurations, fmtDuration } from './parse.js';
 import { ALLERGENS, PURCHASE_UNITS, UNITS, recipeCost, itemCost, suggestedPrice, actualCostPct, recipeAllergens, usesRecipe, hasPrice, orderList, fmtAmount, TEMP_CHECKS, tempStatus, yieldTest, MEASURES, convertFor, densityFor, scaleFromIngredient, bakersPercent, bakersBase, fToC, cToF, prepBatches, niceAmount, niceParts, withPriceHistory, costImpact, foodCostWatch, priceMoves, menuEngineering, MENU_CLASSES, daysUntil, examReadiness, stockValue, stockPeriods, WASTE_REASONS, wasteCost, wasteSummary, money, pct } from './calc.js';
@@ -10,7 +11,7 @@ const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 
 const today = () => new Date().toLocaleDateString('en-CA');
 const num = v => (v === '' || v == null ? null : Number(v));
 const fmtQty = n => (Math.round(n * 100) / 100).toString();
-const opts = (list, sel) => list.map(v => `<option ${v === sel ? 'selected' : ''}>${esc(v)}</option>`).join('');
+const opts = (list, sel) => list.map(v => `<option value="${esc(v)}" ${v === sel ? 'selected' : ''}>${esc(v)}</option>`).join('');
 const datalist = (id, list) => `<datalist id="${id}">${[...new Set(list.filter(Boolean))].sort().map(v => `<option value="${esc(v)}">`).join('')}</datalist>`;
 const byName = (a, b) => a.name.localeCompare(b.name);
 const go = h => { location.hash = h; };
@@ -50,7 +51,7 @@ function page(tab, title, body, { back, action = '' } = {}) {
 const STAR = '<path d="M12 17.75l-6.172 3.245l1.179 -6.873l-5 -4.867l6.9 -1l3.086 -6.253l3.086 6.253l6.9 1l-5 4.867l1.179 6.873z"/>';
 const stars = n => `<span class="stars" role="img" aria-label="${n ? `${n} out of 5` : 'Not rated'}">${[1, 2, 3, 4, 5].map(i =>
   `<svg viewBox="0 0 24 24" aria-hidden="true" class="${i <= Math.round(n || 0) ? 'on' : ''}">${STAR}</svg>`).join('')}</span>`;
-const dateLabel = d => new Date(d + 'T00:00').toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' });
+const dateLabel = d => new Date(d + 'T00:00').toLocaleDateString(locale, { day: 'numeric', month: 'short', year: 'numeric' });
 const attemptsFor = async id => (await db.all('attempts')).filter(a => a.recipeId === id)
   .sort((a, b) => b.date.localeCompare(a.date) || (b.createdAt ?? 0) - (a.createdAt ?? 0));
 const newBtn = href => `<a class="btn sm tint" href="${href}">${ICON.plus}New</a>`;
@@ -150,7 +151,7 @@ async function recipeView(id) {
     <div class="card"><h2>Ingredients</h2>
       <label class="inline">Scale to <input type="number" id="scale" min="1" step="1" inputmode="numeric" value="${esc(r.portions)}"> portions</label>
       <table><tbody id="items"></tbody></table>
-      <a class="btn ghost wide" href="#/recipe/${esc(r.id)}/scale">Scale by an ingredient or baker's %</a></div>
+      <a class="btn ghost wide" href="#/recipe/${esc(r.id)}/scale">Scale by ingredient or baker's %</a></div>
     ${r.method ? `<div class="card"><h2>Method</h2><div class="method">${esc(r.method)}</div></div>` : ''}
     <div class="card practice"><h2>Practice</h2>
       ${attempts.length ? `
@@ -740,7 +741,7 @@ async function deckView(id) {
   const st = await studyState();
   page('study', d.title, `
     <p class="muted">${esc(d.note)}</p>
-    <div class="card"><dl class="ref">${d.cards.map(c => `<dt>${esc(c.front)}${isLearned(st, c.id) ? ' <span class="badge pass">Learned</span>' : ''}</dt><dd>${esc(c.back)}</dd>`).join('')}</dl></div>
+    <div class="card"><dl class="ref" translate="no">${d.cards.map(c => `<dt>${esc(c.front)}${isLearned(st, c.id) ? ' <span class="badge pass">Learned</span>' : ''}</dt><dd>${esc(c.back)}</dd>`).join('')}</dl></div>
     <div class="cta-bar"><a class="btn" href="#/study/go/${d.id}">Study this deck</a></div>`, { back: '#/study' });
 }
 
@@ -764,8 +765,8 @@ async function studySession(deckId) {
     const c = queue[i];
     count.textContent = `Card ${i + 1} of ${queue.length}`;
     flash.innerHTML = `<span class="flash-deck">${esc(DECKS.find(x => x.id === c.deck).title)}</span>
-      <span class="flash-front">${esc(c.front)}</span>
-      ${revealed ? `<span class="flash-back">${esc(c.back)}</span>` : '<span class="flash-hint">Tap to show the answer</span>'}`;
+      <span class="flash-front" translate="no">${esc(c.front)}</span>
+      ${revealed ? `<span class="flash-back" translate="no">${esc(c.back)}</span>` : '<span class="flash-hint">Tap to show the answer</span>'}`;
     flash.disabled = revealed;
     nav.className = `cook-nav${revealed ? '' : ' single'}`;
     nav.innerHTML = revealed ? '<button type="button" class="ghost" id="again">Again</button><button type="button" id="got">Got it</button>'
@@ -963,7 +964,7 @@ async function calcView() {
       </div>
       <div class="row2"><label>Amount<input name="amt" type="text" inputmode="decimal" value="1"></label>
         <label>Measure<select name="unit"><option value="cup">cup</option><option value="tbsp">tbsp</option><option value="tsp">tsp</option></select></label></div>
-      <label>Ingredient<select name="what">${CALC_INGREDIENTS.map(n => `<option>${esc(n)}</option>`).join('')}</select></label>
+      <label>Ingredient<select name="what">${CALC_INGREDIENTS.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('')}</select></label>
       <p class="stat" id="cupOut"></p><p class="stat-sub" id="cupSub"></p>
     </form>
     <form class="card" onsubmit="return false" data-pair="temp">
@@ -986,7 +987,7 @@ async function calcView() {
     const ml = amount(cups.amt.value) * MEASURES[sys][cups.unit.value];
     const g = convertFor(ml, 'ml', 'g', cups.what.value);
     document.getElementById('cupOut').textContent = Number.isFinite(g) ? `≈ ${g >= 100 ? Math.round(g) : fmtQty(g)} g` : '-';
-    document.getElementById('cupSub').textContent = Number.isFinite(ml) ? `${fmtQty(ml)} ml ${sys === 'au' ? 'Australian' : 'US'} measure, ${cups.what.value.toLowerCase()} at ${densityFor(cups.what.value)} g/ml` : 'Enter an amount, e.g. 1 1/2';
+    document.getElementById('cupSub').textContent = Number.isFinite(ml) ? `${fmtQty(ml)} ml ${sys === 'au' ? 'Australian' : 'US'} measure, ${cups.what.selectedOptions[0].text.toLowerCase()} at ${densityFor(cups.what.value)} g/ml` : 'Enter an amount, e.g. 1 1/2';
   };
   cups.addEventListener('input', drawCups);
   cups.querySelector('.seg').addEventListener('click', e => {
@@ -1228,8 +1229,8 @@ async function ingredientEdit(id) {
       <label>Per<select name="unit">${opts(PURCHASE_UNITS, i.unit)}</select></label>
     </div>
     <label>Yield % <small>(usable after trimming/peeling)</small><input name="yieldPct" type="number" min="1" max="100" step="any" inputmode="decimal" required value="${esc(i.yieldPct)}"></label>
-    ${(i.priceHistory ?? []).length > 1 ? `<p><small>Price history: ${i.priceHistory.slice(-5).reverse().map(h => `${esc(new Date(h.date + 'T00:00').toLocaleDateString('en-AU', { day: 'numeric', month: 'short' }))} ${money(h.price)}/${esc(h.unit)}`).join(', ')}</small></p>` : ''}
-    ${isNew ? '' : `<p><small>${i.lastYieldTest ? `Last yield test ${esc(new Date(i.lastYieldTest.date + 'T00:00').toLocaleDateString('en-AU'))}: ${pct(i.lastYieldTest.yieldPct)}. ` : ''}<a href="#/yield/${esc(i.id)}">Run a yield test</a></small></p>`}
+    ${(i.priceHistory ?? []).length > 1 ? `<p><small>Price history: ${i.priceHistory.slice(-5).reverse().map(h => `${esc(new Date(h.date + 'T00:00').toLocaleDateString(locale, { day: 'numeric', month: 'short' }))} ${money(h.price)}/${esc(h.unit)}`).join(', ')}</small></p>` : ''}
+    ${isNew ? '' : `<p><small>${i.lastYieldTest ? `Last yield test ${esc(dateLabel(i.lastYieldTest.date))}: ${pct(i.lastYieldTest.yieldPct)}. ` : ''}<a href="#/yield/${esc(i.id)}">Run a yield test</a></small></p>`}
     <h2>Allergens</h2>
     <div class="checks">${ALLERGENS.map(a => `<label><input type="checkbox" name="allergens" value="${a}" ${i.allergens?.includes(a) ? 'checked' : ''}> ${a}</label>`).join('')}</div>
     ${isNew ? '' : `<h2 style="margin-top:24px">Used in</h2>${usedIn.length
@@ -1276,7 +1277,7 @@ async function costWatchView() {
     ${noPrice ? `<p class="muted center"><small>${noPrice} recipe${noPrice === 1 ? '' : 's'} without a menu price ${noPrice === 1 ? 'isn’t' : 'aren’t'} shown.</small></p>` : ''}
     ${moves.length ? `<h2 class="day">Latest price changes</h2><ul class="list">${moves.map(m => `<li><a href="#/ingredient/${esc(m.ing.id)}/edit">
       <div class="grow"><b>${esc(m.ing.name)}</b><small>${money(m.from.price)} → ${money(m.to.price)} per ${esc(m.ing.unit)}</small></div>
-      <span class="trail"><span class="${m.change > 0 ? 'alert-text' : 'ok-text'}">${m.change > 0 ? '+' : ''}${pct(m.change)}</span><small>${esc(new Date(m.to.date + 'T00:00').toLocaleDateString('en-AU', { day: 'numeric', month: 'short' }))}</small></span></a></li>`).join('')}</ul>` : ''}`,
+      <span class="trail"><span class="${m.change > 0 ? 'alert-text' : 'ok-text'}">${m.change > 0 ? '+' : ''}${pct(m.change)}</span><small>${esc(shortDate(m.to.date))}</small></span></a></li>`).join('')}</ul>` : ''}`,
     { back: '#/pantry' });
 }
 
@@ -1500,7 +1501,7 @@ async function orderView() {
 
 // ---------- Stocktake: count what's on the shelves, then actual food cost per period ----------
 
-const shortDate = d => new Date(d + 'T00:00').toLocaleDateString('en-AU', { day: 'numeric', month: 'short' });
+const shortDate = d => new Date(d + 'T00:00').toLocaleDateString(locale, { day: 'numeric', month: 'short' });
 
 async function stockList() {
   const [counts, waste, s, menus, ings, recipes] = await Promise.all([db.all('counts'), db.all('waste'), settings(), db.all('menus'), ingMap(), db.all('recipes')]);
@@ -1684,7 +1685,7 @@ async function logList() {
     </div></div>
     ${logs.length ? `<ul class="list">${logs.map(l => `<li><a href="#/log/${esc(l.id)}/edit">
       ${l.photo ? `<img src="${esc(l.photo)}" alt="">` : `<span class="ph tag ${l.type}">${l.type === 'school' ? 'School' : 'Work'}</span>`}
-      <div class="grow"><b>${esc(new Date(l.date + 'T00:00').toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' }))}, ${esc(l.period)}</b>
+      <div class="grow"><b>${esc(new Date(l.date + 'T00:00').toLocaleDateString(locale, { weekday: 'short', day: 'numeric', month: 'short' }))}, ${esc(l.period)}</b>
         <small>${esc([l.venue, l.station].filter(Boolean).join(' · ') || 'No venue')}</small></div>
       ${l.hours ? `<span class="trail">${esc(l.hours)} h</span>` : ''}</a></li>`).join('')}</ul>`
       : '<p class="empty">Log every service: what you cooked, where, and what chef said.</p>'}`);
@@ -1752,7 +1753,7 @@ async function tempList() {
       <div><small>Checks today</small><div class="big">${todays.length}</div></div>
       <div><small>Failed today</small><div class="big ${fails ? 'alert-text' : ''}">${fails}</div></div></div>
       ${open ? `<p class="warn">⚠ ${open} check(s) still open. Finish the cooling readings.</p>` : ''}</div>
-    ${days.length ? days.map(d => `<h2 class="day">${esc(new Date(d + 'T00:00').toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }))}</h2>
+    ${days.length ? days.map(d => `<h2 class="day">${esc(new Date(d + 'T00:00').toLocaleDateString(locale, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }))}</h2>
       <ul class="list">${temps.filter(t => t.at.startsWith(d)).map(t => {
         const st = tempStatus(t);
         return `<li><a href="#/temp/${esc(t.id)}/edit"><div class="grow"><b>${esc(t.item || TEMP_CHECKS[t.type]?.label)}</b>
@@ -1961,6 +1962,9 @@ async function settingsView() {
   const s = await settings();
   const est = await navigator.storage?.estimate?.().catch(() => null);
   page('settings', 'Settings', `
+    <div class="card"><h2>Language</h2>
+      <div class="seg" role="tablist" aria-label="Language" translate="no" style="margin:0">${[['en', 'English'], ['ko', '한국어']].map(([k, l]) =>
+        `<button type="button" role="tab" data-lang="${k}" aria-selected="${k === LANG}">${l}</button>`).join('')}</div></div>
     <div class="card" id="acct"></div>
     <form id="f" class="card">
       <h2>You</h2>
@@ -1971,7 +1975,7 @@ async function settingsView() {
     </form>
     <div class="card"><h2>Backup</h2>
       <p class="muted">A backup file is a copy you keep yourself, in Files, Drive or email.</p>
-      <p>Last backup: <b>${s.lastBackup ? esc(new Date(s.lastBackup).toLocaleString()) : 'never'}</b>${est ? ` · Using ${(est.usage / 1e6).toFixed(1)} MB` : ''}</p>
+      <p>Last backup: <b>${s.lastBackup ? esc(new Date(s.lastBackup).toLocaleString(locale)) : 'never'}</b>${est ? ` · Using ${(est.usage / 1e6).toFixed(1)} MB` : ''}</p>
       <div class="actions"><button id="export">Export backup</button><label class="btn ghost">Import<input type="file" id="import" accept="application/json,.json" hidden></label></div>
     </div>
     <form class="card" id="fb">
@@ -1981,8 +1985,9 @@ async function settingsView() {
     </form>
     <div class="card"><h2>Invite classmates</h2><p class="muted">Pinch is free. Share the link. Everyone gets their own private recipe book.</p>
       <button type="button" class="ghost" id="invite">Share Pinch</button> <span id="inviteMsg" class="muted"></span></div>
-    <p class="muted center"><small>Pinch v20</small></p>`);
+    <p class="muted center"><small>Pinch v21</small></p>`);
 
+  document.querySelector('[data-lang]').parentElement.onclick = e => { const l = e.target.closest('[data-lang]')?.dataset.lang; if (l && l !== LANG) setLang(l); };
   const acct = document.getElementById('acct');
   drawAccount = () => {
     if (!acct.isConnected) return;
@@ -1991,7 +1996,7 @@ async function settingsView() {
     const err = st.error ? `<p class="warn">⚠ ${esc(st.error)}</p>` : '';
     acct.innerHTML = st.email ? `<h2>Account &amp; sync</h2>
       <p>Signed in as <b>${esc(st.email)}</b></p>
-      <p class="muted">${st.syncing ? 'Syncing…' : st.lastSync ? `Last synced ${esc(new Date(st.lastSync).toLocaleString('en-AU'))}` : 'Not synced yet'}</p>${err}
+      <p class="muted">${st.syncing ? 'Syncing…' : st.lastSync ? `Last synced ${esc(new Date(st.lastSync).toLocaleString(locale))}` : 'Not synced yet'}</p>${err}
       <div class="actions"><button type="button" id="syncNow">Sync now</button><button type="button" class="ghost" id="signOut">Sign out</button></div>`
     : `<h2>Account &amp; sync</h2>
       <p class="muted">Optional. Sign in to back up to the cloud and use Pinch on more than one device. Without an account, data stays on this phone only.</p>${err}

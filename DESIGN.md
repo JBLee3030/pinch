@@ -96,6 +96,7 @@ These are the rules the v7 and v8 layout passes enforced and checked on every sc
 - Buttons: a verb, 1 to 3 words (`Save`, `Share list`, `Add to recipe`).
 - Errors say what happened and what to do next (`This reset link is no longer valid. Request a new one from Settings.`).
 - Australian English and kitchen terms (trim yield, food cost %, inc GST).
+- Korean: screens are written in English and translated by [`i18n.js`](i18n.js) with the phrases in [`ko.js`](ko.js). Any new on-screen text needs a Korean line there (a pattern if it has numbers or names in it). Paper output and study card text stay English. Korean follows the same tone: short, friendly 해요체, kitchen terms the course uses in English keep the English word.
 
 ## Paper output
 

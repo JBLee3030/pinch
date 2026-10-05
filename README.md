@@ -72,6 +72,7 @@ I built Pinch while studying Commercial Cookery and Kitchen Management in Melbou
 - Portfolio page generated from the log and featured dishes, printable to PDF
 
 **Data**
+- English or Korean, switched in Settings. Recipe cards, the portfolio and study cards stay in English for school and work
 - Works offline; data lives on the device
 - Optional account: email + password sign-in syncs across devices, with in-app password reset
 - First-run guide, in-app feedback and a share link for inviting classmates

@@ -575,3 +575,9 @@ dl.ref dd { margin: var(--s1) 0 0; color: var(--text-2); }
 .mx span { color: var(--text-2); }
 .today .links { margin-bottom: var(--s4); }
 .today h2.day { margin-top: 0; }
+
+/* Korean: break between words, not inside them */
+:lang(ko) body { word-break: keep-all; overflow-wrap: anywhere; }
+
+/* Narrow phones: less side padding so two-up button labels fit without an ellipsis */
+@media (max-width: 380px) { .btn:not(.sm), button:not(.sm, .x, .link) { padding-inline: var(--s3); } }

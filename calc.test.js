@@ -1,6 +1,7 @@
 // Run: node calc.test.js
 import assert from 'node:assert/strict';
 import { remoteWins } from './db.js';
+import { tr } from './i18n.js';
 import { DECKS, ALL_CARDS, review, pickSession, isDue, isLearned } from './study.js';
 import { extractRecipe, safeUrl } from './supabase/functions/recipe-import/index.js';
 import { parseIngredientLine as P, matchIngredient, parsePriceList, packUnit, splitSteps, findDurations, fmtDuration } from './parse.js';
@@ -455,6 +456,15 @@ assert.equal(niceAmount(2, 'portion'), '2 portion');
   close(s.total, 30.5);
   assert.deepEqual(s.byReason.map(x => [x.key, x.cost]), [['over', 20], ['spoiled', 10.5]]);
   assert.deepEqual(s.topItems.map(x => x.key), ['Ragù', 'Basil', 'Bread']);
+}
+
+// Korean UI
+{
+  assert.equal(tr('Save'), '저장');
+  assert.equal(tr('  3 of 8 items counted '), '  8개 중 3개 셈 ');                                  // spaces kept
+  assert.equal(tr('Make 2.2 L (10 portions), about 45 min of cooking time'), '2.2 L (10인분) 만들기, 조리 시간 약 45분'); // nested parts
+  assert.equal(tr(' for 30.0% food cost'), '에 팔면 원가율 30.0%');                                   // joins onto the price before it
+  assert.equal(tr('Fresh egg pasta'), 'Fresh egg pasta');                                              // what people typed stays as is
 }
 
 console.log('calc ok');
