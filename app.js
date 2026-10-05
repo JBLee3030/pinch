@@ -2156,7 +2156,7 @@ async function settingsView() {
       <button type="submit" class="ghost">Send feedback</button> <span id="fbMsg" class="muted"></span>
     </form>
     <div class="actions"><button type="button" class="ghost" id="invite">Invite classmates</button></div><p id="inviteMsg" class="muted center"></p>
-    <p class="muted center"><small>Pinch v23</small></p>`, { back: '#/home' });
+    <p class="muted center"><small>Pinch v24</small></p>`, { back: '#/home' });
 
   document.querySelector('[data-lang]').parentElement.onclick = e => { const l = e.target.closest('[data-lang]')?.dataset.lang; if (l && l !== LANG) setLang(l); };
   const acct = document.getElementById('acct');
@@ -2438,6 +2438,11 @@ sync.onStatus(st => {
 });
 recovery = sync.readRecoveryHash();
 if (recovery) history.replaceState(null, '', location.pathname + location.search + '#/reset'); // drop tokens from the URL
+// Every launch starts on Home, whatever address the installed app was saved with. A reload in the same
+// session (sessionStorage survives it) keeps you where you were; the password-reset link keeps its page.
+let launched = false;
+try { launched = !!sessionStorage.getItem('pinch-launched'); sessionStorage.setItem('pinch-launched', '1'); } catch {}
+if (!launched && !recovery) history.replaceState(null, '', location.pathname + location.search + '#/home');
 // Re-seed the demo when its sample data changes, so returning visitors see new features filled in
 const DEMO_DATA = 23;
 if (db.DEMO && (await db.get('settings', 'demo'))?.v !== DEMO_DATA) { await loadDemo(); await db.put('settings', { id: 'demo', v: DEMO_DATA }); }
