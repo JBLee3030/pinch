@@ -459,3 +459,48 @@ export const checkProgress = (list, record) => {
   const done = new Set(record?.done ?? []);
   return { done: (list.items ?? []).filter(x => done.has(x)).length, total: (list.items ?? []).length };
 };
+
+// ---- Sharing a recipe
+// Everything needed to rebuild a recipe elsewhere: it, the sub-recipes it uses (any depth) and their
+// ingredients. No photos, practice notes or menu prices.
+export function shareBundle(recipe, recs, ings) {
+  const rs = [], is = new Map(), seen = new Set();
+  const add = r => {
+    if (seen.has(r.id)) return;
+    seen.add(r.id);
+    rs.push(r);
+    for (const it of r.items ?? []) {
+      if (it.recipeId) { if (recs.has(it.recipeId)) add(recs.get(it.recipeId)); }
+      else if (ings.has(it.ingredientId)) is.set(it.ingredientId, ings.get(it.ingredientId));
+    }
+  };
+  add(recipe);
+  return {
+    v: 1,
+    recipes: rs.map(({ id, name, category, portions, method, yieldQty, yieldUnit, items }) => ({ id, name, category, portions, method, yieldQty, yieldUnit,
+      items: (items ?? []).map(({ recipeId, ingredientId, qty, unit }) => (recipeId ? { recipeId, qty, unit } : { ingredientId, qty, unit })) })),
+    ingredients: [...is.values()].map(({ id, name, unit, price, yieldPct, allergens }) => ({ id, name, unit, price, yieldPct, allergens })),
+  };
+}
+
+// Brings a shared bundle into someone's book: ingredients and sub-recipes they already have (same name)
+// are reused, the rest are added with new ids. Returns the new records and the main recipe's id.
+export function importBundle(b, myIngs, myRecs, newId) {
+  const named = (list, name) => list.find(x => x.name?.trim().toLowerCase() === String(name ?? '').trim().toLowerCase());
+  const ingId = new Map(), ingredients = [];
+  for (const i of b.ingredients ?? []) {
+    const mine = named(myIngs, i.name);
+    if (mine) { ingId.set(i.id, mine.id); continue; }
+    const id = newId();
+    ingId.set(i.id, id);
+    ingredients.push({ id, name: i.name, unit: i.unit, price: i.price ?? null, yieldPct: i.yieldPct ?? 100, allergens: i.allergens ?? [] });
+  }
+  const [main, ...subs] = b.recipes;
+  const recId = new Map();
+  const fresh = subs.filter(r => { const mine = named(myRecs, r.name); recId.set(r.id, mine ? mine.id : newId()); return !mine; });
+  recId.set(main.id, newId());
+  const recipes = [...fresh, main].map(r => ({ ...r, id: recId.get(r.id), source: 'shared',
+    items: (r.items ?? []).filter(it => (it.recipeId ? recId.has(it.recipeId) : ingId.has(it.ingredientId)))
+      .map(it => (it.recipeId ? { ...it, recipeId: recId.get(it.recipeId) } : { ...it, ingredientId: ingId.get(it.ingredientId) })) }));
+  return { ingredients, recipes, mainId: recId.get(main.id) };
+}

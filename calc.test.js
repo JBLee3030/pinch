@@ -5,7 +5,7 @@ import { tr } from './i18n.js';
 import { DECKS, ALL_CARDS, review, pickSession, isDue, isLearned } from './study.js';
 import { extractRecipe, safeUrl } from './supabase/functions/recipe-import/index.js';
 import { parseIngredientLine as P, matchIngredient, parsePriceList, packUnit, splitSteps, findDurations, fmtDuration } from './parse.js';
-import { convert, recipeCost, suggestedPrice, actualCostPct, recipeAllergens, orderList, fmtAmount, tempStatus, yieldTest, convertFor, densityFor, MEASURES, scaleFromIngredient, itemGrams, bakersPercent, bakersBase, fToC, cToF, prepBatches, niceAmount, withPriceHistory, costImpact, foodCostWatch, priceMoves, menuEngineering, daysUntil, examReadiness, stockValue, stockPeriods, wasteCost, wasteSummary, periodKey, checkProgress } from './calc.js';
+import { convert, recipeCost, suggestedPrice, actualCostPct, recipeAllergens, orderList, fmtAmount, tempStatus, yieldTest, convertFor, densityFor, MEASURES, scaleFromIngredient, itemGrams, bakersPercent, bakersBase, fToC, cToF, prepBatches, niceAmount, withPriceHistory, costImpact, foodCostWatch, priceMoves, menuEngineering, daysUntil, examReadiness, stockValue, stockPeriods, wasteCost, wasteSummary, periodKey, checkProgress, shareBundle, importBundle } from './calc.js';
 
 const close = (a, b) => assert.ok(Math.abs(a - b) < 1e-9, `${a} != ${b}`);
 
@@ -474,6 +474,30 @@ assert.equal(niceAmount(2, 'portion'), '2 portion');
   assert.equal(periodKey('week', '2026-10-05'), '2026-10-05');
   assert.equal(periodKey('week', '2026-10-11'), '2026-10-05');                                                             // Sunday belongs to the week before
   assert.deepEqual(checkProgress({ items: ['a', 'b', 'c'] }, { done: ['a', 'c', 'gone'] }), { done: 2, total: 3 });
+}
+
+// Sharing a recipe
+{
+  const ings = new Map([['t', { id: 't', name: 'Tomatoes', unit: 'kg', price: 4, yieldPct: 100, allergens: [], par: 9, area: 'dry' }],
+    ['f', { id: 'f', name: 'Flour', unit: 'kg', price: 2, yieldPct: 100, allergens: ['Gluten'] }], ['x', { id: 'x', name: 'Unused', unit: 'kg' }]]);
+  const sauce = { id: 's', name: 'Sauce', portions: 4, items: [{ ingredientId: 't', qty: 1, unit: 'kg' }], photo: 'data:…' };
+  const pasta = { id: 'p', name: 'Pasta', portions: 1, menuPrice: 26, items: [{ recipeId: 's', qty: 1, unit: 'portion' }, { ingredientId: 'f', qty: 100, unit: 'g' }, { ingredientId: 'gone', qty: 1, unit: 'g' }] };
+  const loop = { id: 'l', name: 'Loop', items: [{ recipeId: 'l', qty: 1, unit: 'portion' }] };
+  const recs = new Map([['s', sauce], ['p', pasta], ['l', loop]]);
+  const b = shareBundle(pasta, recs, ings);
+  assert.deepEqual(b.recipes.map(r => r.id), ['p', 's']);
+  assert.deepEqual(b.ingredients.map(i => i.id), ['t', 'f']);
+  assert.ok(!('photo' in b.recipes[1]) && !('menuPrice' in b.recipes[0]) && !('par' in b.ingredients[0]));   // nothing personal travels
+  assert.equal(shareBundle(loop, recs, ings).recipes.length, 1);                                             // a loop doesn't hang
+  let n = 0;
+  const into = importBundle(JSON.parse(JSON.stringify(b)), [{ id: 'my-t', name: 'tomatoes ' }], [{ id: 'my-s', name: 'Sauce' }], () => `new${++n}`);
+  assert.deepEqual(into.ingredients.map(i => i.name), ['Flour']);                                            // tomatoes reused by name
+  assert.deepEqual(into.recipes.map(r => r.name), ['Pasta']);                                                // their own Sauce is used
+  assert.deepEqual(into.recipes[0].items.map(it => it.recipeId ?? it.ingredientId), ['my-s', 'new1']);       // the missing ingredient is dropped
+  assert.equal(into.mainId, into.recipes[0].id);
+  const fresh = importBundle(b, [], [], () => `id${++n}`);
+  assert.deepEqual(fresh.recipes.map(r => [r.name, r.source]), [['Sauce', 'shared'], ['Pasta', 'shared']]);
+  assert.equal(fresh.recipes[1].items[0].recipeId, fresh.recipes[0].id);
 }
 
 // Korean UI

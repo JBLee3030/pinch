@@ -3,7 +3,7 @@ import * as sync from './sync.js';
 import { LANG, locale, setLang } from './i18n.js';
 import { DECKS, ALL_CARDS, review, pickSession, isDue, isLearned } from './study.js';
 import { parseIngredientLine, matchIngredient, parsePriceList, splitSteps, findDurations, fmtDuration } from './parse.js';
-import { ALLERGENS, PURCHASE_UNITS, UNITS, recipeCost, itemCost, suggestedPrice, actualCostPct, recipeAllergens, usesRecipe, hasPrice, orderList, fmtAmount, TEMP_CHECKS, tempStatus, yieldTest, MEASURES, convertFor, densityFor, scaleFromIngredient, bakersPercent, bakersBase, fToC, cToF, prepBatches, niceAmount, niceParts, withPriceHistory, costImpact, foodCostWatch, priceMoves, menuEngineering, MENU_CLASSES, daysUntil, examReadiness, AREAS, periodKey, checkProgress, stockValue, stockPeriods, WASTE_REASONS, wasteCost, wasteSummary, money, pct } from './calc.js';
+import { ALLERGENS, PURCHASE_UNITS, UNITS, recipeCost, itemCost, suggestedPrice, actualCostPct, recipeAllergens, usesRecipe, hasPrice, orderList, fmtAmount, TEMP_CHECKS, tempStatus, yieldTest, MEASURES, convertFor, densityFor, scaleFromIngredient, bakersPercent, bakersBase, fToC, cToF, prepBatches, niceAmount, niceParts, withPriceHistory, costImpact, foodCostWatch, priceMoves, menuEngineering, MENU_CLASSES, daysUntil, examReadiness, AREAS, periodKey, checkProgress, shareBundle, importBundle, stockValue, stockPeriods, WASTE_REASONS, wasteCost, wasteSummary, money, pct } from './calc.js';
 
 const view = document.getElementById('view');
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -47,6 +47,7 @@ const ICON = {
   resize: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 4l4 0l0 4"/><path d="M14 10l6 -6"/><path d="M8 20l-4 0l0 -4"/><path d="M4 20l6 -6"/><path d="M16 20l4 0l0 -4"/><path d="M14 14l6 6"/><path d="M8 4l-4 0l0 4"/><path d="M4 4l6 6"/></svg>',
   printer: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 17h2a2 2 0 0 0 2 -2v-4a2 2 0 0 0 -2 -2h-14a2 2 0 0 0 -2 2v4a2 2 0 0 0 2 2h2"/><path d="M17 9v-4a2 2 0 0 0 -2 -2h-6a2 2 0 0 0 -2 2v4"/><path d="M7 13m0 2a2 2 0 0 1 2 -2h6a2 2 0 0 1 2 2v4a2 2 0 0 1 -2 2h-6a2 2 0 0 1 -2 -2z"/></svg>',
   checkbox: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 11l3 3l8 -8"/><path d="M20 12v6a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h9"/></svg>',
+  share: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12m-3 0a3 3 0 1 0 6 0a3 3 0 1 0 -6 0"/><path d="M18 6m-3 0a3 3 0 1 0 6 0a3 3 0 1 0 -6 0"/><path d="M18 18m-3 0a3 3 0 1 0 6 0a3 3 0 1 0 -6 0"/><path d="M8.7 10.7l6.6 -3.4"/><path d="M8.7 13.3l6.6 3.4"/></svg>',
   pencil: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4"/><path d="M13.5 6.5l4 4"/></svg>',
 };
 
@@ -98,16 +99,65 @@ const photoValue = async (fd, old) => fd.get('rmPhoto') ? null : (await readPhot
 // ---------- Home: what needs doing today, and every tool ----------
 
 async function homeView() {
-  const todo = await todayItems();
+  const [todo, recipes] = await Promise.all([todayItems(), db.all('recipes')]);
+  const favs = recipes.filter(r => r.fav).sort(byName);
   page('home', 'Today', `
     <p class="muted home-date">${esc(new Date().toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'long' }))}</p>
     ${todo.length ? `<div class="links" role="navigation" aria-label="To do">${todo.map(([href, label, value, alert]) =>
       `<a href="${href}"><span>${esc(label)}</span><span class="count ${alert ? 'alert-text' : ''}">${esc(value)}</span></a>`).join('')}</div>`
       : '<div class="card all-done"><b>All done for now</b><small>Nothing needs doing. Nice work.</small></div>'}
+    ${favs.length ? `<h2 class="day">Favourites</h2><ul class="list">${favs.map(r => `<li><a href="#/recipe/${esc(r.id)}">
+      ${r.photo ? `<img src="${esc(r.photo)}" alt="">` : '<span class="ph" aria-hidden="true"></span>'}
+      <div class="grow"><b>${esc(r.name)}</b><small>${esc(r.category || 'Uncategorised')}</small></div></a></li>`).join('')}</ul>` : ''}
     <h2 class="day">Tools</h2>
     <div class="tiles" role="navigation" aria-label="Tools">${TOOLS.map(([href, label, icon]) =>
       `<a href="${href}"><span class="tile-ic">${ICON[icon]}</span><span>${label}</span></a>`).join('')}</div>`,
     { action: `<a class="icon-btn" href="#/settings" aria-label="Settings">${ICON.settings}</a>` });
+}
+
+// ---------- Shared recipe links ----------
+// The bundle travels in the link itself (deflate + base64url), so sharing needs no server or account.
+
+const toB64 = bytes => btoa(String.fromCharCode(...new Uint8Array(bytes))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+const fromB64 = s => Uint8Array.from(atob(s.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
+const squeeze = (data, how) => new Response(new Blob([data]).stream().pipeThrough(how)).arrayBuffer();
+
+async function shareLink(r, recs, ings) {
+  const packed = await squeeze(JSON.stringify(shareBundle(r, recs, ings)), new CompressionStream('deflate-raw'));
+  return `${APP_URL}#/r/${toB64(packed)}`;
+}
+
+async function sharedRecipe(data) {
+  let b = null;
+  try { b = JSON.parse(new TextDecoder().decode(await squeeze(fromB64(data), new DecompressionStream('deflate-raw')))); } catch {}
+  if (!b?.recipes?.length) {
+    page('recipes', 'Shared recipe', '<div class="empty"><p>This link is broken or cut short.</p><p>Ask for the recipe to be shared again.</p></div>', { back: '#/recipes' });
+    return;
+  }
+  const [main, ...subs] = b.recipes;
+  const ingName = new Map((b.ingredients ?? []).map(i => [i.id, i.name])), recName = new Map(b.recipes.map(x => [x.id, x.name]));
+  const [myIngs, myRecs] = await Promise.all([db.all('ingredients'), db.all('recipes')]);
+  const have = myRecs.some(x => x.name.trim().toLowerCase() === main.name.trim().toLowerCase());
+  const ios = /iPhone|iPad|iPod/.test(navigator.userAgent);
+  page('recipes', 'Shared recipe', `
+    <div class="card"><p class="stat-label">Shared with you</p><h2 class="shared-name">${esc(main.name)}</h2>
+      <p class="muted">${esc([main.category, portionsLabel(main.portions || 1)].filter(Boolean).join(' · '))}</p>
+      <table><tbody>${(main.items ?? []).map(it => `<tr><td>${esc(it.recipeId ? recName.get(it.recipeId) ?? '' : ingName.get(it.ingredientId) ?? '')}${it.recipeId ? '<br><small>Sub-recipe</small>' : ''}</td>
+        <td class="n">${esc(niceAmount(it.qty, it.unit))}</td></tr>`).join('')}</tbody></table>
+      ${subs.length ? `<p class="muted"><small>Comes with ${subs.length === 1 ? 'its sub-recipe' : `its ${subs.length} sub-recipes`}: ${subs.map(x => esc(x.name)).join(', ')}</small></p>` : ''}</div>
+    ${main.method ? `<div class="card"><h2>Method</h2><div class="method">${esc(main.method)}</div></div>` : ''}
+    ${have ? `<p class="muted center"><small>You already have a recipe called ${esc(main.name)}. Saving adds a second one.</small></p>` : ''}
+    ${ios && !standalone() ? `<div class="card tip-card"><p><small><b>Using Pinch from your home screen?</b> It keeps its own recipes. Copy this link, then in the app tap New recipe and paste it under Import.</small></p>
+      <div class="actions"><button type="button" class="ghost" id="copy">Copy link</button></div></div>` : ''}
+    <div class="cta-bar"><button type="button" id="save">Save to my recipes</button></div>`, { back: '#/recipes' });
+  document.getElementById('copy')?.addEventListener('click', async e => { await navigator.clipboard.writeText(location.href); e.target.textContent = 'Copied'; });
+  document.getElementById('save').onclick = async e => {
+    e.target.disabled = true;
+    const t = Date.now(), into = importBundle(b, myIngs, myRecs, uid);
+    for (const i of into.ingredients) await db.put('ingredients', { ...i, updatedAt: t });
+    for (const x of into.recipes) await db.put('recipes', { ...x, createdAt: t, updatedAt: t });
+    go(`#/recipe/${into.mainId}`);
+  };
 }
 
 // ---------- Recipes ----------
@@ -163,12 +213,13 @@ async function recipeView(id) {
 
   page('recipes', r.name, `
     ${r.photo ? `<img class="hero" src="${esc(r.photo)}" alt="">` : ''}
-    <p class="muted">${esc(r.category || 'Uncategorised')} · ${/^https?:\/\//.test(r.sourceUrl ?? '') ? `From <a href="${esc(r.sourceUrl)}" target="_blank" rel="noopener">${esc(new URL(r.sourceUrl).hostname.replace(/^www\./, ''))}</a>` : esc({ school: 'From school', work: 'From work', own: 'My own', web: 'From the web' }[r.source] || '')}${r.yieldQty ? ` · Yields ${esc(r.yieldQty)} ${esc(r.yieldUnit)}` : ''}</p>
+    <p class="muted">${esc(r.category || 'Uncategorised')} · ${/^https?:\/\//.test(r.sourceUrl ?? '') ? `From <a href="${esc(r.sourceUrl)}" target="_blank" rel="noopener">${esc(new URL(r.sourceUrl).hostname.replace(/^www\./, ''))}</a>` : esc({ school: 'From school', work: 'From work', own: 'My own', web: 'From the web', shared: 'Shared with me' }[r.source] || '')}${r.yieldQty ? ` · Yields ${esc(r.yieldQty)} ${esc(r.yieldUnit)}` : ''}</p>
     ${usedIn.length ? `<p class="muted">Used in: ${usedIn.map(x => `<a href="#/recipe/${esc(x.id)}">${esc(x.name)}</a>`).join(', ')}</p>` : ''}
     <div class="quick" role="navigation" aria-label="Recipe tools">
       <a href="#/recipe/${esc(r.id)}/scale">${ICON.resize}<span>Scale</span></a>
       <a href="#/recipe/${esc(r.id)}/card">${ICON.printer}<span>Recipe card</span></a>
       <a href="#/recipe/${esc(r.id)}/attempt">${ICON.pencil}<span>Log practice</span></a>
+      <a href="#" id="share">${ICON.share}<span>Share</span></a>
     </div>
     <div class="card stat-card">
       <p class="stat-label">Cost per portion</p>
@@ -204,7 +255,24 @@ async function recipeView(id) {
           <span class="trail">${stars(a.rating)}</span></a></li>`).join('')}</ul>`
         : '<p class="muted">Each time you cook this, note how it went and what to change. Your notes show up when you start cooking.</p>'}</div>
     <div class="cta-bar"><a class="btn" href="#/recipe/${esc(r.id)}/cook">Start cooking</a></div>`,
-    { back: '#/recipes', action: `<a class="btn sm tint" href="#/recipe/${esc(r.id)}/edit">Edit</a>` });
+    { back: '#/recipes', action: `<button type="button" class="icon-btn fav" id="fav" aria-pressed="${!!r.fav}" aria-label="Favourite"><svg viewBox="0 0 24 24" aria-hidden="true">${STAR}</svg></button>
+      <a class="btn sm tint" href="#/recipe/${esc(r.id)}/edit">Edit</a>` });
+
+  const favBtn = document.getElementById('fav');
+  favBtn.onclick = async () => {
+    const now = await db.get('recipes', r.id), fav = !now.fav;
+    favBtn.setAttribute('aria-pressed', String(fav));
+    await db.put('recipes', { ...now, fav, updatedAt: Date.now() });
+  };
+  document.getElementById('share').onclick = async e => {
+    e.preventDefault();
+    const label = e.currentTarget.querySelector('span'); // read before the first await: currentTarget is gone after it
+    const url = await shareLink(r, recs, ings);
+    try {
+      if (navigator.share) await navigator.share({ title: r.name, text: `${r.name}, a recipe from Pinch`, url });
+      else { await navigator.clipboard.writeText(url); label.textContent = 'Link copied'; }
+    } catch (err) { if (err.name !== 'AbortError') throw err; }
+  };
 
   const scale = document.getElementById('scale');
   const drawItems = () => {
@@ -236,7 +304,7 @@ async function recipeCard(id) {
   const [ings, s, recipes] = await Promise.all([ingMap(), settings(), db.all('recipes')]);
   const recs = toMap(recipes);
   const target = r.targetCostPct || s.targetCostPct;
-  const sourceLabel = r.source === 'web' && r.sourceUrl ? `Source: ${r.sourceUrl}` : { school: 'School', work: 'Work', own: 'Own recipe', web: 'Web' }[r.source] || '';
+  const sourceLabel = r.source === 'web' && r.sourceUrl ? `Source: ${r.sourceUrl}` : { school: 'School', work: 'Work', own: 'Own recipe', web: 'Web', shared: 'Shared recipe' }[r.source] || '';
 
   page('recipes', 'Recipe card', `
     <div class="no-print card"><label class="inline">Portions <input type="number" id="cp" min="1" step="1" inputmode="numeric" value="${esc(r.portions)}"></label></div>
@@ -368,7 +436,7 @@ async function recipeEdit(id) {
       <summary>More details <small>category, pricing, batch yield</small></summary>
       <div class="row2">
         <label>Category<input name="category" list="cats" placeholder="Pasta, Sauce…" value="${esc(r.category)}"></label>
-        <label>Source<select name="source">${[['school', 'School'], ['work', 'Work'], ['own', 'My own'], ['web', 'Web']].map(([v, l]) => `<option value="${v}" ${v === r.source ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
+        <label>Source<select name="source">${[['school', 'School'], ['work', 'Work'], ['own', 'My own'], ['web', 'Web'], ['shared', 'Shared']].map(([v, l]) => `<option value="${v}" ${v === r.source ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
       </div>
       ${datalist('cats', recipes.map(x => x.category))}
       <div class="row2">
@@ -391,6 +459,8 @@ async function recipeEdit(id) {
   document.getElementById('importBtn')?.addEventListener('click', async e => {
     const url = document.getElementById('importUrl').value.trim(), msg = document.getElementById('importMsg');
     if (!url) { msg.innerHTML = '<small class="warn-text">Paste a link first.</small>'; return; }
+    const shared = url.match(/#\/r\/([\w-]+)/);
+    if (shared) return go(`#/r/${shared[1]}`);
     e.target.disabled = true;
     msg.innerHTML = '<small>Reading the recipe…</small>';
     try {
@@ -2035,7 +2105,7 @@ async function portfolioView() {
   recipes.sort(byName);
   const recs = toMap(recipes);
   let pf = { headline: '', contact: '', bio: '', recipeIds: [], showCosting: false, ...saved, id: 'portfolio' };
-  const srcLabel = { school: 'Training', work: 'Work', own: 'Original', web: 'Web recipe' };
+  const srcLabel = { school: 'Training', work: 'Work', own: 'Original', web: 'Web recipe', shared: 'Shared recipe' };
 
   page('log', 'Portfolio', `
     <details class="card no-print" ${pf.recipeIds.length ? '' : 'open'}><summary>Your details</summary>
@@ -2156,7 +2226,7 @@ async function settingsView() {
       <button type="submit" class="ghost">Send feedback</button> <span id="fbMsg" class="muted"></span>
     </form>
     <div class="actions"><button type="button" class="ghost" id="invite">Invite classmates</button></div><p id="inviteMsg" class="muted center"></p>
-    <p class="muted center"><small>Pinch v24</small></p>`, { back: '#/home' });
+    <p class="muted center"><small>Pinch v25</small></p>`, { back: '#/home' });
 
   document.querySelector('[data-lang]').parentElement.onclick = e => { const l = e.target.closest('[data-lang]')?.dataset.lang; if (l && l !== LANG) setLang(l); };
   const acct = document.getElementById('acct');
@@ -2316,7 +2386,7 @@ const DEMO_ART = {
 async function loadDemo() {
   await loadSample();
   for (const [id, art] of [['s-pomo', DEMO_ART.pomo], ['s-pasta', DEMO_ART.pasta], ['s-tag', DEMO_ART.tag]]) {
-    await db.put('recipes', { ...(await db.get('recipes', id)), photo: art });
+    await db.put('recipes', { ...(await db.get('recipes', id)), photo: art, fav: id !== 's-pasta' });
   }
   const day = n => { const d = new Date(); d.setDate(d.getDate() - n); return d.toLocaleDateString('en-CA'); };
   const at = hoursAgo => { const d = new Date(Date.now() - hoursAgo * 3600e3); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 16); };
@@ -2376,6 +2446,7 @@ async function loadDemo() {
 
 const routes = [
   [/^#\/home$/, homeView],
+  [/^#\/r\/([\w-]+)$/, sharedRecipe],
   [/^#\/checks$/, checklistsView],
   [/^#\/check\/([^/]+)$/, checklistDay],
   [/^#\/check\/([^/]+)\/edit$/, checklistEdit],
@@ -2442,9 +2513,9 @@ if (recovery) history.replaceState(null, '', location.pathname + location.search
 // session (sessionStorage survives it) keeps you where you were; the password-reset link keeps its page.
 let launched = false;
 try { launched = !!sessionStorage.getItem('pinch-launched'); sessionStorage.setItem('pinch-launched', '1'); } catch {}
-if (!launched && !recovery) history.replaceState(null, '', location.pathname + location.search + '#/home');
+if (!launched && !recovery && !location.hash.startsWith('#/r/')) history.replaceState(null, '', location.pathname + location.search + '#/home');
 // Re-seed the demo when its sample data changes, so returning visitors see new features filled in
-const DEMO_DATA = 23;
+const DEMO_DATA = 25;
 if (db.DEMO && (await db.get('settings', 'demo'))?.v !== DEMO_DATA) { await loadDemo(); await db.put('settings', { id: 'demo', v: DEMO_DATA }); }
 render();
 sync.sync();

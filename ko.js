@@ -40,6 +40,12 @@ export const KO = {
   'Add recipes, or set par levels in Pantry, to make an order list.': '레시피를 추가하거나 팬트리에서 적정 재고를 정하면 발주 리스트를 만들 수 있어요.',
   'Order = need ÷ trim yield, or par if that’s more, − on hand. Count stock in the purchase unit (kg, L, each).': '발주량 = 필요량 ÷ 수율과 적정 재고 중 큰 값 − 보유량. 재고는 구매 단위(kg, L, 개)로 세요.',
 
+  // Sharing and favourites
+  'Favourite': '즐겨찾기', 'Favourites': '즐겨찾기', 'Shared recipe': '공유받은 레시피', 'Shared with you': '공유받은 레시피', 'Shared with me': '공유받음', 'Shared': '공유받음',
+  'This link is broken or cut short.': '링크가 깨졌거나 잘렸어요.', 'Ask for the recipe to be shared again.': '레시피를 다시 공유해 달라고 해 주세요.',
+  'Save to my recipes': '내 레시피에 저장', 'Copy link': '링크 복사', 'Using Pinch from your home screen?': '홈 화면의 Pinch 앱을 쓰나요?',
+  'It keeps its own recipes. Copy this link, then in the app tap New recipe and paste it under Import.': '앱은 레시피를 따로 보관해요. 이 링크를 복사한 뒤 앱에서 새 레시피를 열고 가져오기에 붙여넣으세요.',
+
   // Recipes tab
   'Recipe tools': '레시피 도구', 'Allergen chart': '알레르기 표', 'Kitchen calculator': '주방 계산기', 'Timers': '타이머', 'Prep list': '프렙 리스트', 'Menus': '메뉴',
   'Temperature check still open': '마치지 않은 온도 체크', 'Study cards to review': '복습할 카드', 'Over target food cost': '목표 원가율 초과',
@@ -266,6 +272,7 @@ const dur = (h, m, s) => [h && `${h}시간`, m && `${m}분`, s && `${s}초`].fil
 export const KO_PATTERNS = [
   // Units, amounts, durations
   [/^([\d.]+) portions?$/, q => portions(q)],
+  [/^(.+) · ([\d.]+) portions?$/, (c, q) => `${c} · ${portions(q)}`],
   [/^([\d.]+) each$/, '$1개'],
   [/^(?:(\d+) h)?(?: ?(\d+) min)?(?: ?(\d+) s)?$/, dur],
   [/^([\d.]+) hours?$/, '$1시간'],
@@ -412,5 +419,8 @@ export const KO_PATTERNS = [
   [/^Import failed \((\d+)\)\.$/, '가져오기 실패 ($1).'],
   [/^The site answered (\d+)\. Check the link opens in your browser\.$/, '사이트가 $1 오류를 보냈어요. 브라우저에서 링크가 열리는지 확인하세요.'],
   [/^(.+?) → (.+)$/, '$1 → $2'], // nested costing problems: "Sauce → Price missing: Basil"
+  [/^Comes with its sub-recipe: (.+)$/, '서브 레시피도 함께 와요: $1'],
+  [/^Comes with its (\d+) sub-recipes: (.+)$/, '서브 레시피 $1개도 함께 와요: $2'],
+  [/^You already have a recipe called (.+)\. Saving adds a second one\.$/, '이미 "$1" 레시피가 있어요. 저장하면 하나 더 생겨요.'],
   [/^Password should be at least (\d+) characters\.?$/, '비밀번호는 $1자 이상이어야 해요.'],
 ];

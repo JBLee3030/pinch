@@ -47,6 +47,8 @@ I built Pinch while studying Commercial Cookery and Kitchen Management in Melbou
 - Find recipes by ingredient: search matches ingredient names, and each Pantry item lists the recipes that use it
 - Kitchen calculator: cups and spoons to grams per ingredient (Australian or US measures), °F/°C with fan-forced, oz/lb/fl oz
 - Cooking mode: one big step at a time, timers found in the method ("simmer 45 min"), a scaled ingredient checklist, and the screen kept awake
+- Share a recipe as a link: the recipe, its sub-recipes and their ingredients travel inside the link (compressed, no server or account), and the person opening it saves it to their own book, reusing Pantry items they already have
+- Favourites: star a recipe to keep it on Home
 - Import from a link: paste any recipe page URL (schema.org Recipe) to fill name, ingredients, method, servings and photo, with the source kept
 - Quick capture: name + ingredient lines + Save; on iPhone, copy a printed recipe with the Camera's Live Text and paste it
 - Paste a whole ingredient list: quantities, fractions and units are read (Australian cup / tbsp / tsp), names are matched to the Pantry

@@ -615,3 +615,13 @@ body.sub .card form .actions > button[type=submit] { min-height: var(--h-md); fo
 .par-toggle { margin: 0 0 var(--s4); padding-bottom: var(--s4); border-bottom: 1px solid var(--line); font-weight: 600; }
 .card.area h2 { margin-bottom: 0; }
 .card > .checklist:first-child { margin-top: calc(var(--s2) * -1); margin-bottom: calc(var(--s2) * -1); }
+
+/* ---- v25: share, favourites ---- */
+.quick { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.quick a { font-size: 13px; }
+.icon-btn.fav { background: none; border: 0; padding: 0; min-height: 44px; color: var(--text-3); }
+.icon-btn.fav svg { stroke-width: 1.8; }
+.icon-btn.fav[aria-pressed="true"] { color: var(--accent); }
+.icon-btn.fav[aria-pressed="true"] svg { fill: currentColor; }
+.shared-name { font: var(--t-title); margin: var(--s1) 0 var(--s2); }
+.tip-card .actions { margin-top: var(--s3); }
