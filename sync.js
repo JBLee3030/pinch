@@ -82,7 +82,8 @@ export async function signUp(email, password) {
 // Supabase emails a link back to this page with #access_token=…&type=recovery,
 // or #error_description=… if the link expired or was already used.
 export const sendReset = email =>
-  api('/auth/v1/recover', { method: 'POST', auth: false, body: { email, redirect_to: location.origin + location.pathname } });
+  // redirect_to must be a query parameter (Supabase ignores it in the body) and be on the project's Redirect URLs list
+  api(`/auth/v1/recover?redirect_to=${encodeURIComponent(location.origin + location.pathname)}`, { method: 'POST', auth: false, body: { email } });
 
 export function readRecoveryHash() {
   const p = new URLSearchParams(location.hash.slice(1));

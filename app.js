@@ -2247,7 +2247,7 @@ async function settingsView() {
       <button type="submit" class="ghost">Send feedback</button> <span id="fbMsg" class="muted"></span>
     </form>
     <div class="actions"><button type="button" class="ghost" id="invite">Invite classmates</button></div><p id="inviteMsg" class="muted center"></p>
-    <p class="muted center"><small>Pinch v28</small></p>`, { back: '#/home' });
+    <p class="muted center"><small>Pinch v29</small></p>`, { back: '#/home' });
 
   document.querySelector('[data-lang]').parentElement.onclick = e => { const l = e.target.closest('[data-lang]')?.dataset.lang; if (l && l !== LANG) setLang(l); };
   const acct = document.getElementById('acct');
