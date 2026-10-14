@@ -112,7 +112,8 @@ header.top.root { position: static; padding: calc(env(safe-area-inset-top) + var
 .icon-btn:active { background: var(--fill); }
 svg[aria-hidden] { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
 
-/* Tab bar: 4 destinations, hidden in sub flows */
+/* Tab bar: 5 destinations, hidden in sub flows. Settings joins them only in the laptop side menu */
+nav a.side-only { display: none; }
 nav {
   position: fixed; bottom: 0; left: 0; right: 0; z-index: 10;
   display: flex; height: calc(var(--tabbar-h) + env(safe-area-inset-bottom));
@@ -629,3 +630,29 @@ body.sub .card form .actions > button[type=submit] { min-height: var(--h-md); fo
 /* ---- v26: read a recipe photo ---- */
 .photo-read { margin-top: var(--s2); }
 .photo-read.busy { opacity: .55; pointer-events: none; }
+
+/* ---- Laptop and desktop: a side menu instead of the tab bar, a wider column, hover feedback ---- */
+@media screen and (min-width: 960px) {
+  :root { --side: 232px; --col: 760px; }
+  body, body.sub { padding: 0 0 var(--s8) var(--side); }
+  nav, body.sub nav {
+    display: flex; flex-direction: column; gap: var(--s1);
+    top: 0; bottom: 0; right: auto; width: var(--side); height: auto;
+    padding: var(--s6) var(--s3); border-top: 0; border-right: 1px solid var(--line); background: var(--surface);
+  }
+  nav::before { content: "Pinch"; padding: 0 var(--s3) var(--s5); font: 800 24px/1 var(--font); letter-spacing: -.03em; color: var(--accent); }
+  nav a { flex: none; flex-direction: row; justify-content: flex-start; gap: var(--s3); min-height: 48px; padding: 0 var(--s3);
+    border-radius: var(--r-control); font: 600 16px/1 var(--font); color: var(--text-2); }
+  nav a.on { background: var(--accent-weak); color: var(--accent); }
+  nav a.side-only { display: flex; margin-top: auto; }
+  main, header.top { max-width: var(--col); }
+  header.top.root { padding-top: var(--s8); }
+  .hero { max-height: 340px; }
+  .tiles { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+  .timer-pill, body.sub .timer-pill { bottom: var(--s5); left: calc(50% + var(--side) / 2); }
+}
+@media (hover: hover) {
+  .list li a:hover, .links a:hover, .tiles a:hover, .quick a:hover, nav a:hover, .icon-btn:hover { background: var(--fill); }
+  nav a.on:hover { background: var(--accent-weak); }
+  :is(.btn, button):not(:disabled):hover { filter: brightness(.96); }
+}

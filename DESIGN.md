@@ -63,6 +63,7 @@ System UI font (SF Pro on iPhone, Roboto on Android): native feel, zero download
 - Settings is a sub page behind the gear on Home. Tools are sub pages whose back button returns to Home.
 - On a detail screen, secondary actions sit up top as equal quick-action tiles (the recipe's Scale, Recipe card, Log practice); the one primary action is the bottom CTA. Long reference data (costing breakdown) is folded.
 - Settings save as you go; no Save button.
+- **Laptop (960 px and wider):** the tab bar becomes a side menu (with Settings at the bottom), the column widens to 760 px, Home tools go 6 to a row, photos cap at 340 px tall, and rows and tiles get hover states. Phones are unchanged.
 
 ## Components
 

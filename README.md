@@ -79,6 +79,7 @@ I built Pinch while studying Commercial Cookery and Kitchen Management in Melbou
 **Data**
 - English or Korean, switched in Settings. Recipe cards, the portfolio and study cards stay in English for school and work
 - Works offline; data lives on the device
+- Phone and laptop: a side-menu layout on wider screens; sign in on both to keep them in sync
 - Optional account: email + password sign-in syncs across devices, with in-app password reset
 - First-run guide, in-app feedback and a share link for inviting classmates
 - JSON backup export / import

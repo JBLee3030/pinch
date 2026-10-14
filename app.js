@@ -2226,7 +2226,7 @@ let drawAccount = () => {};
 async function settingsView() {
   const s = await settings();
   const est = await navigator.storage?.estimate?.().catch(() => null);
-  page('home', 'Settings', `
+  page('settings', 'Settings', `
     <div class="card"><h2>Language</h2>
       <div class="seg" role="tablist" aria-label="Language" translate="no" style="margin:0">${[['en', 'English'], ['ko', '한국어']].map(([k, l]) =>
         `<button type="button" role="tab" data-lang="${k}" aria-selected="${k === LANG}">${l}</button>`).join('')}</div></div>
@@ -2247,7 +2247,7 @@ async function settingsView() {
       <button type="submit" class="ghost">Send feedback</button> <span id="fbMsg" class="muted"></span>
     </form>
     <div class="actions"><button type="button" class="ghost" id="invite">Invite classmates</button></div><p id="inviteMsg" class="muted center"></p>
-    <p class="muted center"><small>Pinch v26</small></p>`, { back: '#/home' });
+    <p class="muted center"><small>Pinch v27</small></p>`, { back: '#/home' });
 
   document.querySelector('[data-lang]').parentElement.onclick = e => { const l = e.target.closest('[data-lang]')?.dataset.lang; if (l && l !== LANG) setLang(l); };
   const acct = document.getElementById('acct');
