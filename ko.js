@@ -40,6 +40,16 @@ export const KO = {
   'Add recipes, or set par levels in Pantry, to make an order list.': '레시피를 추가하거나 팬트리에서 적정 재고를 정하면 발주 리스트를 만들 수 있어요.',
   'Order = need ÷ trim yield, or par if that’s more, − on hand. Count stock in the purchase unit (kg, L, each).': '발주량 = 필요량 ÷ 수율과 적정 재고 중 큰 값 − 보유량. 재고는 구매 단위(kg, L, 개)로 세요.',
 
+  // Reading a recipe photo
+  'Read a recipe photo': '레시피 사진으로 읽기', 'Reading the photo… this takes about 10 to 30 seconds.': '사진을 읽는 중… 10~30초 정도 걸려요.',
+  'Paste a recipe link, or take a photo of a printed or handwritten recipe. Pinch fills in the form for you to check.': '레시피 링크를 붙여넣거나, 인쇄되거나 손으로 쓴 레시피를 찍으세요. Pinch가 칸을 채워 주면 확인만 하면 돼요.',
+  'Reading photos is turned off in the demo.': '데모에서는 사진 읽기가 꺼져 있어요.', 'Sign in (Settings → Account) to read recipe photos.': '사진을 읽으려면 로그인하세요 (설정 → 계정과 동기화).',
+  'You’re offline. Connect to the internet to read a photo.': '오프라인이에요. 사진을 읽으려면 인터넷에 연결하세요.', 'Photo reading isn’t set up yet.': '사진 읽기가 아직 설정되지 않았어요.',
+  'Send a JPEG, PNG or WebP photo under 4 MB.': '4 MB 이하의 JPEG, PNG, WebP 사진을 보내세요.', 'Busy right now. Try again in a minute.': '지금 바빠요. 1분 뒤에 다시 해 보세요.',
+  'This photo couldn’t be read. Try another photo, or paste the text.': '이 사진은 읽을 수 없어요. 다른 사진으로 하거나 글을 붙여넣으세요.',
+  'No recipe found in that photo. Get the whole recipe in frame, in good light.': '사진에서 레시피를 찾지 못했어요. 밝은 곳에서 레시피 전체가 나오게 찍어 주세요.',
+  'Couldn’t read the photo. Try again.': '사진을 읽지 못했어요. 다시 해 보세요.',
+
   // Sharing and favourites
   'Favourite': '즐겨찾기', 'Favourites': '즐겨찾기', 'Shared recipe': '공유받은 레시피', 'Shared with you': '공유받은 레시피', 'Shared with me': '공유받음', 'Shared': '공유받음',
   'This link is broken or cut short.': '링크가 깨졌거나 잘렸어요.', 'Ask for the recipe to be shared again.': '레시피를 다시 공유해 달라고 해 주세요.',
@@ -76,7 +86,7 @@ export const KO = {
   'Add to recipe': '레시피에 추가', 'Ingredient or sub-recipe': '재료 또는 서브 레시피', '+ Add ingredient': '+ 재료 추가', 'Paste a list': '목록 붙여넣기',
   'Add one at a time': '하나씩 추가', 'More details': '자세히', 'category, pricing, batch yield': '카테고리, 가격, 배치 완성량', 'Pasta, Sauce…': '파스타, 소스…',
   'Source': '출처', 'My own': '내 레시피', 'Web': '웹', 'Target food cost %': '목표 원가율 %', 'Batch yield': '배치 완성량', '(for sub-recipes)': '(서브 레시피용)',
-  'e.g. 2.2': '예: 2.2', 'Yield unit': '완성량 단위', 'Import from a website': '웹사이트에서 가져오기', 'Paste a recipe link': '레시피 링크 붙여넣기',
+  'e.g. 2.2': '예: 2.2', 'Yield unit': '완성량 단위', 'Import from a website': '웹사이트에서 가져오기', 'Import a recipe': '레시피 가져오기', 'Paste a recipe link': '레시피 링크 붙여넣기',
   'Recipe link': '레시피 링크', 'Import': '가져오기', 'Find a recipe on Google, copy its link and paste it here. Works with most recipe sites.': '구글에서 레시피를 찾아 링크를 복사해 붙여넣으세요. 대부분의 레시피 사이트에서 돼요.',
   'Paste a link first.': '먼저 링크를 붙여넣으세요.', 'Reading the recipe…': '레시피 읽는 중…', 'Paste at least one line.': '한 줄 이상 붙여넣으세요.',
   'From school': '학교 레시피', 'From work': '직장 레시피', 'From the web': '웹 레시피',
@@ -422,5 +432,8 @@ export const KO_PATTERNS = [
   [/^Comes with its sub-recipe: (.+)$/, '서브 레시피도 함께 와요: $1'],
   [/^Comes with its (\d+) sub-recipes: (.+)$/, '서브 레시피 $1개도 함께 와요: $2'],
   [/^You already have a recipe called (.+)\. Saving adds a second one\.$/, '이미 "$1" 레시피가 있어요. 저장하면 하나 더 생겨요.'],
+  [/^Read (\d+) ingredients and (\d+) steps\. Check them, then Save\.$/, '재료 $1개, 단계 $2개를 읽었어요. 확인하고 저장하세요.'],
+  [/^That's (\d+) photos today\. Try again tomorrow, or paste the text instead\.$/, '오늘은 사진 $1장을 다 썼어요. 내일 다시 하거나 글을 붙여넣으세요.'],
+  [/^Couldn’t read the photo \((.+)\)\.(?: Try again\.)?$/, '사진을 읽지 못했어요 ($1). 다시 해 보세요.'],
   [/^Password should be at least (\d+) characters\.?$/, '비밀번호는 $1자 이상이어야 해요.'],
 ];

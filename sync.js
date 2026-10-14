@@ -116,6 +116,25 @@ export async function importRecipe(url) {
   return data;
 }
 
+// ---- Recipe photo reading (Edge Function supabase/functions/recipe-photo). Signed-in users only:
+// the function calls a paid API, so it takes the user's own token, never the public anon key.
+export async function readRecipePhoto(base64, type) {
+  if (db.DEMO) throw new Error('Reading photos is turned off in the demo.');
+  if (!state.session) throw new Error('Sign in (Settings → Account) to read recipe photos.');
+  let res;
+  try {
+    res = await fetch(`${BASE}/functions/v1/recipe-photo`, {
+      method: 'POST', body: JSON.stringify({ image: base64, type }),
+      headers: { 'Content-Type': 'application/json', apikey: KEY, Authorization: `Bearer ${await accessToken()}` },
+    });
+  } catch {
+    throw new Error('You’re offline. Connect to the internet to read a photo.');
+  }
+  const data = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(data?.error || (res.status === 404 ? 'Photo reading isn’t set up yet.' : `Couldn’t read the photo (${res.status}).`));
+  return data;
+}
+
 // ---- Feedback (table `feedback`, insert-only; see supabase.sql)
 export const sendFeedback = async (message, context) =>
   api('/rest/v1/feedback', { method: 'POST', auth: state.session ? true : false, headers: { Prefer: 'return=minimal' }, body: { message, context } });

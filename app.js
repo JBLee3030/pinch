@@ -48,6 +48,7 @@ const ICON = {
   printer: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 17h2a2 2 0 0 0 2 -2v-4a2 2 0 0 0 -2 -2h-14a2 2 0 0 0 -2 2v4a2 2 0 0 0 2 2h2"/><path d="M17 9v-4a2 2 0 0 0 -2 -2h-6a2 2 0 0 0 -2 2v4"/><path d="M7 13m0 2a2 2 0 0 1 2 -2h6a2 2 0 0 1 2 2v4a2 2 0 0 1 -2 2h-6a2 2 0 0 1 -2 -2z"/></svg>',
   checkbox: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 11l3 3l8 -8"/><path d="M20 12v6a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h9"/></svg>',
   share: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12m-3 0a3 3 0 1 0 6 0a3 3 0 1 0 -6 0"/><path d="M18 6m-3 0a3 3 0 1 0 6 0a3 3 0 1 0 -6 0"/><path d="M18 18m-3 0a3 3 0 1 0 6 0a3 3 0 1 0 -6 0"/><path d="M8.7 10.7l6.6 -3.4"/><path d="M8.7 13.3l6.6 3.4"/></svg>',
+  camera: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h1a2 2 0 0 0 2 -2a1 1 0 0 1 1 -1h6a1 1 0 0 1 1 1a2 2 0 0 0 2 2h1a2 2 0 0 1 2 2v9a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-9a2 2 0 0 1 2 -2"/><path d="M9 13a3 3 0 1 0 6 0a3 3 0 0 0 -6 0"/></svg>',
   pencil: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4"/><path d="M13.5 6.5l4 4"/></svg>',
 };
 
@@ -82,15 +83,15 @@ const attemptsFor = async id => (await db.all('attempts')).filter(a => a.recipeI
   .sort((a, b) => b.date.localeCompare(a.date) || (b.createdAt ?? 0) - (a.createdAt ?? 0));
 const newBtn = href => `<a class="btn sm tint" href="${href}">${ICON.plus}New</a>`;
 
-async function readPhoto(file) {
+async function readPhoto(file, max = 1200, quality = 0.8) {
   if (!file?.size) return null;
   const img = await createImageBitmap(file);
-  const s = Math.min(1, 1200 / Math.max(img.width, img.height));
+  const s = Math.min(1, max / Math.max(img.width, img.height));
   const c = document.createElement('canvas');
   c.width = Math.round(img.width * s);
   c.height = Math.round(img.height * s);
   c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
-  return c.toDataURL('image/jpeg', 0.8);
+  return c.toDataURL('image/jpeg', quality);
 }
 const photoField = cur => `<label>Photo<input type="file" name="photo" accept="image/*"></label>
   ${cur ? `<img class="hero" src="${esc(cur)}" alt=""><label class="inline"><input type="checkbox" name="rmPhoto"> Remove photo</label>` : ''}`;
@@ -409,9 +410,10 @@ async function recipeEdit(id) {
   const typing = !r.items.length; // no rows yet: ingredients start as a text box
   page('recipes', isNew ? 'New recipe' : 'Edit recipe', `<form id="f">
     ${isNew ? `<div class="card import-card">
-      <h2>Import from a website</h2>
+      <h2>Import a recipe</h2>
       <div class="bar"><input type="url" id="importUrl" inputmode="url" autocomplete="off" placeholder="Paste a recipe link" aria-label="Recipe link"><button type="button" id="importBtn">Import</button></div>
-      <p id="importMsg"><small>Find a recipe on Google, copy its link and paste it here. Works with most recipe sites.</small></p>
+      <label class="btn ghost wide photo-read">${ICON.camera}Read a recipe photo<input type="file" id="photoRead" accept="image/*" hidden></label>
+      <p id="importMsg"><small>Paste a recipe link, or take a photo of a printed or handwritten recipe. Pinch fills in the form for you to check.</small></p>
     </div>` : ''}
     <input type="hidden" name="sourceUrl" value="${esc(r.sourceUrl)}">
     <label>Name<input name="name" required placeholder="e.g. Pomodoro sauce" value="${esc(r.name)}"></label>
@@ -477,6 +479,25 @@ async function recipeEdit(id) {
     } catch (err) {
       msg.innerHTML = `<small class="warn-text">${esc(err.message)}</small>`;
     } finally { e.target.disabled = false; }
+  });
+  // Read a photo: Claude reads the recipe on the server; the form is filled for you to check, then Save
+  document.getElementById('photoRead')?.addEventListener('change', async e => {
+    const file = e.target.files[0], msg = document.getElementById('importMsg'), label = e.target.closest('label');
+    if (!file) return;
+    label.classList.add('busy');
+    msg.innerHTML = '<small>Reading the photo… this takes about 10 to 30 seconds.</small>';
+    try {
+      const jpeg = await readPhoto(file, 1600, 0.85); // big enough for small print, small enough to send quickly
+      const rec = await sync.readRecipePhoto(jpeg.split(',')[1], 'image/jpeg');
+      const f = document.getElementById('f');
+      f.elements.name.value = rec.name;
+      document.getElementById('pasteText').value = rec.ingredients.join('\n');
+      f.elements.method.value = rec.steps.map((st, i) => `${i + 1}. ${st}`).join('\n');
+      if (rec.servings) f.elements.portions.value = rec.servings;
+      msg.innerHTML = `<small class="ok-text">Read ${rec.ingredients.length} ingredients and ${rec.steps.length} steps. Check them, then Save.</small>`;
+    } catch (err) {
+      msg.innerHTML = `<small class="warn-text">${esc(err.message)}</small>`;
+    } finally { label.classList.remove('busy'); e.target.value = ''; }
   });
   const pasteOpen = document.getElementById('pasteOpen');
   if (pasteOpen) pasteOpen.onclick = () => { paste.hidden = !paste.hidden; if (!paste.hidden) document.getElementById('pasteText').focus(); };
@@ -2226,7 +2247,7 @@ async function settingsView() {
       <button type="submit" class="ghost">Send feedback</button> <span id="fbMsg" class="muted"></span>
     </form>
     <div class="actions"><button type="button" class="ghost" id="invite">Invite classmates</button></div><p id="inviteMsg" class="muted center"></p>
-    <p class="muted center"><small>Pinch v25</small></p>`, { back: '#/home' });
+    <p class="muted center"><small>Pinch v26</small></p>`, { back: '#/home' });
 
   document.querySelector('[data-lang]').parentElement.onclick = e => { const l = e.target.closest('[data-lang]')?.dataset.lang; if (l && l !== LANG) setLang(l); };
   const acct = document.getElementById('acct');

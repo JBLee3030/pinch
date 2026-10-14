@@ -55,3 +55,20 @@ alter table public.feedback enable row level security;
 create policy "anyone can send feedback" on public.feedback for insert to anon, authenticated with check (true);
 revoke all on public.feedback from anon, authenticated; -- Supabase grants everything by default
 grant insert (message, context) on public.feedback to anon, authenticated;
+
+-- ---------------------------------------------------------------------------
+-- Recipe photo reading (Edge Function recipe-photo): one row per photo read, so each
+-- signed-in user gets a daily limit. Users can see and add only their own rows.
+create table public.photo_reads (
+  id         bigint generated always as identity primary key,
+  user_id    uuid not null default auth.uid() references auth.users on delete cascade,
+  created_at timestamptz not null default now()
+);
+create index photo_reads_user_time on public.photo_reads (user_id, created_at);
+
+alter table public.photo_reads enable row level security;
+create policy "own photo reads" on public.photo_reads for all to authenticated
+  using (user_id = (select auth.uid()))
+  with check (user_id = (select auth.uid()));
+revoke all on public.photo_reads from anon, authenticated; -- Supabase grants everything by default
+grant select, insert on public.photo_reads to authenticated;

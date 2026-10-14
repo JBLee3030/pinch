@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 import { remoteWins } from './db.js';
 import { tr } from './i18n.js';
+import { toRecipe, SCHEMA } from './supabase/functions/recipe-photo/index.js';
 import { DECKS, ALL_CARDS, review, pickSession, isDue, isLearned } from './study.js';
 import { extractRecipe, safeUrl } from './supabase/functions/recipe-import/index.js';
 import { parseIngredientLine as P, matchIngredient, parsePriceList, packUnit, splitSteps, findDurations, fmtDuration } from './parse.js';
@@ -498,6 +499,18 @@ assert.equal(niceAmount(2, 'portion'), '2 portion');
   const fresh = importBundle(b, [], [], () => `id${++n}`);
   assert.deepEqual(fresh.recipes.map(r => [r.name, r.source]), [['Sauce', 'shared'], ['Pasta', 'shared']]);
   assert.equal(fresh.recipes[1].items[0].recipeId, fresh.recipes[0].id);
+}
+
+// Reading a recipe photo: tidying what the model returns
+{
+  const r = toRecipe({ found: true, name: '  Ragù  alla bolognese ', servings: 6,
+    ingredients: ['500 g  beef mince', '', '  1 onion '], steps: ['1. Brown the meat.', 'Step 2: Add the wine', '3) Simmer 2 h'] });
+  assert.deepEqual(r, { name: 'Ragù alla bolognese', servings: 6, ingredients: ['500 g beef mince', '1 onion'], steps: ['Brown the meat.', 'Add the wine', 'Simmer 2 h'] });
+  assert.equal(toRecipe({ name: '', servings: 0 }).servings, null);                       // 0 means not stated
+  assert.equal(toRecipe({ name: '', servings: 0 }).name, 'Recipe from a photo');
+  assert.deepEqual(toRecipe(null).ingredients, []);
+  assert.equal(toRecipe({ steps: ['2 eggs, beaten'] }).steps[0], '2 eggs, beaten');        // a leading amount isn't a step number
+  assert.deepEqual(SCHEMA.required.sort(), Object.keys(SCHEMA.properties).sort());        // structured outputs need every field required
 }
 
 // Korean UI

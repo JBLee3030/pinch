@@ -625,3 +625,7 @@ body.sub .card form .actions > button[type=submit] { min-height: var(--h-md); fo
 .icon-btn.fav[aria-pressed="true"] svg { fill: currentColor; }
 .shared-name { font: var(--t-title); margin: var(--s1) 0 var(--s2); }
 .tip-card .actions { margin-top: var(--s3); }
+
+/* ---- v26: read a recipe photo ---- */
+.photo-read { margin-top: var(--s2); }
+.photo-read.busy { opacity: .55; pointer-events: none; }
