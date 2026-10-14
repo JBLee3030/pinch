@@ -23,7 +23,10 @@ async function api(path, { method = 'GET', body, auth = true, headers = {} } = {
   const h = { apikey: KEY, 'Content-Type': 'application/json', ...headers };
   // auth: true = current session, a string = that access token (password recovery), false = anonymous
   if (auth) h.Authorization = 'Bearer ' + (typeof auth === 'string' ? auth : await accessToken());
-  const res = await fetch(BASE + path, { method, headers: h, body: body && JSON.stringify(body) });
+  // A network failure (offline, or the server unreachable, e.g. a paused Supabase project) says so plainly
+  const res = await fetch(BASE + path, { method, headers: h, body: body && JSON.stringify(body) }).catch(() => {
+    throw new Error(navigator.onLine ? 'Can’t reach the Pinch server right now. Try again in a few minutes.' : 'You’re offline. Connect to the internet and try again.');
+  });
   const text = await res.text();
   let json = null;
   try { json = text ? JSON.parse(text) : null; } catch {}

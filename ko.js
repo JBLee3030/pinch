@@ -263,7 +263,7 @@ export const KO = {
   'Replace ALL data on this phone with this backup?': '이 휴대폰의 모든 데이터를 이 백업으로 바꿀까요?', 'Backup restored.': '백업을 복원했어요.',
 
   // Errors from sync and recipe import
-  'Not signed in': '로그인되어 있지 않아요', 'Invalid login credentials': '이메일 또는 비밀번호가 맞지 않아요', 'User already registered': '이미 가입된 이메일이에요',
+  'Not signed in': '로그인되어 있지 않아요', 'Can’t reach the Pinch server right now. Try again in a few minutes.': '지금 Pinch 서버에 연결할 수 없어요. 몇 분 뒤에 다시 해 보세요.', 'You’re offline. Connect to the internet and try again.': '오프라인이에요. 인터넷에 연결한 뒤 다시 해 보세요.', 'Invalid login credentials': '이메일 또는 비밀번호가 맞지 않아요', 'User already registered': '이미 가입된 이메일이에요',
   'Email not confirmed': '이메일 인증이 안 됐어요', 'Offline. Pinch will sync when you are back online.': '오프라인이에요. 다시 연결되면 Pinch가 동기화해요.',
   'Account created, but email confirmation is on. Turn off "Confirm email" in Supabase.': '계정은 만들었지만 이메일 인증이 켜져 있어요. Supabase에서 "Confirm email"을 끄세요.',
   'You’re offline. Connect to the internet to import a recipe.': '오프라인이에요. 레시피를 가져오려면 인터넷에 연결하세요.', 'Recipe import isn’t set up yet.': '레시피 가져오기가 아직 설정되지 않았어요.',
