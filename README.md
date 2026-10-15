@@ -1,6 +1,6 @@
 # Pinch
 
-**A study companion for culinary students**: your class recipes, practice, exams, flash cards and service log in one installable app that works offline.
+**A study companion for culinary students**: your class recipes, practice, exams, flash cards and class log in one installable app that works offline.
 
 **[Open the app](https://jblee3030.github.io/pinch/)** · **[Try the demo with sample data](https://jblee3030.github.io/pinch/?demo)**
 
@@ -43,8 +43,8 @@ I built Pinch while studying Commercial Cookery and Kitchen Management (Cert IV)
 - Flash card decks: knife cuts, food safety temperatures (FSANZ), steak doneness, mother sauces, ratios and kitchen terms; spaced repetition (1, 3, 7, 14, 30 days)
 - Home: what needs doing today (the next exam and dishes to practise, cards due, prep progress, today's service to log) and every tool in one grid
 
-**Service log and portfolio**
-- Log today's service in two taps; school service periods and work shifts with progress toward the course requirement
+**Class log and portfolio**
+- Class log: log today's class service in two taps (kitchen, station and hours carried over), with progress toward the course's required service periods
 - Food safety temperature log and opening, closing and cleaning checklists for kitchen practicals and placements
 - Portfolio page generated from the log and featured dishes, printable to PDF
 

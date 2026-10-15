@@ -166,10 +166,10 @@ export const KO = {
   'Total cost': '총원가', 'Value of reused trim': '재사용 트림 가치', 'Usable': '사용 가능량', 'Unaccounted loss': '알 수 없는 손실',
   
   // Service log
-  'Service log': '서비스 기록', 'Log tools': '기록 도구', 'Temp log': '온도 기록', 'Portfolio': '포트폴리오', 'School service periods': '학교 서비스 횟수',
-  'Work shifts': '근무 횟수', 'Takes a few seconds': '몇 초면 돼요', 'Same as last time': '지난번과 같음', 'No venue': '장소 없음',
-  'Log every service: what you cooked, where, and what chef said.': '서비스마다 기록하세요: 무엇을, 어디서 만들었고 셰프가 뭐라고 했는지.',
-  'Edit service': '서비스 수정', 'New service': '새 서비스', 'Venue': '장소', 'AMCA kitchen, restaurant name…': 'AMCA 주방, 레스토랑 이름…', 'Service': '서비스',
+  'Class log': '수업 기록', 'Log tools': '기록 도구', 'Temp log': '온도 기록', 'Portfolio': '포트폴리오', 'School service periods': '학교 서비스 횟수',
+   'Takes a few seconds': '몇 초면 돼요', 'Same as last time': '지난번과 같음', 'No venue': '장소 없음',
+  'Log every class service: what you cooked, your station and what chef said.': '수업 서비스마다 기록하세요: 무엇을 만들었고, 어느 스테이션이었고, 셰프가 뭐라고 했는지.', 'Kitchen': '주방', 'e.g. AMCA training kitchen': '예: AMCA 실습 주방',
+  'Edit service': '서비스 수정', 'New service': '새 서비스', 'Venue': '장소',  'Service': '서비스',
   'Hours': '시간', 'Station': '스테이션', 'Dishes cooked': '만든 요리', 'Chef feedback / what to improve': '셰프 피드백 / 개선할 점', 'Tagliatelle al ragù ×18…': 'Tagliatelle al ragù ×18…',
   'Delete this service entry?': '이 서비스 기록을 삭제할까요?',
 
@@ -359,5 +359,6 @@ export const KO_PATTERNS = [
   [/^Couldn’t read the photo \((.+)\)\.(?: Try again\.)?$/, '사진을 읽지 못했어요 ($1). 다시 해 보세요.'],
   [/^(\d+) without a price\. Recipes using them show an incomplete cost\.$/, '가격 없는 재료 $1개. 이 재료를 쓰는 레시피는 원가가 미완성으로 나와요.'],
   [/^in (\d+) recipes?$/, '레시피 $1개에 사용'],
+  [/^([\d.]+) hours in the kitchen$/, '주방에서 $1시간'],
   [/^Password should be at least (\d+) characters\.?$/, '비밀번호는 $1자 이상이어야 해요.'],
 ];

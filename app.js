@@ -1074,7 +1074,7 @@ async function checklistEdit(id) {
 
 async function todayItems() {
   const [exams, attempts, st, temps, prep, logs, recipes] = await Promise.all([db.all('exams'), db.all('attempts'), studyState(), db.all('temps'),
-    db.get('settings', 'prepPlan'), db.all('logs'), db.all('recipes')]);
+    db.get('settings', 'prepPlan'), classLogs(), db.all('recipes')]);
   const items = [], t = today();
   const next = exams.filter(e => daysUntil(e.date, t) >= 0).sort((a, b) => a.date.localeCompare(b.date))[0];
   if (next) {
@@ -1557,56 +1557,54 @@ async function yieldView(id) {
 // ---------- Log ----------
 
 const PERIODS = ['Breakfast', 'Lunch', 'Dinner', 'Function', 'Prep shift', 'Other'];
+// The log is for class services. Work shifts logged by older versions stay in storage but aren't shown or counted.
+const classLogs = async () => (await db.all('logs')).filter(l => l.type !== 'work');
 const STATIONS = ['Pasta', 'Sauce', 'Grill', 'Larder / Garde manger', 'Pastry', 'Fry', 'Prep', 'Pizza', 'Pass'];
 
 async function logList() {
-  const [logs, s] = await Promise.all([db.all('logs'), settings()]);
+  const [logs, s] = await Promise.all([classLogs(), settings()]);
   logs.sort((a, b) => b.date.localeCompare(a.date) || b.createdAt - a.createdAt);
-  const school = logs.filter(l => l.type === 'school').length;
-  const work = logs.filter(l => l.type === 'work');
-  const hours = work.reduce((n, l) => n + (l.hours || 0), 0);
+  const hours = logs.reduce((n, l) => n + (l.hours || 0), 0);
   const last = [...logs].sort((a, b) => b.createdAt - a.createdAt)[0];
   const doneNow = logs.some(l => l.date === today() && l.period === periodNow());
-  page('log', 'Service log', `
+  page('log', 'Class log', `
     <a class="card quick-log" href="#/log/new/edit">
       <span class="grow"><b>${doneNow ? `${periodNow()} logged. Log another` : `Log today’s ${periodNow().toLowerCase()} service`}</b>
         <small>${last ? esc([last.venue, last.station].filter(Boolean).join(' · ') || 'Same as last time') : 'Takes a few seconds'}</small></span>
       <span class="btn sm">${ICON.plus}Log</span></a>
-    <div class="card"><div class="row2">
-      <div><small>School service periods</small><div class="big">${school} / ${esc(s.logTarget)}</div>
-        <div class="progress"><i style="width:${Math.min(100, school / s.logTarget * 100)}%"></i></div></div>
-      <div><small>Work shifts</small><div class="big">${work.length}</div><small>${fmtQty(hours)} hours</small></div>
-    </div></div>
+    <div class="card stat-card"><p class="stat-label">School service periods</p>
+      <p class="stat">${logs.length} / ${esc(s.logTarget)}</p>
+      <div class="progress"><i style="width:${Math.min(100, logs.length / s.logTarget * 100)}%"></i></div>
+      <p class="stat-sub">${fmtQty(hours)} hours in the kitchen</p></div>
     ${logs.length ? `<ul class="list">${logs.map(l => `<li><a href="#/log/${esc(l.id)}/edit">
-      ${l.photo ? `<img src="${esc(l.photo)}" alt="">` : `<span class="ph tag ${l.type}">${l.type === 'school' ? 'School' : 'Work'}</span>`}
+      ${l.photo ? `<img src="${esc(l.photo)}" alt="">` : ''}
       <div class="grow"><b>${esc(new Date(l.date + 'T00:00').toLocaleDateString(locale, { weekday: 'short', day: 'numeric', month: 'short' }))}, ${esc(l.period)}</b>
         <small>${esc([l.venue, l.station].filter(Boolean).join(' · ') || 'No venue')}</small></div>
       ${l.hours ? `<span class="trail">${esc(l.hours)} h</span>` : ''}</a></li>`).join('')}</ul>`
-      : '<p class="empty">Log every service: what you cooked, where, and what chef said.</p>'}`);
+      : '<p class="empty">Log every class service: what you cooked, your station and what chef said.</p>'}`);
 }
 
 const periodNow = () => { const h = new Date().getHours(); return h < 10 ? 'Breakfast' : h < 15 ? 'Lunch' : 'Dinner'; };
 
 async function logEdit(id) {
   const isNew = id === 'new';
-  const logs = await db.all('logs');
+  const logs = await classLogs();
   const last = logs.sort((a, b) => b.createdAt - a.createdAt)[0];
   // A new entry starts from your last one (kitchen, station, hours) and the service happening now
-  const l = isNew ? { id: uid(), date: today(), type: last?.type ?? 'school', venue: last?.venue ?? '', station: last?.station ?? '', hours: last?.hours ?? null, period: periodNow() }
+  const l = isNew ? { id: uid(), date: today(), venue: last?.venue ?? '', station: last?.station ?? '', hours: last?.hours ?? null, period: periodNow() }
     : logs.find(x => x.id === id);
   if (!l) return go('#/log');
   page('log', isNew ? 'New service' : 'Edit service', `<form id="f">
     <div class="row2">
       <label>Date<input name="date" type="date" required value="${esc(l.date)}"></label>
-      <label>Type<select name="type"><option value="school" ${l.type === 'school' ? 'selected' : ''}>School</option><option value="work" ${l.type === 'work' ? 'selected' : ''}>Work</option></select></label>
+      <label>Service<select name="period">${opts(PERIODS, l.period)}</select></label>
     </div>
-    <label>Venue<input name="venue" list="venues" placeholder="AMCA kitchen, restaurant name…" value="${esc(l.venue)}"></label>
+    <label>Kitchen<input name="venue" list="venues" placeholder="e.g. AMCA training kitchen" value="${esc(l.venue)}"></label>
     ${datalist('venues', logs.map(x => x.venue))}
     <div class="row2">
-      <label>Service<select name="period">${opts(PERIODS, l.period)}</select></label>
+      <label>Station<input name="station" list="stations" value="${esc(l.station)}"></label>
       <label>Hours<input name="hours" type="number" min="0" step="0.25" inputmode="decimal" value="${esc(l.hours)}"></label>
     </div>
-    <label>Station<input name="station" list="stations" value="${esc(l.station)}"></label>
     ${datalist('stations', [...STATIONS, ...logs.map(x => x.station)])}
     <label>Dishes cooked<textarea name="dishes" placeholder="Tagliatelle al ragù ×18…">${esc(l.dishes)}</textarea></label>
     <label>Chef feedback / what to improve<textarea name="feedback">${esc(l.feedback)}</textarea></label>
@@ -1618,7 +1616,7 @@ async function logEdit(id) {
   form.onsubmit = async e => {
     e.preventDefault();
     const fd = new FormData(form);
-    await db.put('logs', { ...l, date: fd.get('date'), type: fd.get('type'), venue: fd.get('venue').trim(), period: fd.get('period'),
+    await db.put('logs', { ...l, date: fd.get('date'), type: 'school', venue: fd.get('venue').trim(), period: fd.get('period'),
       hours: num(fd.get('hours')), station: fd.get('station').trim(), dishes: fd.get('dishes'), feedback: fd.get('feedback'),
       photo: await photoValue(fd, l.photo), createdAt: l.createdAt ?? Date.now(), updatedAt: Date.now() });
     go('#/log');
@@ -1735,8 +1733,8 @@ const monthYear = d => new Date(d + 'T00:00').toLocaleDateString('en-AU', { mont
 function experience(logs) {
   const m = new Map();
   for (const l of logs) {
-    const venue = l.venue || 'Unnamed kitchen', key = venue + '\u0000' + l.type;
-    const v = m.get(key) ?? { venue, type: l.type, count: 0, hours: 0, first: l.date, last: l.date, stations: new Set() };
+    const venue = l.venue || 'Training kitchen', key = venue;
+    const v = m.get(key) ?? { venue, count: 0, hours: 0, first: l.date, last: l.date, stations: new Set() };
     v.count++;
     v.hours += l.hours || 0;
     if (l.date < v.first) v.first = l.date;
@@ -1751,7 +1749,7 @@ function experience(logs) {
 }
 
 async function portfolioView() {
-  const [recipes, logs, ings, s, saved] = await Promise.all([db.all('recipes'), db.all('logs'), ingMap(), settings(), db.get('settings', 'portfolio')]);
+  const [recipes, logs, ings, s, saved, attempts] = await Promise.all([db.all('recipes'), classLogs(), ingMap(), settings(), db.get('settings', 'portfolio'), db.all('attempts')]);
   recipes.sort(byName);
   const recs = toMap(recipes);
   let pf = { headline: '', contact: '', bio: '', recipeIds: [], showCosting: false, ...saved, id: 'portfolio' };
@@ -1782,7 +1780,6 @@ async function portfolioView() {
   };
   const draw = () => {
     const featured = recipes.filter(r => pf.recipeIds.includes(r.id));
-    const school = logs.filter(l => l.type === 'school').length, work = logs.filter(l => l.type === 'work').length;
     const hours = logs.reduce((n, l) => n + (l.hours || 0), 0);
     const exp = experience(logs);
     sheet.innerHTML = `
@@ -1790,9 +1787,9 @@ async function portfolioView() {
         ${pf.headline ? `<p><b>${esc(pf.headline)}</b></p>` : ''}${pf.contact ? `<p class="muted">${esc(pf.contact)}</p>` : ''}</div></div>
       ${pf.bio ? `<p class="bio">${esc(pf.bio)}</p>` : ''}
       <div class="stats">
-        <div><b>${school}</b><small>school service periods</small></div><div><b>${work}</b><small>work shifts</small></div>
+        <div><b>${logs.length}</b><small>service periods</small></div><div><b>${attempts.length}</b><small>practice cooks logged</small></div>
         <div><b>${fmtQty(hours)}</b><small>hours logged</small></div><div><b>${recipes.length}</b><small>recipes in my book</small></div></div>
-      ${exp.length ? `<h2>Kitchen experience</h2><ul class="exp">${exp.map(v => `<li><b>${esc(v.venue)}</b> <small>· ${v.type === 'school' ? 'Training kitchen' : 'Work'}</small><br>
+      ${exp.length ? `<h2>Training kitchen experience</h2><ul class="exp">${exp.map(v => `<li><b>${esc(v.venue)}</b><br>
         <small>${esc(v.range)} · ${v.count} services${v.hours ? ` · ${fmtQty(v.hours)} h` : ''}${v.stations.length ? ` · ${v.stations.map(esc).join(', ')}` : ''}</small></li>`).join('')}</ul>` : ''}
       ${featured.length ? `<h2>Featured dishes</h2><div class="dishes">${featured.map(dish).join('')}</div>` : ''}
       <p class="sheet-foot">Made with Pinch · ${new Date().toLocaleDateString('en-AU')}</p>`;
@@ -1876,7 +1873,7 @@ async function settingsView() {
       <button type="submit" class="ghost">Send feedback</button> <span id="fbMsg" class="muted"></span>
     </form>
     <div class="actions"><button type="button" class="ghost" id="invite">Invite classmates</button></div><p id="inviteMsg" class="muted center"></p>
-    <p class="muted center"><small>Pinch v30</small></p>`, { back: '#/home' });
+    <p class="muted center"><small>Pinch v31</small></p>`, { back: '#/home' });
 
   document.querySelector('[data-lang]').parentElement.onclick = e => { const l = e.target.closest('[data-lang]')?.dataset.lang; if (l && l !== LANG) setLang(l); };
   const acct = document.getElementById('acct');
@@ -2046,11 +2043,11 @@ async function loadDemo() {
   await L(40, 'school', 'AMCA training kitchen', 'Lunch', 'Pasta', 4, 'Tagliatelle al pomodoro ×18', 'Good pasta texture. Season the water more.');
   await L(33, 'school', 'AMCA training kitchen', 'Dinner', 'Sauce', 4, 'Pomodoro, ragù', 'Reduce the sauce further before service.');
   await L(26, 'school', 'AMCA training kitchen', 'Lunch', 'Larder / Garde manger', 4, 'Caprese, bruschetta ×24', 'Clean station, good speed.');
-  await L(19, 'work', 'Trattoria Nonna (casual)', 'Dinner', 'Pasta', 5.5, 'Tagliatelle, gnocchi ×60', 'Keep the pass wiped between plates.');
+  await L(19, 'school', 'AMCA training kitchen', 'Dinner', 'Pasta', 4, 'Gnocchi al burro e salvia ×30', 'Keep the pass wiped between plates.');
   await L(12, 'school', 'AMCA training kitchen', 'Dinner', 'Pastry', 4, 'Tiramisu ×20', 'Mascarpone mix was perfect.');
-  await L(9, 'work', 'Trattoria Nonna (casual)', 'Dinner', 'Larder / Garde manger', 6, 'Antipasti boards ×35', 'Faster plating this week.');
+  await L(9, 'school', 'AMCA training kitchen', 'Function', 'Larder / Garde manger', 5, 'Antipasti boards ×35', 'Faster plating this week.');
   await L(5, 'school', 'AMCA training kitchen', 'Lunch', 'Pass', 4, 'Expo for 40 covers', 'Called tickets clearly.');
-  await L(2, 'work', 'Trattoria Nonna (casual)', 'Dinner', 'Pasta', 6, 'Tagliatelle al pomodoro ×42', '');
+  await L(2, 'school', 'AMCA training kitchen', 'Dinner', 'Pasta', 4, 'Tagliatelle al pomodoro ×42', '');
   const T = (id, hoursAgo, type, item, temp, action = '') => db.put('temps', { id, at: at(hoursAgo), type, item, temp, action, note: '', createdAt: t });
   await T('d-t1', 5, 'fridge', 'Walk-in cool room', 3.2);
   await T('d-t2', 5, 'freezer', 'Chest freezer', -18);
@@ -2144,7 +2141,7 @@ let launched = false;
 try { launched = !!sessionStorage.getItem('pinch-launched'); sessionStorage.setItem('pinch-launched', '1'); } catch {}
 if (!launched && !recovery && !location.hash.startsWith('#/r/')) history.replaceState(null, '', location.pathname + location.search + '#/home');
 // Re-seed the demo when its sample data changes, so returning visitors see new features filled in
-const DEMO_DATA = 30;
+const DEMO_DATA = 31;
 if (db.DEMO && (await db.get('settings', 'demo'))?.v !== DEMO_DATA) { await loadDemo(); await db.put('settings', { id: 'demo', v: DEMO_DATA }); }
 render();
 sync.sync();
