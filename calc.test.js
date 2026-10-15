@@ -145,6 +145,13 @@ assert.equal(remoteWins({}, 1), true);
   assert.equal(m('oil'), 'Oil');                 // exact beats partial
   assert.equal(m('red onion'), null);            // different ingredient: new
   assert.equal(m('San Marzano tomatoes'), null);
+  const more = [...pantry, { name: 'Pasta water' }, { name: 'Rice flour' }, { name: 'Chicken stock' }, { name: 'Egg yolk' }];
+  const m2 = n => matchIngredient(n, more)?.name ?? null;
+  assert.equal(m2('water'), null);                // a different thing, not a description: a new ingredient
+  assert.equal(m2('stock'), null);
+  assert.equal(m2('egg'), 'Eggs, free range');    // not 'Egg yolk'
+  assert.equal(m2('flour'), 'Flour, tipo 00');    // not 'Rice flour'
+  assert.equal(m2('pasta water'), 'Pasta water');
 }
 
 // Cooking mode: steps and timers

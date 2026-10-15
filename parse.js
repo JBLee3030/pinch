@@ -84,15 +84,17 @@ const STOP = new Set(['of', 'and', 'the', 'a', 'an', 'fresh', 'large', 'small', 
 const singular = w => (w.length > 3 ? w.replace(/ies$/, 'y').replace(/oes$/, 'o').replace(/([^s])s$/, '$1') : w);
 const tokens = s => new Set(String(s).toLowerCase().replace(/[^a-z0-9]+/g, ' ').split(' ').filter(w => w && !STOP.has(w)).map(singular));
 
-// Best match by shared words: 3 = same words, 2 = all of `name`'s words are in the item, 1 = the item's words are all in `name`.
+// Best match by shared words: 3 = same words, 2 = all of `name`'s words are in the item and the item adds only
+// a description after its comma ("olive oil" -> "Olive oil, extra virgin", never "water" -> "Pasta water"),
+// 1 = the item's words are all in `name`.
 export function matchIngredient(name, list, minScore = 2) {
   const q = tokens(name);
   if (!q.size) return null;
   let best = null, bestScore = 0, bestExtra = Infinity;
   for (const it of list) {
-    const c = tokens(it.name);
-    const qInC = [...q].every(w => c.has(w)), cInQ = [...c].every(w => q.has(w));
-    const score = qInC && cInQ ? 3 : qInC ? 2 : cInQ && c.size ? 1 : 0;
+    const c = tokens(it.name), head = tokens(String(it.name).split(',')[0]);
+    const qInC = [...q].every(w => c.has(w)), cInQ = [...c].every(w => q.has(w)), headInQ = [...head].every(w => q.has(w));
+    const score = qInC && cInQ ? 3 : qInC && headInQ ? 2 : cInQ && c.size ? 1 : 0;
     const extra = Math.abs(c.size - q.size);
     if (score >= minScore && (score > bestScore || (score === bestScore && extra < bestExtra))) { best = it; bestScore = score; bestExtra = extra; }
   }
