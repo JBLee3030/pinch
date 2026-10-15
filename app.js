@@ -281,7 +281,7 @@ async function recipeView(id) {
       const sub = it.recipeId && recs.get(it.recipeId);
       const name = sub ? `<a href="#/recipe/${esc(sub.id)}">${esc(sub.name)}</a><br><small>Sub-recipe</small>`
         : ings.has(it.ingredientId) ? `<a href="#/ingredient/${esc(it.ingredientId)}/edit">${esc(ings.get(it.ingredientId).name)}</a>` : '(deleted)';
-      return `<tr><td>${name}</td><td class="n">${esc(niceAmount(it.qty * f, it.unit))}</td><td class="n muted">${money(cost)}</td></tr>`;
+      return `<tr><td>${name}</td><td class="n">${esc(niceAmount(it.qty * f, it.unit))}</td><td class="n muted">${it.qty > 0 ? money(cost) : '-'}</td></tr>`;
     }).join('') + `<tr><th>Total</th><td></td><td class="n"><b>${money(total)}</b></td></tr>`;
   };
   scale.addEventListener('input', drawItems);
@@ -327,7 +327,7 @@ async function recipeCard(id) {
         name = esc(ing?.name ?? '(deleted)');
         if (ing) { unitPrice = `${money(ing.price)}/${esc(ing.unit)}`; yieldPct = `${esc(ing.yieldPct)}%`; }
       }
-      return `<tr><td>${name}</td><td class="n">${esc(niceParts(it.qty * f, it.unit)[0])}</td><td>${esc(niceParts(it.qty * f, it.unit)[1])}</td><td class="n">${unitPrice}</td><td class="n">${yieldPct}</td><td class="n">${money(cost)}</td></tr>`;
+      return `<tr><td>${name}</td><td class="n">${esc(niceParts(it.qty * f, it.unit)[0])}</td><td>${esc(niceParts(it.qty * f, it.unit)[1])}</td><td class="n">${unitPrice}</td><td class="n">${yieldPct}</td><td class="n">${it.qty > 0 ? money(cost) : '-'}</td></tr>`;
     }).join('');
 
     sheet.innerHTML = `
@@ -397,7 +397,7 @@ async function recipeEdit(id) {
     const k = keyOf(it), label = k ? labelOf(k) : '';
     return `<div class="item">
       <input name="ing" list="ingOpts" autocomplete="off" placeholder="Ingredient" aria-label="Ingredient or sub-recipe" value="${esc(label)}" data-key="${esc(k)}" data-label="${esc(label)}">
-      <input name="qty" type="number" step="any" min="0" inputmode="decimal" placeholder="Qty" aria-label="Quantity" value="${esc(it.qty)}">
+      <input name="qty" type="number" step="any" min="0" inputmode="decimal" placeholder="q.b." aria-label="Quantity (empty for q.b., as much as needed)" value="${esc(it.qty)}">
       <select name="unit" aria-label="Unit">${opts(unitsFor(k), it.unit ?? 'g')}</select>
       <button type="button" class="x" aria-label="Remove">×</button></div>`;
   };
@@ -418,7 +418,7 @@ async function recipeEdit(id) {
     <div class="paste" id="paste" ${typing ? '' : 'hidden'}>
       <label class="sr-only" for="pasteText">Ingredients, one per line</label>
       <textarea id="pasteText" placeholder="One per line, e.g.&#10;500 g tipo 00 flour&#10;5 eggs&#10;2 cloves garlic&#10;1/2 cup olive oil"></textarea>
-      <p><small>Type or paste. Amounts and units are read for you, and names are matched to your ingredients.</small></p>
+      <p><small>Type or paste. Amounts and units are read for you, and names are matched to your ingredients. No amount (oil, salt, to taste) is fine: it's saved as q.b.</small></p>
       <p class="tip"><small><b>From a printed recipe:</b> open the Camera, point it at the page, tap the text icon, select the ingredients and tap Copy. Then paste here.</small></p>
       ${typing ? '' : '<button type="button" id="pasteAdd">Add to recipe</button> <span id="pasteMsg" class="muted"></span>'}
     </div>
@@ -513,13 +513,13 @@ async function recipeEdit(id) {
       inp.dispatchEvent(new Event('change', { bubbles: true })); // sets unit choices and the "new" outline
       el.querySelector('[name=qty]').value = p.qty ?? '';
       el.querySelector('[name=unit]').value = p.unit;
-      if (!p.ok) { el.classList.add('uncertain'); el.title = `Check this line: "${p.raw}"`; unsure++; }
+      if (!p.name) { el.classList.add('uncertain'); el.title = `Check this line: "${p.raw}"`; unsure++; }
     }
     text.value = '';
     paste.hidden = true;
     if (msg) msg.textContent = '';
     document.querySelector('.paste-note')?.remove();
-    rows.insertAdjacentHTML('afterend', `<p class="paste-note muted"><small>Added ${lines.length} ingredients: ${matched} already in your list, ${lines.length - matched} new.${unsure ? ` ${unsure} highlighted row(s) need a quantity.` : ''}</small></p>`);
+    rows.insertAdjacentHTML('afterend', `<p class="paste-note muted"><small>Added ${lines.length} ingredients: ${matched} already in your list, ${lines.length - matched} new.${unsure ? ` ${unsure} highlighted row(s) need a name.` : ''}</small></p>`);
   };
   document.getElementById('pasteAdd')?.addEventListener('click', addPasted);
   rows.addEventListener('click', e => e.target.matches('.x') && e.target.closest('.item').remove());
@@ -535,24 +535,15 @@ async function recipeEdit(id) {
     e.preventDefault();
     const fd = new FormData(form);
     if (document.getElementById('pasteText').value.trim()) addPasted();
-    // Never drop a typed ingredient silently: a line without an amount stops the save.
-    const missing = [...form.querySelectorAll('.item')].filter(el => el.querySelector('[name=ing]').value.trim() && !(num(el.querySelector('[name=qty]').value) > 0));
-    if (missing.length) {
-      missing.forEach(el => el.classList.add('uncertain'));
-      document.querySelector('.paste-note')?.remove();
-      rows.insertAdjacentHTML('afterend', `<p class="paste-note warn">Add an amount for ${missing.length === 1 ? 'the highlighted ingredient' : `the ${missing.length} highlighted ingredients`}, or remove ${missing.length === 1 ? 'it' : 'them'} with ×.</p>`);
-      missing[0].querySelector('[name=qty]').focus();
-      return;
-    }
     const created = new Map(); // new ingredients by lowercased name, so repeats share one
     const items = [];
     for (const el of form.querySelectorAll('.item')) {
-      const k = resolve(el), qty = num(el.querySelector('[name=qty]').value), unit = el.querySelector('[name=unit]').value;
-      if (!k || !(qty > 0)) continue;
+      const k = resolve(el), q = num(el.querySelector('[name=qty]').value), qty = q > 0 ? q : null, unit = el.querySelector('[name=unit]').value;
+      if (!k) continue; // an empty amount is kept as q.b.
       if (k !== 'new') { items.push({ [k.startsWith('r:') ? 'recipeId' : 'ingredientId']: k.slice(2), qty, unit }); continue; }
       const name = el.querySelector('[name=ing]').value.trim();
       let ing = created.get(name.toLowerCase());
-      if (!ing) created.set(name.toLowerCase(), ing = { id: uid(), name, unit: { g: 'kg', kg: 'kg', ml: 'L', L: 'L' }[unit] ?? 'each', price: null, yieldPct: 100, allergens: [], updatedAt: Date.now() });
+      if (!ing) created.set(name.toLowerCase(), ing = { id: uid(), name, unit: { g: 'kg', kg: 'kg', ml: 'L', L: 'L' }[unit] ?? (qty ? 'each' : 'kg'), price: null, yieldPct: 100, allergens: [], updatedAt: Date.now() });
       items.push({ ingredientId: ing.id, qty, unit });
     }
     for (const ing of created.values()) await db.put('ingredients', ing);
@@ -1125,9 +1116,9 @@ async function scaleView(id) {
     </div>
     <form class="card" id="sc" onsubmit="return false">
       <div data-for="have">
-        <label>Ingredient<select name="item">${items.map((it, i) => `<option value="${i}">${esc(nameOf(it))} (${fmtQty(it.qty)} ${esc(it.unit)})</option>`).join('')}</select></label>
+        <label>Ingredient<select name="item">${items.map((it, i) => (it.qty > 0 ? `<option value="${i}">${esc(nameOf(it))} (${fmtQty(it.qty)} ${esc(it.unit)})</option>` : '')).join('')}</select></label>
         <div class="row2"><label>I have<input name="have" type="number" min="0" step="any" inputmode="decimal" placeholder="e.g. 3"></label>
-          <label>Unit<select name="haveUnit">${opts(UNITS, items[0]?.unit)}</select></label></div>
+          <label>Unit<select name="haveUnit">${opts(UNITS, items.find(it => it.qty > 0)?.unit)}</select></label></div>
       </div>
       <div data-for="portions" hidden><label>Portions<input name="portions" type="number" min="1" step="any" inputmode="decimal" value="${esc(r.portions)}"></label></div>
       <div data-for="bakers" hidden>
@@ -1938,7 +1929,7 @@ async function settingsView() {
       <button type="submit" class="ghost">Send feedback</button> <span id="fbMsg" class="muted"></span>
     </form>
     <div class="actions"><button type="button" class="ghost" id="invite">Invite classmates</button></div><p id="inviteMsg" class="muted center"></p>
-    <p class="muted center"><small>Pinch v32</small></p>`, { back: '#/home' });
+    <p class="muted center"><small>Pinch v33</small></p>`, { back: '#/home' });
 
   document.querySelector('[data-lang]').parentElement.onclick = e => { const l = e.target.closest('[data-lang]')?.dataset.lang; if (l && l !== LANG) setLang(l); };
   const acct = document.getElementById('acct');

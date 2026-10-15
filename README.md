@@ -25,6 +25,7 @@ I built Pinch while studying Commercial Cookery and Kitchen Management (Cert IV)
 
 **Recipes**
 - Recipe book with photos, method, sub-recipes (a sauce or dough inside a dish), favourites on Home and search by ingredient
+- Amounts are optional: oil, salt or anything "to taste" is saved as q.b. (quanto basta), shown as q.b. everywhere and left out of costing
 - Get recipes in fast: quick capture (name + ingredient lines), read a photo of a handout, book page, handwritten note or whiteboard (Claude via a Supabase Edge Function; signed-in users, daily limit), import a recipe web page, or paste a list (fractions, ranges, AU cup / tbsp / tsp)
 - Share a recipe with classmates as a link: the recipe, its sub-recipes and ingredients travel inside the link (compressed, no server or account) and save into their own book
 - Scale by portions, from an ingredient you have ("3 kg mince makes 37 portions") or by baker's percentage

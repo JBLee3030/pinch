@@ -125,6 +125,10 @@ assert.equal(remoteWins({}, 1), true);
   assert.deepEqual(q('2 large eggs ((Note 2))'), [2, 'each', 'Large eggs', true]);
   assert.deepEqual(q('1 cup (250ml) milk'), [250, 'ml', 'Milk', true]);
   assert.equal(P('   '), null);
+  // No amount: kept as q.b. (the words go, the name stays)
+  assert.deepEqual(q('Olive oil q.b.'), [null, 'each', 'Olive oil', false]);
+  assert.deepEqual(q('salt to taste'), [null, 'each', 'Salt', false]);
+  assert.deepEqual(q('소금 약간'), [null, 'each', '소금', false]);
 }
 
 // Matching to Pantry
@@ -393,6 +397,18 @@ assert.equal(niceAmount(2, 'portion'), '2 portion');
   assert.deepEqual(toRecipe(null).ingredients, []);
   assert.equal(toRecipe({ steps: ['2 eggs, beaten'] }).steps[0], '2 eggs, beaten');        // a leading amount isn't a step number
   assert.deepEqual(SCHEMA.required.sort(), Object.keys(SCHEMA.properties).sort());        // structured outputs need every field required
+}
+
+// q.b. ingredients (no amount): shown as q.b., not costed, never flagged, no grams
+{
+  const ings = new Map([['oil', { id: 'oil', name: 'Olive oil', unit: 'L', price: null, yieldPct: 100 }], ['flo', { id: 'flo', name: 'Flour', unit: 'kg', price: 2, yieldPct: 100 }]]);
+  const r = { id: 'r', portions: 2, items: [{ ingredientId: 'flo', qty: 500, unit: 'g' }, { ingredientId: 'oil', qty: null, unit: 'ml' }] };
+  const c = recipeCost(r, ings);
+  close(c.total, 1); assert.deepEqual(c.problems, []);                   // the unpriced oil doesn't make the cost incomplete
+  assert.equal(niceAmount(null, 'ml'), 'q.b.');
+  assert.equal(niceAmount(0 * 3, 'g'), 'q.b.');                          // scaling q.b. is still q.b.
+  assert.equal(itemGrams(r.items[1], ings), null);
+  assert.equal(bakersPercent(r, ings, new Map(), 0).rows[1].pct, null);
 }
 
 // Korean UI

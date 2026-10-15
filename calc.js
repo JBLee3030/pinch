@@ -56,6 +56,7 @@ export const eachGrams = name => EACH_GRAMS.find(([k]) => String(name ?? '').toL
 // `seen` holds the recipe ids above this item, to stop circular sub-recipes.
 export function itemCost(it, ings, recs = new Map(), seen = new Set()) {
   const qty = Number(it.qty);
+  if (!(qty > 0)) return { cost: 0, problems: [] }; // q.b. (no amount, like oil or salt): not costed, never flagged
   if (it.recipeId) {
     const sub = recs.get(it.recipeId);
     if (!sub) return { cost: NaN, problems: ['A sub-recipe was deleted'] };
@@ -197,6 +198,7 @@ export function scaleFromIngredient(recipe, index, haveQty, haveUnit, ings, recs
 // An item's weight in grams: weight units directly, volume via density (water if unknown), eggs by count.
 export function itemGrams(it, ings, recs = new Map()) {
   const q = Number(it.qty), name = itemName(it, ings, recs);
+  if (!(q > 0)) return null; // q.b.
   if (MASS[it.unit]) return q * MASS[it.unit];
   if (VOLUME[it.unit]) return q * VOLUME[it.unit] * (densityFor(name) ?? 1);
   if (it.unit === 'each') { const g = eachGrams(name); return g ? q * g : null; }
@@ -261,12 +263,13 @@ export function prepBatches(plan, recs) {
 // Three significant-ish figures: >= 100 whole numbers, >= 10 one decimal, else two.
 export function niceParts(q, unit) {
   let v = Number(q), u = unit;
+  if (!(v > 0)) return ['q.b.', '']; // no amount: quanto basta, as much as needed
   if (u === 'g' && v >= 1000) { v /= 1000; u = 'kg'; } else if (u === 'kg' && v > 0 && v < 1) { v *= 1000; u = 'g'; }
   if (u === 'ml' && v >= 1000) { v /= 1000; u = 'L'; } else if (u === 'L' && v > 0 && v < 1) { v *= 1000; u = 'ml'; }
   const r = Math.abs(v) >= 100 ? Math.round(v) : Math.abs(v) >= 10 ? Math.round(v * 10) / 10 : Math.round(v * 100) / 100;
   return [String(r), u];
 }
-export const niceAmount = (q, unit) => niceParts(q, unit).join(' ');
+export const niceAmount = (q, unit) => niceParts(q, unit).join(' ').trim();
 
 // ---- Ingredient prices
 

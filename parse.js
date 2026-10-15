@@ -36,6 +36,7 @@ const cleanName = s => {
   const n = s.replace(/\([^)]*\)/g, ' ').replace(/[()]/g, ' ').split(',')[0]
     .replace(/^\s*(?:of|x)\s+/i, '')
     .replace(/^(?:cans?|tins?|packets?|jars?|bottles?|bags?)\s+(?:of\s+)?/i, '')
+    .replace(/\s+(?:q\.?\s?b\.?|to taste|as needed|as required)$/i, '').replace(/\s*(?:적당량|약간|조금)$/, '') // "no amount" words: the amount stays empty (q.b.)
     .replace(/\s+/g, ' ').trim();
   return n.charAt(0).toUpperCase() + n.slice(1);
 };
