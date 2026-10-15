@@ -45,6 +45,7 @@ I built Pinch while studying Commercial Cookery and Kitchen Management (Cert IV)
 
 **Class log and portfolio**
 - Class log: log today's class service in two taps (kitchen, station and hours carried over), with progress toward the course's required service periods
+- Tick what you cooked from your recipe book (recently cooked first, search for big books) and rate each dish: every ticked dish also becomes a practice cook of that recipe with the chef's feedback, so recipe practice, cooking-mode notes and exam readiness all count class services
 - Food safety temperature log and opening, closing and cleaning checklists for kitchen practicals and placements
 - Portfolio page generated from the log and featured dishes, printable to PDF
 

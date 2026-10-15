@@ -248,7 +248,7 @@ async function recipeView(id) {
         ${lastNext ? `<p class="tip"><small><b>Next time:</b> ${esc(lastNext)}</small></p>` : ''}
         <ul class="list">${attempts.slice(0, 3).map(a => `<li><a href="#/attempt/${esc(a.id)}/edit">
           ${a.photo ? `<img src="${esc(a.photo)}" alt="">` : '<span class="ph" aria-hidden="true"></span>'}
-          <div class="grow"><b>${esc(dateLabel(a.date))}</b><small>${esc(a.notes || a.next || 'No notes')}</small></div>
+          <div class="grow"><b>${esc(dateLabel(a.date))}</b><small>${esc(a.logId ? ['Class service', a.notes].filter(Boolean).join('. ') : a.notes || a.next || 'No notes')}</small></div>
           <span class="trail">${stars(a.rating)}</span></a></li>`).join('')}</ul>`
         : '<p class="muted">Each time you cook this, note how it went and what to change. Your notes show up when you start cooking.</p>'}</div>
     <div class="cta-bar"><a class="btn" href="#/recipe/${esc(r.id)}/cook">Start cooking</a></div>`,
@@ -598,6 +598,7 @@ async function attemptEdit(recipeId, attemptId) {
   const isNew = !attemptId;
   page('recipes', isNew ? 'How did it go?' : 'Attempt', `<form id="f">
     <p class="muted">${esc(r.name)}</p>
+    ${a.logId ? `<p class="tip"><small>From your class log. <a href="#/log/${esc(a.logId)}/edit">Open the log</a></small></p>` : ''}
     <fieldset class="rating"><legend>Rating</legend>
       ${[1, 2, 3, 4, 5].map(i => `<label><input type="radio" name="rating" value="${i}" ${i === a.rating ? 'checked' : ''}>
         <svg viewBox="0 0 24 24" aria-hidden="true">${STAR}</svg><span class="sr-only">${i} star${i > 1 ? 's' : ''}</span></label>`).join('')}
@@ -1559,11 +1560,27 @@ async function yieldView(id) {
 const PERIODS = ['Breakfast', 'Lunch', 'Dinner', 'Function', 'Prep shift', 'Other'];
 // The log is for class services. Work shifts logged by older versions stay in storage but aren't shown or counted.
 const classLogs = async () => (await db.all('logs')).filter(l => l.type !== 'work');
+
+// Each recipe ticked in a class log is also a practice cook of it (rating and chef feedback), so the
+// recipe's practice list, cooking-mode notes and exam readiness all count class services. One record
+// per log and recipe: re-saving the log updates it, unticking or deleting the log removes it.
+async function syncLogPractice(log) {
+  const mine = (await db.all('attempts')).filter(a => a.logId === log.id);
+  const keep = new Set((log.cooked ?? []).map(c => c.recipeId));
+  for (const a of mine) if (!keep.has(a.recipeId)) await db.del('attempts', a.id);
+  for (const c of log.cooked ?? []) {
+    const id = `${log.id}:${c.recipeId}`, old = mine.find(a => a.id === id);
+    await db.put('attempts', { ...old, id, recipeId: c.recipeId, logId: log.id, date: log.date, rating: c.rating ?? null,
+      notes: log.feedback?.trim() || old?.notes || '', createdAt: old?.createdAt ?? Date.now(), updatedAt: Date.now() });
+  }
+}
 const STATIONS = ['Pasta', 'Sauce', 'Grill', 'Larder / Garde manger', 'Pastry', 'Fry', 'Prep', 'Pizza', 'Pass'];
 
 async function logList() {
-  const [logs, s] = await Promise.all([classLogs(), settings()]);
+  const [logs, s, recipes] = await Promise.all([classLogs(), settings(), db.all('recipes')]);
   logs.sort((a, b) => b.date.localeCompare(a.date) || b.createdAt - a.createdAt);
+  const recs = toMap(recipes);
+  const what = l => [...(l.cooked ?? []).map(c => recs.get(c.recipeId)?.name).filter(Boolean), l.dishes?.trim()].filter(Boolean).join(', ');
   const hours = logs.reduce((n, l) => n + (l.hours || 0), 0);
   const last = [...logs].sort((a, b) => b.createdAt - a.createdAt)[0];
   const doneNow = logs.some(l => l.date === today() && l.period === periodNow());
@@ -1579,7 +1596,7 @@ async function logList() {
     ${logs.length ? `<ul class="list">${logs.map(l => `<li><a href="#/log/${esc(l.id)}/edit">
       ${l.photo ? `<img src="${esc(l.photo)}" alt="">` : ''}
       <div class="grow"><b>${esc(new Date(l.date + 'T00:00').toLocaleDateString(locale, { weekday: 'short', day: 'numeric', month: 'short' }))}, ${esc(l.period)}</b>
-        <small>${esc([l.venue, l.station].filter(Boolean).join(' · ') || 'No venue')}</small></div>
+        <small>${esc([l.station, what(l)].filter(Boolean).join(' · ') || l.venue || 'No venue')}</small></div>
       ${l.hours ? `<span class="trail">${esc(l.hours)} h</span>` : ''}</a></li>`).join('')}</ul>`
       : '<p class="empty">Log every class service: what you cooked, your station and what chef said.</p>'}`);
 }
@@ -1594,6 +1611,15 @@ async function logEdit(id) {
   const l = isNew ? { id: uid(), date: today(), venue: last?.venue ?? '', station: last?.station ?? '', hours: last?.hours ?? null, period: periodNow() }
     : logs.find(x => x.id === id);
   if (!l) return go('#/log');
+  const [recipes, attempts] = await Promise.all([db.all('recipes'), db.all('attempts')]);
+  // Ticked dishes and their portions and ratings (a rating changed on the recipe's practice record wins)
+  const cooked = new Map((l.cooked ?? []).map(c => [c.recipeId, { ...c, rating: attempts.find(a => a.id === `${l.id}:${c.recipeId}`)?.rating ?? c.rating }]));
+  // Most likely first: what you cooked in recent classes, then favourites, then A to Z
+  const recent = new Map();
+  [...logs].sort((a, b) => b.date.localeCompare(a.date)).forEach(x => (x.cooked ?? []).forEach(c => recent.has(c.recipeId) || recent.set(c.recipeId, recent.size)));
+  const rank = r => recent.get(r.id) ?? (r.fav ? 1e4 : 2e4);
+  recipes.sort((a, b) => rank(a) - rank(b) || byName(a, b));
+  const SHOW = 8;
   page('log', isNew ? 'New service' : 'Edit service', `<form id="f">
     <div class="row2">
       <label>Date<input name="date" type="date" required value="${esc(l.date)}"></label>
@@ -1606,23 +1632,62 @@ async function logEdit(id) {
       <label>Hours<input name="hours" type="number" min="0" step="0.25" inputmode="decimal" value="${esc(l.hours)}"></label>
     </div>
     ${datalist('stations', [...STATIONS, ...logs.map(x => x.station)])}
-    <label>Dishes cooked<textarea name="dishes" placeholder="Tagliatelle al ragù ×18…">${esc(l.dishes)}</textarea></label>
-    <label>Chef feedback / what to improve<textarea name="feedback">${esc(l.feedback)}</textarea></label>
+    <h2>What did you cook?</h2>
+    ${recipes.length ? `${recipes.length > SHOW ? '<div class="bar"><input type="search" id="dq" placeholder="Search your recipes" aria-label="Search your recipes"></div>' : ''}
+      <div class="checks" id="dishPick">${recipes.map((r, i) => `<label data-q="${esc(r.name.toLowerCase())}" ${i >= SHOW && !cooked.has(r.id) ? 'hidden' : ''}>
+        <input type="checkbox" name="cooked" value="${esc(r.id)}" ${cooked.has(r.id) ? 'checked' : ''}> ${esc(r.name)}</label>`).join('')}</div>
+      ${recipes.length > SHOW ? `<button type="button" class="link" id="allDishes">Show all ${recipes.length} recipes</button>` : ''}
+      <div id="cookedRows"></div>`
+      : '<p class="muted">Add your class recipes to the book, then tick them here.</p>'}
+    <label style="margin-top:16px">Other dishes <small>(not in your book)</small><input name="dishes" placeholder="e.g. staff meal" value="${esc(l.dishes)}"></label>
+    <label>Chef feedback / what to improve <small>(saved with each dish's practice)</small><textarea name="feedback">${esc(l.feedback)}</textarea></label>
     ${photoField(l.photo)}
     <div class="actions"><button type="submit">Save</button>${isNew ? '' : '<button type="button" class="danger" id="del">Delete</button>'}</div>
   </form>`, { back: '#/log' });
 
-  const form = document.getElementById('f');
+  const form = document.getElementById('f'), rows = document.getElementById('cookedRows'), pick = document.getElementById('dishPick');
+  const recs = toMap(recipes);
+  // One row per ticked dish: portions and a rating. Values live in `cooked`, so redrawing keeps them.
+  const drawRows = () => {
+    if (!rows) return;
+    const ids = [...pick.querySelectorAll('input:checked')].map(x => x.value);
+    rows.innerHTML = ids.length ? `<div class="card cooked-card"><h3>How did each go?</h3>${ids.map(rid => { const c = cooked.get(rid) ?? {}, name = recs.get(rid)?.name ?? '';
+      return `<div class="cooked-row" data-id="${esc(rid)}"><div class="cooked-head"><b>${esc(name)}</b>
+        <input type="number" min="0" step="1" inputmode="numeric" data-k="portions" placeholder="Portions" aria-label="Portions of ${esc(name)}" value="${esc(c.portions)}"></div>
+        <fieldset class="rating"><legend class="sr-only">Rating for ${esc(name)}</legend>${[1, 2, 3, 4, 5].map(i => `<label><input type="radio" name="rate-${esc(rid)}" value="${i}" ${i === c.rating ? 'checked' : ''}>
+          <svg viewBox="0 0 24 24" aria-hidden="true">${STAR}</svg><span class="sr-only">${i} star${i > 1 ? 's' : ''}</span></label>`).join('')}</fieldset></div>`; }).join('')}</div>` : '';
+  };
+  rows?.addEventListener('input', e => {
+    const id = e.target.closest('.cooked-row')?.dataset.id;
+    if (!id) return;
+    const c = { recipeId: id, ...cooked.get(id) };
+    if (e.target.dataset.k === 'portions') c.portions = num(e.target.value); else c.rating = Number(e.target.value);
+    cooked.set(id, c);
+  });
+  pick?.addEventListener('change', drawRows);
+  const dq = document.getElementById('dq');
+  dq?.addEventListener('input', () => pick.querySelectorAll('label').forEach((lb, i) => {
+    lb.hidden = dq.value ? !lb.dataset.q.includes(dq.value.toLowerCase()) : i >= SHOW && !lb.querySelector('input').checked;
+  }));
+  document.getElementById('allDishes')?.addEventListener('click', e => { pick.querySelectorAll('label').forEach(lb => { lb.hidden = false; }); e.target.remove(); });
+  drawRows();
+
   form.onsubmit = async e => {
     e.preventDefault();
     const fd = new FormData(form);
-    await db.put('logs', { ...l, date: fd.get('date'), type: 'school', venue: fd.get('venue').trim(), period: fd.get('period'),
-      hours: num(fd.get('hours')), station: fd.get('station').trim(), dishes: fd.get('dishes'), feedback: fd.get('feedback'),
-      photo: await photoValue(fd, l.photo), createdAt: l.createdAt ?? Date.now(), updatedAt: Date.now() });
+    const next = { ...l, date: fd.get('date'), type: 'school', venue: fd.get('venue').trim(), period: fd.get('period'),
+      hours: num(fd.get('hours')), station: fd.get('station').trim(), dishes: fd.get('dishes').trim(), feedback: fd.get('feedback'),
+      cooked: fd.getAll('cooked').map(rid => ({ recipeId: rid, portions: cooked.get(rid)?.portions ?? null, rating: cooked.get(rid)?.rating ?? null })),
+      photo: await photoValue(fd, l.photo), createdAt: l.createdAt ?? Date.now(), updatedAt: Date.now() };
+    await db.put('logs', next);
+    await syncLogPractice(next);
     go('#/log');
   };
   document.getElementById('del')?.addEventListener('click', async () => {
-    if (confirm('Delete this service entry?')) { await db.del('logs', l.id); go('#/log'); }
+    if (confirm('Delete this service entry? Its practice records on recipes go too.')) {
+      await syncLogPractice({ id: l.id, cooked: [] });
+      await db.del('logs', l.id); go('#/log');
+    }
   });
 }
 
@@ -1873,7 +1938,7 @@ async function settingsView() {
       <button type="submit" class="ghost">Send feedback</button> <span id="fbMsg" class="muted"></span>
     </form>
     <div class="actions"><button type="button" class="ghost" id="invite">Invite classmates</button></div><p id="inviteMsg" class="muted center"></p>
-    <p class="muted center"><small>Pinch v31</small></p>`, { back: '#/home' });
+    <p class="muted center"><small>Pinch v32</small></p>`, { back: '#/home' });
 
   document.querySelector('[data-lang]').parentElement.onclick = e => { const l = e.target.closest('[data-lang]')?.dataset.lang; if (l && l !== LANG) setLang(l); };
   const acct = document.getElementById('acct');
@@ -2038,16 +2103,19 @@ async function loadDemo() {
   const day = n => { const d = new Date(); d.setDate(d.getDate() - n); return d.toLocaleDateString('en-CA'); };
   const at = hoursAgo => { const d = new Date(Date.now() - hoursAgo * 3600e3); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 16); };
   const t = Date.now();
-  const L = (n, type, venue, period, station, hours, dishes, feedback) =>
-    db.put('logs', { id: `d-log-${n}`, date: day(n), type, venue, period, station, hours, dishes, feedback, createdAt: t - n });
-  await L(40, 'school', 'AMCA training kitchen', 'Lunch', 'Pasta', 4, 'Tagliatelle al pomodoro ×18', 'Good pasta texture. Season the water more.');
-  await L(33, 'school', 'AMCA training kitchen', 'Dinner', 'Sauce', 4, 'Pomodoro, ragù', 'Reduce the sauce further before service.');
+  const L = async (n, type, venue, period, station, hours, dishes, feedback, cooked = []) => {
+    const log = { id: `d-log-${n}`, date: day(n), type, venue, period, station, hours, dishes: cooked.length ? '' : dishes, feedback, cooked, createdAt: t - n };
+    await db.put('logs', log);
+    await syncLogPractice(log);
+  };
+  await L(40, 'school', 'AMCA training kitchen', 'Lunch', 'Pasta', 4, '', 'Good pasta texture. Season the water more.', [{ recipeId: 's-tag', portions: 18, rating: 3 }, { recipeId: 's-pasta', portions: null, rating: 4 }]);
+  await L(33, 'school', 'AMCA training kitchen', 'Dinner', 'Sauce', 4, '', 'Reduce the sauce further before service.', [{ recipeId: 's-pomo', portions: 30, rating: 3 }]);
   await L(26, 'school', 'AMCA training kitchen', 'Lunch', 'Larder / Garde manger', 4, 'Caprese, bruschetta ×24', 'Clean station, good speed.');
   await L(19, 'school', 'AMCA training kitchen', 'Dinner', 'Pasta', 4, 'Gnocchi al burro e salvia ×30', 'Keep the pass wiped between plates.');
   await L(12, 'school', 'AMCA training kitchen', 'Dinner', 'Pastry', 4, 'Tiramisu ×20', 'Mascarpone mix was perfect.');
   await L(9, 'school', 'AMCA training kitchen', 'Function', 'Larder / Garde manger', 5, 'Antipasti boards ×35', 'Faster plating this week.');
   await L(5, 'school', 'AMCA training kitchen', 'Lunch', 'Pass', 4, 'Expo for 40 covers', 'Called tickets clearly.');
-  await L(2, 'school', 'AMCA training kitchen', 'Dinner', 'Pasta', 4, 'Tagliatelle al pomodoro ×42', '');
+  await L(2, 'school', 'AMCA training kitchen', 'Dinner', 'Pasta', 4, '', 'Sauce consistency spot on.', [{ recipeId: 's-tag', portions: 42, rating: 4 }, { recipeId: 's-pomo', portions: null, rating: 4 }]);
   const T = (id, hoursAgo, type, item, temp, action = '') => db.put('temps', { id, at: at(hoursAgo), type, item, temp, action, note: '', createdAt: t });
   await T('d-t1', 5, 'fridge', 'Walk-in cool room', 3.2);
   await T('d-t2', 5, 'freezer', 'Chest freezer', -18);
@@ -2141,7 +2209,7 @@ let launched = false;
 try { launched = !!sessionStorage.getItem('pinch-launched'); sessionStorage.setItem('pinch-launched', '1'); } catch {}
 if (!launched && !recovery && !location.hash.startsWith('#/r/')) history.replaceState(null, '', location.pathname + location.search + '#/home');
 // Re-seed the demo when its sample data changes, so returning visitors see new features filled in
-const DEMO_DATA = 31;
+const DEMO_DATA = 32;
 if (db.DEMO && (await db.get('settings', 'demo'))?.v !== DEMO_DATA) { await loadDemo(); await db.put('settings', { id: 'demo', v: DEMO_DATA }); }
 render();
 sync.sync();

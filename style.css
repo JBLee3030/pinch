@@ -632,3 +632,13 @@ body.sub .card form .actions > button[type=submit] { min-height: var(--h-md); fo
   :is(.btn, button):not(:disabled):hover { filter: brightness(.96); }
 }
 .stat-card .progress + .stat-sub { margin-top: var(--s3); }
+
+/* ---- v32: dishes from the recipe book in the class log ---- */
+.cooked-card { margin-top: var(--s3); }
+.cooked-card h3 { margin: 0 0 var(--s3); }
+.cooked-row + .cooked-row { border-top: 1px solid var(--line); padding-top: var(--s3); margin-top: var(--s3); }
+.cooked-head { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); }
+.cooked-head b { font: var(--t-row); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cooked-head input { flex: none; width: 104px; margin: 0; text-align: center; }
+.cooked-row fieldset.rating { margin: var(--s2) 0 0; }
+#allDishes { margin-top: var(--s2); }

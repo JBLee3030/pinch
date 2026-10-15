@@ -166,6 +166,12 @@ export const KO = {
   'Total cost': '총원가', 'Value of reused trim': '재사용 트림 가치', 'Usable': '사용 가능량', 'Unaccounted loss': '알 수 없는 손실',
   
   // Service log
+  'What did you cook?': '무엇을 만들었나요?', 'Search your recipes': '내 레시피 검색', 'How did each go?': '요리별로 어땠나요?',
+  'Add your class recipes to the book, then tick them here.': '수업 레시피를 레시피북에 넣으면 여기서 체크할 수 있어요.',
+  'Other dishes': '그 밖의 요리', '(not in your book)': '(레시피북에 없는 것)', 'e.g. staff meal': '예: 스태프 밀',
+  "(saved with each dish's practice)": '(요리별 연습 기록에도 저장돼요)', 'Class service': '수업 서비스',
+  'From your class log.': '수업 기록에서 온 연습이에요.', 'Open the log': '기록 열기',
+  'Delete this service entry? Its practice records on recipes go too.': '이 서비스 기록을 삭제할까요? 레시피에 남은 연습 기록도 함께 지워져요.',
   'Class log': '수업 기록', 'Log tools': '기록 도구', 'Temp log': '온도 기록', 'Portfolio': '포트폴리오', 'School service periods': '학교 서비스 횟수',
    'Takes a few seconds': '몇 초면 돼요', 'Same as last time': '지난번과 같음', 'No venue': '장소 없음',
   'Log every class service: what you cooked, your station and what chef said.': '수업 서비스마다 기록하세요: 무엇을 만들었고, 어느 스테이션이었고, 셰프가 뭐라고 했는지.', 'Kitchen': '주방', 'e.g. AMCA training kitchen': '예: AMCA 실습 주방',
@@ -360,5 +366,9 @@ export const KO_PATTERNS = [
   [/^(\d+) without a price\. Recipes using them show an incomplete cost\.$/, '가격 없는 재료 $1개. 이 재료를 쓰는 레시피는 원가가 미완성으로 나와요.'],
   [/^in (\d+) recipes?$/, '레시피 $1개에 사용'],
   [/^([\d.]+) hours in the kitchen$/, '주방에서 $1시간'],
+  [/^Show all (\d+) recipes$/, '레시피 $1개 모두 보기'],
+  [/^Portions of (.+)$/, '$1 인분'],
+  [/^Rating for (.+)$/, '$1 평점'],
+  [/^Class service\. (.+)$/, '수업 서비스. $1'],
   [/^Password should be at least (\d+) characters\.?$/, '비밀번호는 $1자 이상이어야 해요.'],
 ];
