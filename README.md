@@ -29,7 +29,7 @@ I built Pinch while studying Commercial Cookery and Kitchen Management (Cert IV)
 - Get recipes in fast: quick capture (name + ingredient lines), read a photo of a handout, book page, handwritten note or whiteboard (Claude via a Supabase Edge Function; signed-in users, daily limit), import a recipe web page, or paste a list (fractions, ranges, AU cup / tbsp / tsp)
 - Share a recipe with classmates as a link: the recipe, its sub-recipes and ingredients travel inside the link (compressed, no server or account) and save into their own book
 - Scale by portions, from an ingredient you have ("3 kg mince makes 37 portions") or by baker's percentage
-- Cooking mode: one big step at a time, timers found in the method ("simmer 45 min"), a scaled ingredient checklist, screen kept awake
+- Cooking mode: every step on one screen, the current one big and outlined, done ones ticked; Next moves on and scrolls to it, tap any step to jump; timers found in the method ("simmer 45 min"), a scaled ingredient checklist, screen kept awake
 - Costing for assignments: ingredient prices (optional), trim yield and yield tests, cost per portion, suggested price from a target food cost %, actual food cost % (GST-aware); missing prices are flagged, never counted as $0
 - Costed standard recipe card, printable to A4 / PDF; allergen chart across all recipes (Australian mandatory allergens)
 - Kitchen calculator (cups and spoons to grams per ingredient, °F/°C with fan-forced, oz/lb/fl oz) and kitchen timers that keep running across screens

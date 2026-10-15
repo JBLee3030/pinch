@@ -370,9 +370,7 @@ details.more :is(input, select) { background-color: var(--fill); }
 .seg button { min-height: 40px; background: transparent; color: var(--text-2); font-size: 15px; border-radius: 10px; }
 .seg button[aria-selected=true] { background: var(--surface); color: var(--text); box-shadow: 0 1px 3px rgb(0 0 0 / .08); }
 
-#steps { background: var(--surface); border-radius: var(--r-card); padding: var(--s6) var(--s5); min-height: calc(100dvh - 290px); touch-action: pan-y; }
 .step-count { font: 600 15px/1.3 var(--font); color: var(--accent); margin-bottom: var(--s3); }
-.step-text { font: 600 24px/1.45 var(--font); letter-spacing: -.01em; margin-bottom: var(--s5); }
 .step-timers { display: flex; flex-wrap: wrap; gap: var(--s2); }
 .step-timers button { min-height: var(--h-md); }
 .cook-nav { position: sticky; bottom: 0; display: grid; grid-template-columns: 1fr 2fr; gap: var(--s2); margin: var(--s4) calc(var(--gutter) * -1) 0;
@@ -650,3 +648,20 @@ svg.card-art { display: block; width: 100%; height: auto; margin-top: var(--s2);
 .ref-item b { font: var(--t-row); }
 .ref-item p { margin: var(--s1) 0 0; color: var(--text-2); }
 .flash .card-art, .flash .card-photo { margin-top: 0; }
+
+/* ---- v36: cooking mode shows every step ---- */
+.cook-ings { margin: 0 0 var(--s4); }
+.cook-ings .checklist { margin-top: var(--s2); }
+.cook-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s2); }
+.cook-steps li { background: var(--surface); border-radius: var(--r-card); padding: var(--s3) var(--s4); border: 2px solid transparent; scroll-margin: 96px; }
+.cook-step { display: flex; align-items: flex-start; justify-content: flex-start; gap: var(--s3); width: 100%; min-height: 44px; padding: 0;
+  background: none; color: var(--text); border-radius: 0; text-align: left; white-space: normal; overflow: visible; font: 500 17px/1.5 var(--font); }
+.cook-step:active { transform: none; filter: none; }
+.step-n { flex: none; display: grid; place-items: center; width: 28px; height: 28px; margin-top: 1px; border-radius: var(--r-pill); background: var(--fill); color: var(--text-2); font: 700 14px/1 var(--font); }
+.cook-steps li.now { border-color: var(--accent); }
+.cook-steps li.now .cook-step { font: 600 21px/1.45 var(--font); }
+.cook-steps li.now .step-n { background: var(--accent); color: #fff; }
+.cook-steps li.done .cook-step { color: var(--text-3); }
+.cook-steps li.done .step-n { background: var(--accent-weak); color: var(--accent); }
+.cook-steps .step-timers { margin: var(--s2) 0 0 40px; }
+.cook-steps .cook-step { padding: 0; } /* not the narrow-phone button padding */

@@ -1386,36 +1386,37 @@ async function cookView(id) {
   let at = 0, portions = r.portions;
   const ticked = new Set();
 
+  // Every step on one screen: the one you're on is big and outlined, done ones are dimmed, the rest wait below.
   page('recipes', r.name, `
-    <div class="seg" role="tablist">
-      <button type="button" role="tab" aria-selected="${steps.length ? 'true' : 'false'}" data-seg="steps">Steps${steps.length ? ` (${steps.length})` : ''}</button>
-      <button type="button" role="tab" aria-selected="${steps.length ? 'false' : 'true'}" data-seg="ings">Ingredients (${(r.items ?? []).length})</button>
-    </div>
     <div id="cookTimers" aria-live="polite"></div>
     ${lastNext ? `<p class="tip"><small><b>Last time (${esc(dateLabel(lastNext.date))}), you noted:</b> ${esc(lastNext.next)}</small></p>` : ''}
-    <section id="steps" ${steps.length ? '' : 'hidden'}></section>
-    <section id="ings" ${steps.length ? 'hidden' : ''}>
-      <div class="card">
-        <label class="inline">Portions <input id="cookPortions" type="number" min="1" step="1" inputmode="numeric" value="${esc(r.portions)}"></label>
-        <ul class="checklist" id="checklist"></ul>
-      </div>
-      ${steps.length ? '' : `<p class="muted center">No method yet. <a href="#/recipe/${esc(r.id)}/edit">Add the steps</a> to cook step by step.</p>`}
-    </section>
-    <div class="cook-nav" id="cookNav" ${steps.length ? '' : 'hidden'}>
-      <button type="button" class="ghost" id="prev">Back</button><button type="button" id="next">Next step</button>
-    </div>`, { back: `#/recipe/${esc(r.id)}` });
+    <details class="more cook-ings" ${steps.length ? '' : 'open'}><summary>Ingredients (${(r.items ?? []).length})</summary>
+      <label class="inline">Portions <input id="cookPortions" type="number" min="1" step="1" inputmode="numeric" value="${esc(r.portions)}"></label>
+      <ul class="checklist" id="checklist"></ul></details>
+    ${steps.length ? `<p class="step-count" id="stepCount"></p>
+      <ol class="cook-steps" id="steps">${steps.map((t, i) => {
+        const ds = findDurations(t);
+        return `<li data-i="${i}"><button type="button" class="cook-step" data-go="${i}"><span class="step-n" aria-hidden="true">${i + 1}</span><span>${esc(t)}</span></button>
+          ${ds.length ? `<div class="step-timers">${ds.map(d => `<button type="button" class="tint sm" data-timer="${d.seconds}" data-label="${esc(`Step ${i + 1}: ${fmtDuration(d.seconds)}`)}">Start ${esc(fmtDuration(d.seconds))} timer</button>`).join('')}</div>` : ''}</li>`;
+      }).join('')}</ol>
+      <div class="cook-nav" id="cookNav"><button type="button" class="ghost" id="prev">Back</button><button type="button" id="next">Next step</button></div>`
+      : `<p class="muted center">No method yet. <a href="#/recipe/${esc(r.id)}/edit">Add the steps</a> to cook step by step.</p>`}`, { back: `#/recipe/${esc(r.id)}` });
   keepAwake(true);
   drawTimers();
 
   const stepsEl = document.getElementById('steps'), prev = document.getElementById('prev'), next = document.getElementById('next');
-  const drawStep = () => {
-    const text = steps[at] ?? '';
-    stepsEl.innerHTML = `<p class="step-count">Step ${at + 1} of ${steps.length}</p>
-      <p class="step-text">${esc(text)}</p>
-      <div class="step-timers">${findDurations(text).map(d =>
-        `<button type="button" class="tint" data-timer="${d.seconds}" data-label="${esc(`Step ${at + 1}: ${fmtDuration(d.seconds)}`)}">Start ${esc(fmtDuration(d.seconds))} timer</button>`).join('')}</div>`;
+  const calm = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const drawSteps = scroll => {
+    stepsEl.querySelectorAll('li').forEach((li, i) => {
+      li.classList.toggle('now', i === at);
+      li.classList.toggle('done', i < at);
+      li.querySelector('.cook-step').toggleAttribute('aria-current', i === at);
+      li.querySelector('.step-n').textContent = i < at ? '✓' : i + 1;
+    });
+    document.getElementById('stepCount').textContent = `Step ${at + 1} of ${steps.length}`;
     prev.disabled = at === 0;
     next.textContent = at === steps.length - 1 ? 'Finish' : 'Next step';
+    if (scroll) stepsEl.children[at].scrollIntoView({ block: 'center', behavior: calm ? 'auto' : 'smooth' });
   };
   const drawChecklist = () => {
     const f = portions / r.portions;
@@ -1425,37 +1426,22 @@ async function cookView(id) {
         <span class="grow">${esc(name)}</span><b>${esc(niceAmount(it.qty * f, it.unit))}</b></label></li>`;
     }).join('') || '<li class="muted">No ingredients yet.</li>';
   };
-  const go_ = d => {
-    if (at + d >= steps.length) return go(`#/recipe/${r.id}/attempt`); // Finish: how did it go?
-    at = Math.max(0, at + d);
-    drawStep();
-    window.scrollTo(0, 0);
-  };
-  if (steps.length) drawStep();
   drawChecklist();
-
-  prev.onclick = () => go_(-1);
-  next.onclick = () => go_(1);
-  stepsEl.addEventListener('click', e => {
-    const b = e.target.closest('[data-timer]');
-    if (b) startTimer(b.dataset.label, Number(b.dataset.timer), r.id);
-  });
-  // Swipe between steps (buttons do the same, for anyone who can't swipe)
-  let x0 = null;
-  stepsEl.addEventListener('touchstart', e => { x0 = e.touches[0].clientX; }, { passive: true });
-  stepsEl.addEventListener('touchend', e => {
-    const dx = e.changedTouches[0].clientX - (x0 ?? 0);
-    if (x0 !== null && Math.abs(dx) > 60) go_(dx < 0 ? 1 : -1);
-    x0 = null;
-  });
-  document.querySelector('.seg').addEventListener('click', e => {
-    const tab = e.target.closest('[data-seg]')?.dataset.seg;
-    if (!tab) return;
-    document.querySelectorAll('.seg [role=tab]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.seg === tab)));
-    stepsEl.hidden = tab !== 'steps' || !steps.length;
-    document.getElementById('cookNav').hidden = tab !== 'steps' || !steps.length;
-    document.getElementById('ings').hidden = tab !== 'ings';
-  });
+  if (steps.length) {
+    drawSteps(false);
+    prev.onclick = () => { at = Math.max(0, at - 1); drawSteps(true); };
+    next.onclick = () => {
+      if (at === steps.length - 1) return go(`#/recipe/${r.id}/attempt`); // Finish: how did it go?
+      at++;
+      drawSteps(true);
+    };
+    stepsEl.addEventListener('click', e => {
+      const t = e.target.closest('[data-timer]');
+      if (t) return startTimer(t.dataset.label, Number(t.dataset.timer), r.id);
+      const s = e.target.closest('[data-go]');
+      if (s) { at = Number(s.dataset.go); drawSteps(false); }
+    });
+  }
   document.getElementById('cookPortions').addEventListener('input', e => { portions = Number(e.target.value) || r.portions; drawChecklist(); });
   document.getElementById('checklist').addEventListener('change', e => {
     const i = Number(e.target.dataset.i);
@@ -1989,7 +1975,7 @@ async function settingsView() {
       <button type="submit" class="ghost">Send feedback</button> <span id="fbMsg" class="muted"></span>
     </form>
     <div class="actions"><button type="button" class="ghost" id="invite">Invite classmates</button></div><p id="inviteMsg" class="muted center"></p>
-    <p class="muted center"><small>Pinch v35</small></p>`, { back: '#/home' });
+    <p class="muted center"><small>Pinch v36</small></p>`, { back: '#/home' });
 
   document.querySelector('[data-lang]').parentElement.onclick = e => { const l = e.target.closest('[data-lang]')?.dataset.lang; if (l && l !== LANG) setLang(l); };
   const acct = document.getElementById('acct');
