@@ -42,6 +42,8 @@ I built Pinch while studying Commercial Cookery and Kitchen Management (Cert IV)
 
 **Study**
 - Flash card decks: knife cuts, food safety temperatures (FSANZ), steak doneness, mother sauces, ratios and kitchen terms; spaced repetition (1, 3, 7, 14, 30 days)
+- Drawn diagrams on the cards: knife cuts to scale on a ruler, steak cross-sections with core temperatures, food safety temperatures on one thermometer (danger zone, 2-stage cooling, the 2-hour / 4-hour rule), what goes into each sauce, and ratio bars. Pure SVG in [`cardart.js`](cardart.js): no images to download, works offline
+- My cards: make your own cards from class (question, answer, optional photo), grouped into your own decks, on the same review schedule
 - Home: what needs doing today (the next exam and dishes to practise, cards due, prep progress, today's service to log) and every tool in one grid
 
 **Class log and portfolio**
@@ -79,6 +81,7 @@ index.html   app shell and tab bar
 app.js       screens and routing
 calc.js      costing, scaling and food safety rules (pure, tested)
 study.js     reference decks and spaced repetition (pure, tested)
+cardart.js   drawn SVG diagrams for the study cards
 parse.js     pasted recipes, method steps and timers (pure, tested)
 db.js        IndexedDB storage, change tracking, backup
 sync.js      optional Supabase auth and sync

@@ -128,6 +128,18 @@ export const KO = {
   'Cup weights are approximate (spooned and levelled). Weigh when it matters.': '컵 무게는 대략이에요(숟가락으로 담아 평평하게). 중요할 땐 저울로 재세요.',
 
   // Study and exams
+  'My cards': '내 카드', 'Make a card': '카드 만들기', 'Add a card': '카드 추가', 'New card': '새 카드', 'Edit card': '카드 수정', 'Deck': '카드 묶음',
+  'Make cards from class: theory notes, what chef stressed, a photo of the plating.': '수업 내용으로 카드를 만드세요: 이론 노트, 셰프가 강조한 점, 플레이팅 사진.',
+  'e.g. Week 3 theory': '예: 3주차 이론', 'Question': '질문', '(or a term)': '(또는 용어)', 'Answer': '답', 'e.g. What does CCP stand for?': '예: CCP는 무엇의 약자일까요?',
+  'A photo shows with the answer: a plating, a cut, a page of class notes.': '사진은 답과 함께 보여요: 플레이팅, 썰기, 수업 노트 등.', 'Delete this card?': '이 카드를 삭제할까요?',
+  // Card diagrams
+  'cold': '냉장·냉동', 'danger zone': '위험 구간', 'hot': '온장', 'use or refrigerate': '사용하거나 냉장', 'use it': '바로 사용', 'throw it out': '폐기',
+  'reheat to 75 °C, then hold at 60 °C or above': '75 °C로 재가열 후 60 °C 이상 유지', '1 to 2 mm thick': '두께 1~2 mm', '7 sides': '7면', '70 °C +': '70 °C 이상',
+  'milk': '우유', 'white roux': '화이트 루', 'white stock': '화이트 스톡', 'blond roux': '블론드 루', 'brown stock': '브라운 스톡', '+ mirepoix, tomato': '+ 미르푸아, 토마토',
+  'brown roux': '브라운 루', 'egg yolks': '달걀노른자', 'clarified butter': '정제 버터', '+ lemon': '+ 레몬', 'tomatoes': '토마토', 'aromatics, stock': '향신 채소, 스톡',
+  'cheese': '치즈', 'tarragon, shallot': '타라곤, 샬롯', 'and vinegar reduction': '식초 리덕션', 'reduce by half': '반으로 졸이기', 'chicken velouté': '치킨 벨루테', 'cream': '생크림',
+  'oil': '오일', 'acid': '산 (식초·레몬즙)', 'flour': '밀가루', 'fat': '지방', 'by weight': '무게 기준', 'tipo 00 flour': 'Tipo 00 밀가루', 'egg': '달걀', 'water': '물', 'salt': '소금',
+  'dried pasta': '건면', 'hot stock': '뜨거운 스톡', 'rice': '쌀', 'by volume, added gradually': '부피 기준, 조금씩 넣기', 'egg yolk': '달걀노른자',
   'All caught up': '모두 끝냈어요', 'Coming up': '다가오는 일정', 'Add an exam or assessment': '시험·평가 추가', 'Decks': '카드 묶음',
   'Knife cuts': '칼 썰기 (Knife cuts)', 'Food safety temperatures': '식품 안전 온도', 'Steak doneness': '스테이크 굽기', 'Mother sauces': '모체 소스 (Mother sauces)',
   'Ratios and basics': '비율과 기본', 'Kitchen terms': '주방 용어',
@@ -370,5 +382,14 @@ export const KO_PATTERNS = [
   [/^Portions of (.+)$/, '$1 인분'],
   [/^Rating for (.+)$/, '$1 평점'],
   [/^Class service\. (.+)$/, '수업 서비스. $1'],
+  [/^(.+) °C or (?:below|colder)$/, '$1 °C 이하'],
+  [/^(.+) °C or above$/, '$1 °C 이상'],
+  [/^(\d+) °C centre$/, '중심 $1 °C'],
+  [/^within (\d+) h$/, '$1시간 안에'],
+  [/^within the next (\d+) h$/, '이후 $1시간 안에'],
+  [/^under (\d+) h$/, '$1시간 미만'],
+  [/^(\d+) to (\d+) h$/, '$1~$2시간'],
+  [/^over (\d+) h$/, '$1시간 초과'],
+  [/^(\d+) to (\d+)( °C| ml)?$/, (a, b, u) => `${a}~${b}${u}`],
   [/^Password should be at least (\d+) characters\.?$/, '비밀번호는 $1자 이상이어야 해요.'],
 ];

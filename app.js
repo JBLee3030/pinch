@@ -1,7 +1,8 @@
 import * as db from './db.js';
 import * as sync from './sync.js';
 import { LANG, locale, setLang } from './i18n.js';
-import { DECKS, ALL_CARDS, review, pickSession, isDue, isLearned } from './study.js';
+import { DECKS, review, pickSession, isDue, isLearned } from './study.js';
+import { cardArt } from './cardart.js';
 import { parseIngredientLine, matchIngredient, splitSteps, findDurations, fmtDuration } from './parse.js';
 import { ALLERGENS, PURCHASE_UNITS, UNITS, recipeCost, itemCost, suggestedPrice, actualCostPct, recipeAllergens, usesRecipe, hasPrice, fmtAmount, TEMP_CHECKS, tempStatus, yieldTest, MEASURES, convertFor, densityFor, scaleFromIngredient, bakersPercent, bakersBase, fToC, cToF, prepBatches, niceAmount, niceParts, withPriceHistory, menuEngineering, MENU_CLASSES, daysUntil, examReadiness, periodKey, checkProgress, shareBundle, importBundle, money, pct } from './calc.js';
 
@@ -821,11 +822,28 @@ async function timersView() {
 
 const studyState = async () => (await db.get('settings', 'study'))?.cards ?? {};
 
+// The built-in decks, then your own cards grouped by the deck name you gave them. Same review schedule for all.
+const MY = 'my:';
+async function decks() {
+  const own = new Map();
+  for (const c of (await db.all('cards')).sort((a, b) => (a.createdAt ?? 0) - (b.createdAt ?? 0))) {
+    const name = c.deck?.trim() || 'My cards';
+    if (!own.has(name)) own.set(name, []);
+    own.get(name).push({ ...c, deckName: name, deck: MY + name });
+  }
+  return [...DECKS, ...[...own].map(([name, cards]) => ({ id: MY + name, title: name, mine: true, cards }))];
+}
+const cardsOf = ds => ds.flatMap(d => d.cards);
+const deckHref = d => `#/study/deck/${encodeURIComponent(d.id)}`;
+// What a card shows with its answer: your photo, or the built-in diagram
+const cardPicture = c => (c.photo ? `<img class="card-photo" src="${esc(c.photo)}" alt="">` : cardArt(c.id));
+
 const EXAM_TYPES = { practical: 'Practical', theory: 'Theory', assignment: 'Assignment' };
 const dLabel = n => (n === 0 ? 'Today' : n === 1 ? 'Tomorrow' : n > 0 ? `${n} days` : `${-n} days ago`);
 
 async function studyHome() {
-  const [st, exams, attempts] = await Promise.all([studyState(), db.all('exams'), db.all('attempts')]);
+  const [st, exams, attempts, ds] = await Promise.all([studyState(), db.all('exams'), db.all('attempts'), decks()]);
+  const ALL_CARDS = cardsOf(ds), own = ds.filter(d => d.mine);
   const now = Date.now();
   const upcoming = exams.filter(e => daysUntil(e.date, today()) >= 0).sort((a, b) => a.date.localeCompare(b.date));
   const past = exams.length - upcoming.length;
@@ -850,31 +868,73 @@ async function studyHome() {
     <a class="btn ghost wide" href="#/exam/new/edit" style="margin:0 0 var(--s3)">Add an exam or assessment</a>
     ${past ? `<p class="muted center"><small>${past} past exam${past === 1 ? '' : 's'} kept in your records.</small></p>` : ''}
     <h2 class="day">Decks</h2>
-    <div class="links" role="navigation" aria-label="Decks">${DECKS.map(d => `<a href="#/study/deck/${d.id}"><span>${esc(d.title)}</span>
+    <div class="links" role="navigation" aria-label="Decks">${DECKS.map(d => `<a href="${deckHref(d)}"><span>${esc(d.title)}</span>
       <span class="count">${d.cards.filter(c => isLearned(st, c.id)).length}/${d.cards.length}</span></a>`).join('')}</div>
+    <h2 class="day">My cards</h2>
+    ${own.length ? `<div class="links" role="navigation" aria-label="My decks">${own.map(d => `<a href="${deckHref(d)}"><span translate="no">${esc(d.title)}</span>
+      <span class="count">${d.cards.filter(c => isLearned(st, c.id)).length}/${d.cards.length}</span></a>`).join('')}</div>`
+      : '<p class="muted">Make cards from class: theory notes, what chef stressed, a photo of the plating.</p>'}
+    <a class="btn ghost wide" href="#/card/new/edit" style="margin:0 0 var(--s3)">Make a card</a>
     <p class="muted center"><small>Cards you get right come back after 1, 3, 7, 14 and 30 days. Ones you miss come straight back.</small></p>`);
 }
 
 async function deckView(id) {
-  const d = DECKS.find(x => x.id === id);
+  const [ds, st] = await Promise.all([decks(), studyState()]);
+  const d = ds.find(x => x.id === id);
   if (!d) return go('#/study');
-  const st = await studyState();
+  const learned = c => (isLearned(st, c.id) ? ' <span class="badge pass">Learned</span>' : '');
   page('study', d.title, `
-    <p class="muted">${esc(d.note)}</p>
-    <div class="card"><dl class="ref" translate="no">${d.cards.map(c => `<dt>${esc(c.front)}${isLearned(st, c.id) ? ' <span class="badge pass">Learned</span>' : ''}</dt><dd>${esc(c.back)}</dd>`).join('')}</dl></div>
-    <div class="cta-bar"><a class="btn" href="#/study/go/${d.id}">Study this deck</a></div>`, { back: '#/study' });
+    ${d.note ? `<p class="muted">${esc(d.note)}</p>` : ''}
+    ${d.mine ? `<ul class="list">${d.cards.map(c => `<li><a href="#/card/${esc(c.id)}/edit">
+        ${c.photo ? `<img src="${esc(c.photo)}" alt="">` : ''}
+        <div class="grow" translate="no"><b>${esc(c.front)}</b><small>${esc(c.back)}</small></div>${learned(c)}</a></li>`).join('')}</ul>
+      <a class="btn ghost wide" href="#/card/new/edit/${encodeURIComponent(d.title)}" style="margin:0 0 var(--s3)">Add a card</a>`
+    : `<div class="card ref-list">${d.cards.map(c => `<div class="ref-item"><div translate="no"><b>${esc(c.front)}</b>${learned(c)}<p>${esc(c.back)}</p></div>${cardArt(c.id)}</div>`).join('')}</div>`}
+    <div class="cta-bar"><a class="btn" href="#/study/go/${encodeURIComponent(d.id)}">Study this deck</a></div>`, { back: '#/study' });
+}
+
+// ---------- Your own study cards ----------
+
+async function cardEdit(id, deckName) {
+  const isNew = id === 'new';
+  const all = await db.all('cards');
+  const last = [...all].sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0))[0];
+  const c = isNew ? { id: 'u-' + uid(), deck: deckName || last?.deck || 'My cards' } : all.find(x => x.id === id);
+  if (!c) return go('#/study');
+  const back = all.some(x => x.deck === c.deck) ? `#/study/deck/${encodeURIComponent(MY + c.deck)}` : '#/study';
+  page('study', isNew ? 'New card' : 'Edit card', `<form id="f">
+    <label>Deck<input name="deck" list="deckNames" required placeholder="e.g. Week 3 theory" value="${esc(c.deck)}"></label>
+    ${datalist('deckNames', all.map(x => x.deck))}
+    <label>Question <small>(or a term)</small><textarea name="front" required rows="2" placeholder="e.g. What does CCP stand for?">${esc(c.front)}</textarea></label>
+    <label>Answer<textarea name="back" required rows="4">${esc(c.back)}</textarea></label>
+    ${photoField(c.photo)}
+    <p><small>A photo shows with the answer: a plating, a cut, a page of class notes.</small></p>
+    <div class="actions"><button type="submit">Save</button>${isNew ? '' : '<button type="button" class="danger" id="del">Delete</button>'}</div>
+  </form>`, { back });
+  const form = document.getElementById('f');
+  form.onsubmit = async e => {
+    e.preventDefault();
+    const fd = new FormData(form), deck = fd.get('deck').trim() || 'My cards';
+    await db.put('cards', { ...c, deck, front: fd.get('front').trim(), back: fd.get('back').trim(), photo: await photoValue(fd, c.photo),
+      createdAt: c.createdAt ?? Date.now(), updatedAt: Date.now() });
+    go(`#/study/deck/${encodeURIComponent(MY + deck)}`);
+  };
+  document.getElementById('del')?.addEventListener('click', async () => {
+    if (confirm('Delete this card?')) { await db.del('cards', c.id); go(all.length > 1 ? back : '#/study'); }
+  });
 }
 
 async function studySession(deckId) {
-  const deck = deckId && DECKS.find(x => x.id === deckId);
-  let st = await studyState();
-  const pool = deck ? deck.cards : ALL_CARDS;
+  const [ds, st0] = await Promise.all([decks(), studyState()]);
+  let st = st0;
+  const deck = deckId && ds.find(x => x.id === deckId);
+  const pool = deck ? deck.cards : cardsOf(ds);
   let queue = pickSession(pool, st, Date.now(), 10);
   if (!queue.length && deck) queue = [...deck.cards].sort(() => Math.random() - 0.5).slice(0, 10); // all learned: practise anyway
   if (!queue.length) return go('#/study');
   const missedOnce = new Set();
   let i = 0, right = 0, again = 0;
-  const back = deck ? `#/study/deck/${deck.id}` : '#/study';
+  const back = deck ? deckHref(deck) : '#/study';
 
   page('study', deck ? deck.title : 'Study', `
     <p class="step-count" id="count"></p>
@@ -884,9 +944,9 @@ async function studySession(deckId) {
   const show = revealed => {
     const c = queue[i];
     count.textContent = `Card ${i + 1} of ${queue.length}`;
-    flash.innerHTML = `<span class="flash-deck">${esc(DECKS.find(x => x.id === c.deck).title)}</span>
+    flash.innerHTML = `<span class="flash-deck" translate="${c.deckName ? 'no' : 'yes'}">${esc(ds.find(x => x.id === c.deck)?.title ?? '')}</span>
       <span class="flash-front" translate="no">${esc(c.front)}</span>
-      ${revealed ? `<span class="flash-back" translate="no">${esc(c.back)}</span>` : '<span class="flash-hint">Tap to show the answer</span>'}`;
+      ${revealed ? `<span class="flash-back" translate="no">${esc(c.back)}</span>${cardPicture(c)}` : '<span class="flash-hint">Tap to show the answer</span>'}`;
     flash.disabled = revealed;
     nav.className = `cook-nav${revealed ? '' : ' single'}`;
     nav.innerHTML = revealed ? '<button type="button" class="ghost" id="again">Again</button><button type="button" id="got">Got it</button>'
@@ -1073,7 +1133,7 @@ async function todayItems() {
     const r = examReadiness(next, attempts), d = daysUntil(next.date, t), behind = r.rows.length - r.ready;
     items.push([`#/exam/${next.id}/edit`, behind ? `${next.title}, ${behind} to practise` : next.title, dLabel(d), d <= 3 && behind]);
   }
-  const due = ALL_CARDS.filter(c => isDue(st, c.id)).length;
+  const due = cardsOf(await decks()).filter(c => isDue(st, c.id)).length;
   if (due) items.push(['#/study/go', 'Study cards to review', String(due)]);
   const open = temps.filter(x => tempStatus(x).status === 'pending').length;
   if (open) items.push(['#/temps', 'Temperature check still open', String(open), true]);
@@ -1929,7 +1989,7 @@ async function settingsView() {
       <button type="submit" class="ghost">Send feedback</button> <span id="fbMsg" class="muted"></span>
     </form>
     <div class="actions"><button type="button" class="ghost" id="invite">Invite classmates</button></div><p id="inviteMsg" class="muted center"></p>
-    <p class="muted center"><small>Pinch v33</small></p>`, { back: '#/home' });
+    <p class="muted center"><small>Pinch v34</small></p>`, { back: '#/home' });
 
   document.querySelector('[data-lang]').parentElement.onclick = e => { const l = e.target.closest('[data-lang]')?.dataset.lang; if (l && l !== LANG) setLang(l); };
   const acct = document.getElementById('acct');
@@ -2121,6 +2181,10 @@ async function loadDemo() {
     notes: 'Much better texture. Chef liked the gloss on the sauce.', next: 'Season the pasta water more; it tasted flat.' });
   await db.put('menus', { id: 'd-menu', name: 'Pasta bar lunch', period: 'Last week', createdAt: t, updatedAt: t,
     items: [{ recipeId: 's-tag', price: 26, sold: 48 }, { recipeId: 's-pasta', price: 9, sold: 6 }, { recipeId: 's-pomo', price: 12, sold: 30 }] });
+  const card = (id, n, front, back, photo) => db.put('cards', { id: `u-d${id}`, deck: 'Week 3 theory', front, back, photo, createdAt: t - n });
+  await card(1, 3, 'HACCP', 'Hazard Analysis and Critical Control Points: a food safety system that finds the steps where a hazard must be controlled.');
+  await card(2, 2, 'CCP (Critical Control Point)', 'A step where control stops a hazard, e.g. cooking chicken to 75 °C in the centre, or cooling within 2 h + 4 h.');
+  await card(3, 1, 'Tagliatelle al pomodoro: what does chef check at the pass?', 'Pasta in a neat nest, sauce coating every strand (no pool), parmigiano on top, clean rim.', DEMO_ART.tag);
   await db.put('exams', { id: 'd-exam', title: 'Practical: fresh pasta and sauce', date: day(-9), type: 'practical', recipeIds: ['s-tag', 's-pasta'], target: 3, createdAt: t });
   const [opening, closing] = await checklists();
   await db.put('checkdays', { id: checkRecordId(opening), listId: opening.id, period: today(), done: opening.items.slice(0, 4), updatedAt: t });
@@ -2158,7 +2222,8 @@ const routes = [
   [/^#\/menu\/([^/]+)\/allergens$/, allergenMenuView],
   [/^#\/study$/, studyHome],
   [/^#\/study\/deck\/([^/]+)$/, deckView],
-  [/^#\/study\/go(?:\/([^/]+))?$/, id => studySession(id === 'undefined' ? null : id)],
+  [/^#\/card\/([^/]+)\/edit(?:\/([^/]+))?$/, cardEdit],
+  [/^#\/study\/go(?:\/([^/]+))?$/, studySession],
   [/^#\/yield(?:\/([^/]+))?$/, yieldView],
   [/^#\/(?:ingredients|pantry)$/, ingredientsList],
   [/^#\/ingredient\/([^/]+)\/edit$/, ingredientEdit],
@@ -2178,7 +2243,7 @@ async function render() {
   if (!h.endsWith('/cook')) keepAwake(false);
   for (const [re, fn] of routes) {
     const m = h.match(re);
-    if (m) return fn(...m.slice(1).map(decodeURIComponent));
+    if (m) return fn(...m.slice(1).map(x => (x == null ? x : decodeURIComponent(x)))); // an absent optional part stays undefined
   }
   go('#/home');
 }
@@ -2200,7 +2265,7 @@ let launched = false;
 try { launched = !!sessionStorage.getItem('pinch-launched'); sessionStorage.setItem('pinch-launched', '1'); } catch {}
 if (!launched && !recovery && !location.hash.startsWith('#/r/')) history.replaceState(null, '', location.pathname + location.search + '#/home');
 // Re-seed the demo when its sample data changes, so returning visitors see new features filled in
-const DEMO_DATA = 32;
+const DEMO_DATA = 34;
 if (db.DEMO && (await db.get('settings', 'demo'))?.v !== DEMO_DATA) { await loadDemo(); await db.put('settings', { id: 'demo', v: DEMO_DATA }); }
 render();
 sync.sync();

@@ -642,3 +642,11 @@ body.sub .card form .actions > button[type=submit] { min-height: var(--h-md); fo
 .cooked-head input { flex: none; width: 104px; margin: 0; text-align: center; }
 .cooked-row fieldset.rating { margin: var(--s2) 0 0; }
 #allDishes { margin-top: var(--s2); }
+
+/* ---- v34: card diagrams and your own cards ---- */
+svg.card-art { display: block; width: 100%; height: auto; margin-top: var(--s2); fill: #4E5968; stroke: none; stroke-width: 1; } /* not the 24 px icon rule */
+.card-photo { display: block; width: 100%; max-height: 260px; object-fit: cover; border-radius: var(--r-control); margin-top: var(--s2); }
+.ref-item + .ref-item { border-top: 1px solid var(--line); margin-top: var(--s4); padding-top: var(--s4); }
+.ref-item b { font: var(--t-row); }
+.ref-item p { margin: var(--s1) 0 0; color: var(--text-2); }
+.flash .card-art, .flash .card-photo { margin-top: 0; }
