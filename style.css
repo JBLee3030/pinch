@@ -665,3 +665,11 @@ svg.card-art { display: block; width: 100%; height: auto; margin-top: var(--s2);
 .cook-steps li.done .step-n { background: var(--accent-weak); color: var(--accent); }
 .cook-steps .step-timers { margin: var(--s2) 0 0 40px; }
 .cook-steps .cook-step { padding: 0; } /* not the narrow-phone button padding */
+
+/* ---- v38: cooking mode timers sit with Back / Next, always on screen ---- */
+.cook-dock { position: sticky; bottom: 0; z-index: 4; margin: var(--s4) calc(var(--gutter) * -1) 0;
+  padding: var(--s3) var(--gutter) calc(var(--s3) + env(safe-area-inset-bottom)); background: linear-gradient(to bottom, transparent, var(--bg) 24px); }
+.cook-dock .cook-nav { position: static; margin: 0; padding: 0; background: none; }
+.cook-dock #cookTimers { margin-bottom: var(--s2); }
+.cook-dock .timer { box-shadow: 0 2px 12px rgb(0 0 0 / .1); }
+button.running { background: var(--accent); color: #fff; font-variant-numeric: tabular-nums; }

@@ -1351,6 +1351,14 @@ function drawTimers() {
     <button type="button" class="x" data-stop="${t.id}" aria-label="${t.done ? 'Dismiss' : 'Stop'} timer ${esc(t.label)}">×</button></div>`).join('');
   const box = document.getElementById('cookTimers');
   if (box) box.innerHTML = html;
+  // A step's timer button counts down in place while its timer runs
+  document.querySelectorAll('button[data-timer][data-label]').forEach(b => {
+    b.dataset.idle ??= b.textContent;
+    const t = timers.find(x => x.label === b.dataset.label);
+    if (!t && !b.classList.contains('running')) return; // idle and never ran: leave it alone
+    b.classList.toggle('running', !!t);
+    b.textContent = !t ? b.dataset.idle : t.done ? 'Done' : clock(t.end - Date.now());
+  });
   // Elsewhere in the app, a pill shows the next timer and leads back to cooking mode
   const pill = document.getElementById('timerPill'), next = timers.find(t => !t.done) ?? timers[0];
   pill.hidden = !next || !!box;
@@ -1389,7 +1397,6 @@ async function cookView(id) {
 
   // Every step on one screen: the one you're on is big and outlined, done ones are dimmed, the rest wait below.
   page('recipes', r.name, `
-    <div id="cookTimers" aria-live="polite"></div>
     ${lastNext ? `<p class="tip"><small><b>Last time (${esc(dateLabel(lastNext.date))}), you noted:</b> ${esc(lastNext.next)}</small></p>` : ''}
     <details class="more cook-ings" ${steps.length ? '' : 'open'}><summary>Ingredients (${(r.items ?? []).length})</summary>
       <label class="inline">Portions <input id="cookPortions" type="number" min="1" step="1" inputmode="numeric" value="${esc(r.portions)}"></label>
@@ -1400,7 +1407,8 @@ async function cookView(id) {
         return `<li data-i="${i}"><button type="button" class="cook-step" data-go="${i}"><span class="step-n" aria-hidden="true">${i + 1}</span><span>${esc(t)}</span></button>
           ${ds.length ? `<div class="step-timers">${ds.map(d => `<button type="button" class="tint sm" data-timer="${d.seconds}" data-label="${esc(`Step ${i + 1}: ${fmtDuration(d.seconds)}`)}">Start ${esc(fmtDuration(d.seconds))} timer</button>`).join('')}</div>` : ''}</li>`;
       }).join('')}</ol>
-      <div class="cook-nav" id="cookNav"><button type="button" class="ghost" id="prev">Back</button><button type="button" id="next">Next step</button></div>`
+      <div class="cook-dock"><div id="cookTimers" aria-live="polite"></div>
+        <div class="cook-nav" id="cookNav"><button type="button" class="ghost" id="prev">Back</button><button type="button" id="next">Next step</button></div></div>`
       : `<p class="muted center">No method yet. <a href="#/recipe/${esc(r.id)}/edit">Add the steps</a> to cook step by step.</p>`}`, { back: `#/recipe/${esc(r.id)}` });
   keepAwake(true);
   drawTimers();
@@ -1438,7 +1446,7 @@ async function cookView(id) {
     };
     stepsEl.addEventListener('click', e => {
       const t = e.target.closest('[data-timer]');
-      if (t) return startTimer(t.dataset.label, Number(t.dataset.timer), r.id);
+      if (t) return timers.some(x => x.label === t.dataset.label && !x.done) || startTimer(t.dataset.label, Number(t.dataset.timer), r.id); // already running: no second one
       const s = e.target.closest('[data-go]');
       if (s) { at = Number(s.dataset.go); drawSteps(false); }
     });
