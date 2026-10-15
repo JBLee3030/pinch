@@ -158,6 +158,8 @@ assert.equal(remoteWins({}, 1), true);
 {
   assert.deepEqual(splitSteps('1. Sweat onion.\n2) Add tomatoes\n\n- Season'), ['Sweat onion.', 'Add tomatoes', 'Season']);
   assert.deepEqual(splitSteps('Step 1 Boil water'), ['Boil water']);
+  assert.deepEqual(splitSteps('1 Wash the vegetables.\n2 Cut the cauliflower.'), ['Wash the vegetables.', 'Cut the cauliflower.']); // number, no full stop
+  assert.deepEqual(splitSteps('2 eggs go in last.'), ['2 eggs go in last.']);   // lower case: an amount, not a step number
   assert.deepEqual(splitSteps(''), []);
   assert.equal(splitSteps('Bring the stock to the boil and skim well. Add the rice and stir for a minute or two until glossy. Ladle in stock slowly.').length, 3);
   const d = t => findDurations(t).map(x => x.seconds);
@@ -425,6 +427,16 @@ assert.equal(niceAmount(2, 'portion'), '2 portion');
   assert.equal(tr('Make 2.2 L (10 portions), about 45 min of cooking time'), '2.2 L (10인분) 만들기, 조리 시간 약 45분'); // nested parts
   assert.equal(tr(' for 30.0% food cost'), '에 팔면 원가율 30.0%');                                   // joins onto the price before it
   assert.equal(tr('Fresh egg pasta'), 'Fresh egg pasta');                                              // what people typed stays as is
+}
+
+// One release version for every file (index.html), so a deploy never mixes old and new files
+{
+  const { readFileSync, readdirSync } = await import('node:fs');
+  const html = readFileSync(new URL('./index.html', import.meta.url), 'utf8');
+  const versions = new Set([...html.matchAll(/\.(?:js|css)\?v=(\w+)/g)].map(m => m[1]));
+  assert.equal(versions.size, 1, `index.html uses versions ${[...versions]}`);
+  const modules = readdirSync(new URL('.', import.meta.url)).filter(f => f.endsWith('.js') && !['sw.js', 'calc.test.js'].includes(f));
+  for (const f of modules) assert.ok(html.includes(`"./${f}": "./${f}?v=`), `${f} is missing from the import map in index.html`);
 }
 
 console.log('calc ok');

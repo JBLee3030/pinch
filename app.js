@@ -6,6 +6,7 @@ import { cardArt } from './cardart.js';
 import { parseIngredientLine, matchIngredient, splitSteps, findDurations, fmtDuration } from './parse.js';
 import { ALLERGENS, PURCHASE_UNITS, UNITS, recipeCost, itemCost, suggestedPrice, actualCostPct, recipeAllergens, usesRecipe, hasPrice, fmtAmount, TEMP_CHECKS, tempStatus, yieldTest, MEASURES, convertFor, densityFor, scaleFromIngredient, bakersPercent, bakersBase, fToC, cToF, prepBatches, niceAmount, niceParts, withPriceHistory, menuEngineering, MENU_CLASSES, daysUntil, examReadiness, periodKey, checkProgress, shareBundle, importBundle, money, pct } from './calc.js';
 
+const VERSION = new URL(import.meta.url).searchParams.get('v') ?? 'dev'; // set once, in index.html
 const view = document.getElementById('view');
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
@@ -1975,7 +1976,7 @@ async function settingsView() {
       <button type="submit" class="ghost">Send feedback</button> <span id="fbMsg" class="muted"></span>
     </form>
     <div class="actions"><button type="button" class="ghost" id="invite">Invite classmates</button></div><p id="inviteMsg" class="muted center"></p>
-    <p class="muted center"><small>Pinch v36</small></p>`, { back: '#/home' });
+    <p class="muted center"><small>Pinch v${VERSION}</small></p>`, { back: '#/home' });
 
   document.querySelector('[data-lang]').parentElement.onclick = e => { const l = e.target.closest('[data-lang]')?.dataset.lang; if (l && l !== LANG) setLang(l); };
   const acct = document.getElementById('acct');

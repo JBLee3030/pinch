@@ -11,7 +11,7 @@
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="style.css?v=37">
 </head>
 <body>
 <div id="view"></div>
@@ -24,6 +24,21 @@
   <a href="#/study" data-tab="study"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.604 7.197l7.138 -3.109a.96 .96 0 0 1 1.27 .527l4.924 11.902a1 1 0 0 1 -.514 1.304l-7.137 3.109a.96 .96 0 0 1 -1.271 -.527l-4.924 -11.903a1 1 0 0 1 .514 -1.304z"/><path d="M15 4h1a1 1 0 0 1 1 1v3.5"/><path d="M20 6c.264 .112 .52 .217 .768 .315a1 1 0 0 1 .53 1.311l-2.298 5.374"/></svg>Study</a>
   <a href="#/settings" data-tab="settings" class="side-only"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10.325 4.317c.426 -1.756 2.924 -1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543 -.94 3.31 .826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756 .426 1.756 2.924 0 3.35a1.724 1.724 0 0 0 -1.066 2.573c.94 1.543 -.826 3.31 -2.37 2.37a1.724 1.724 0 0 0 -2.572 1.065c-.426 1.756 -2.924 1.756 -3.35 0a1.724 1.724 0 0 0 -2.573 -1.066c-1.543 .94 -3.31 -.826 -2.37 -2.37a1.724 1.724 0 0 0 -1.065 -2.572c-1.756 -.426 -1.756 -2.924 0 -3.35a1.724 1.724 0 0 0 1.066 -2.573c-.94 -1.543 .826 -3.31 2.37 -2.37c1 .608 2.296 .07 2.572 -1.065z"/><path d="M9 12a3 3 0 1 0 6 0a3 3 0 0 0 -6 0"/></svg>Settings</a>
 </nav>
-<script type="module" src="app.js"></script>
+<!-- One version for every file: after a deploy the CDN can serve a mix of old and new files for a few minutes;
+     versioned URLs make the browser load either the whole old set or the whole new one. Bump v= here (all of it) per release. -->
+<script type="importmap">
+{ "imports": {
+    "./app.js": "./app.js?v=37",
+    "./calc.js": "./calc.js?v=37",
+    "./cardart.js": "./cardart.js?v=37",
+    "./db.js": "./db.js?v=37",
+    "./i18n.js": "./i18n.js?v=37",
+    "./ko.js": "./ko.js?v=37",
+    "./parse.js": "./parse.js?v=37",
+    "./study.js": "./study.js?v=37",
+    "./sync.js": "./sync.js?v=37"
+} }
+</script>
+<script type="module" src="app.js?v=37"></script>
 </body>
 </html>

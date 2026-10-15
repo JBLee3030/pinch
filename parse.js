@@ -107,7 +107,7 @@ export function matchIngredient(name, list, minScore = 2) {
 // paragraph is split into sentences.
 export function splitSteps(method) {
   let lines = String(method ?? '').split(/\r?\n/)
-    .map(l => l.replace(/^\s*(?:step\s*\d+[.):]?|\d+[.)]|[-•*])\s*/i, '').trim())
+    .map(l => l.replace(/^\s*(?:step\s*\d+[.):]?|\d+[.)]|[-•*])\s*/i, '').replace(/^\d{1,2}\s+(?=[A-Z])/, '').trim()) // '1. ', '2) ', '3 Wash…' (not '2 eggs')
     .filter(Boolean);
   if (lines.length === 1 && lines[0].length > 120) lines = lines[0].split(/(?<=[.!?])\s+(?=[A-Z])/);
   return lines;
