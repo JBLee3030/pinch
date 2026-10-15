@@ -5,8 +5,8 @@ import { tr } from './i18n.js';
 import { toRecipe, SCHEMA } from './supabase/functions/recipe-photo/index.js';
 import { DECKS, ALL_CARDS, review, pickSession, isDue, isLearned } from './study.js';
 import { extractRecipe, safeUrl } from './supabase/functions/recipe-import/index.js';
-import { parseIngredientLine as P, matchIngredient, parsePriceList, packUnit, splitSteps, findDurations, fmtDuration } from './parse.js';
-import { convert, recipeCost, suggestedPrice, actualCostPct, recipeAllergens, orderList, fmtAmount, tempStatus, yieldTest, convertFor, densityFor, MEASURES, scaleFromIngredient, itemGrams, bakersPercent, bakersBase, fToC, cToF, prepBatches, niceAmount, withPriceHistory, costImpact, foodCostWatch, priceMoves, menuEngineering, daysUntil, examReadiness, stockValue, stockPeriods, wasteCost, wasteSummary, periodKey, checkProgress, shareBundle, importBundle } from './calc.js';
+import { parseIngredientLine as P, matchIngredient, splitSteps, findDurations, fmtDuration } from './parse.js';
+import { convert, recipeCost, suggestedPrice, actualCostPct, recipeAllergens, fmtAmount, tempStatus, yieldTest, convertFor, densityFor, MEASURES, scaleFromIngredient, itemGrams, bakersPercent, bakersBase, fToC, cToF, prepBatches, niceAmount, withPriceHistory, menuEngineering, daysUntil, examReadiness, periodKey, checkProgress, shareBundle, importBundle } from './calc.js';
 
 const close = (a, b) => assert.ok(Math.abs(a - b) < 1e-9, `${a} != ${b}`);
 
@@ -65,45 +65,6 @@ const ca = recipeCost(a, ings, cyc);
 close(ca.total, 2);
 assert.ok(ca.problems.some(p => p.includes('circular')));
 assert.deepEqual(recipeAllergens(a, ings, cyc), ['Gluten', 'Wheat']);
-
-// Order list: expands sub-recipes, grosses up for yield, and at 100% yield its cost equals recipe costing
-{
-  const I = new Map([
-    ['tom', { name: 'Tomato', unit: 'kg', price: 4, yieldPct: 100 }],
-    ['oni', { name: 'Onion', unit: 'kg', price: 3, yieldPct: 90 }],
-    ['egg', { name: 'Egg', unit: 'each', price: 0.5, yieldPct: 100 }],
-  ]);
-  const sauce = { id: 'sauce', name: 'Sauce', portions: 10, yieldQty: 2, yieldUnit: 'L', items: [{ ingredientId: 'tom', qty: 2, unit: 'kg' }, { ingredientId: 'oni', qty: 450, unit: 'g' }] };
-  const dish = { id: 'dish', name: 'Dish', portions: 4, items: [{ recipeId: 'sauce', qty: 500, unit: 'ml' }, { ingredientId: 'egg', qty: 3, unit: 'each' }, { ingredientId: 'tom', qty: 100, unit: 'g' }] };
-  const R = new Map([[sauce.id, sauce], [dish.id, dish]]);
-  // 8 dishes = 2 batches: sauce 1 L = half a sauce batch -> tom 1 kg + oni 0.225 kg; eggs 6; tom +0.2 kg
-  const o = orderList([{ recipeId: 'dish', portions: 8 }, { recipeId: 'sauce', portions: 5 }, { recipeId: 'nope', portions: 3 }], I, R);
-  const by = Object.fromEntries(o.lines.map(l => [l.ing.name, l]));
-  close(by.Tomato.usable, 1 + 0.2 + 1);       // + 5 portions of sauce = half batch = 1 kg
-  close(by.Onion.usable, 0.225 + 0.225);
-  close(by.Onion.order, 0.45 / 0.9);          // grossed up for 90% yield
-  assert.equal(by.Egg.order, 6);
-  close(o.total, 2.2 * 4 + 0.5 * 3 + 6 * 0.5);
-  close(o.total, recipeCost(dish, I, R).total * 2 + recipeCost(sauce, I, R).total * 0.5); // matches costing
-  assert.deepEqual(o.problems, []);
-  // eggs round up to whole units
-  assert.equal(orderList([{ recipeId: 'dish', portions: 1 }], I, R).lines.find(l => l.ing.name === 'Egg').order, 1);
-  // On hand: subtracted from the yield-adjusted gross, never below zero; eggs round up after subtracting
-  const h = orderList([{ recipeId: 'dish', portions: 8 }], I, R, { tom: 0.5, oni: 10, egg: 2.5 });
-  const hb = Object.fromEntries(h.lines.map(l => [l.ing.name, l]));
-  close(hb.Tomato.order, 1.2 - 0.5);
-  assert.equal(hb.Onion.order, 0);
-  assert.equal(hb.Onion.cost, 0);
-  assert.equal(hb.Egg.order, 4);                // 6 - 2.5 = 3.5 -> 4
-  close(h.total, 0.7 * 4 + 4 * 0.5);
-  // Missing price only matters if we actually need to order it
-  const I2 = new Map([...I, ['oni', { ...I.get('oni'), price: null }]]);
-  assert.deepEqual(orderList([{ recipeId: 'sauce', portions: 10 }], I2, R, { oni: 1 }).problems, []);
-  assert.deepEqual(orderList([{ recipeId: 'sauce', portions: 10 }], I2, R).problems, ['Price missing: Onion']);
-  assert.equal(fmtAmount(0.04, 'kg'), '40 g');
-  assert.equal(fmtAmount(3.333, 'kg'), '3.33 kg');
-  assert.equal(fmtAmount(6, 'each'), '6 each');
-}
 
 // Temperature checks
 {
@@ -180,35 +141,6 @@ assert.equal(remoteWins({}, 1), true);
   assert.equal(m('oil'), 'Oil');                 // exact beats partial
   assert.equal(m('red onion'), null);            // different ingredient: new
   assert.equal(m('San Marzano tomatoes'), null);
-}
-
-// Supplier price lists
-{
-  assert.deepEqual(packUnit('5kg'), ['kg', 5]);
-  assert.deepEqual(packUnit('500g'), ['kg', 0.5]);
-  assert.deepEqual(packUnit('per kg'), ['kg', 1]);
-  assert.deepEqual(packUnit('dozen'), ['each', 12]);
-  assert.deepEqual(packUnit('bunch'), ['each', 1]);
-  assert.deepEqual(packUnit('box'), ['each', 1]);
-  assert.equal(packUnit('mystery'), null);
-  const csv = 'Product,Pack,Price,Yield %\n"Tomatoes, canned whole",2.5kg,"$10.50",\nFlour tipo 00,12.5 kg bag,$35.00,\nEggs free range,dozen,7.20,\nBasil,bunch,3.50,70\nMystery,???,4\n';
-  const rows = parsePriceList(csv);
-  assert.equal(rows.length, 5);
-  assert.deepEqual(rows.map(r => [r.name, r.price, r.unit, r.ok]), [
-    ['Tomatoes, canned whole', 4.2, 'kg', true],
-    ['Flour tipo 00', 2.8, 'kg', true],
-    ['Eggs free range', 0.6, 'each', true],
-    ['Basil', 3.5, 'each', true],
-    ['Mystery', null, 'kg', false],
-  ]);
-  assert.equal(rows[3].yieldPct, 70);
-  // Pasted from a spreadsheet (tabs), no header
-  assert.deepEqual(parsePriceList('Garlic\t18\tkg\nMilk\t1.80\tL').map(r => [r.name, r.price, r.unit]), [['Garlic', 18, 'kg'], ['Milk', 1.8, 'L']]);
-  // "Price per L" header gives the unit
-  assert.deepEqual(parsePriceList('Item,Price per L\nCream,6.40').map(r => [r.name, r.price, r.unit]), [['Cream', 6.4, 'L']]);
-  // Semicolon CSV (European Excel)
-  assert.deepEqual(parsePriceList('Name;Price;Unit\nButter;12,50;kg').map(r => [r.name, r.price, r.unit]), [['Butter', 12.5, 'kg']]);
-  assert.equal(parsePriceList('Name,Price\nWagyu,"$1,234.50"')[0].price, 1234.5); // thousands separator
 }
 
 // Cooking mode: steps and timers
@@ -375,27 +307,13 @@ assert.equal(niceAmount(12.345, 'ml'), '12.3 ml');
 assert.equal(niceAmount(4.2666, 'each'), '4.27 each');
 assert.equal(niceAmount(2, 'portion'), '2 portion');
 
-// Food cost watch
+// Price history on ingredients
 {
   const g0 = { id: 'g', name: 'Garlic', unit: 'kg', price: 18, yieldPct: 100 };
   let g1 = withPriceHistory(g0, { ...g0, price: 22 }, '2026-10-03');
   assert.deepEqual(g1.priceHistory.map(h => h.price), [18, 22]);              // old price seeded, new one added
   assert.equal(withPriceHistory(g1, { ...g1, name: 'Garlic, peeled' }, '2026-10-04').priceHistory.length, 2); // no price change, no entry
   assert.equal(withPriceHistory(undefined, { name: 'New', unit: 'kg', price: null }, 'x').priceHistory.length, 0); // unpriced new item
-  const sauce = { id: 'sauce', name: 'Sauce', portions: 10, yieldQty: 1, yieldUnit: 'L', items: [{ ingredientId: 'g', qty: 100, unit: 'g' }] };
-  const dish = { id: 'dish', name: 'Dish', portions: 1, menuPrice: 11, targetCostPct: 30, items: [{ recipeId: 'sauce', qty: 500, unit: 'ml' }] };
-  const other = { id: 'other', name: 'Other', portions: 1, menuPrice: 11, items: [] };
-  const before = new Map([['g', g0]]), after = new Map([['g', g1]]);
-  const imp = costImpact([sauce, dish, other], before, after);
-  assert.deepEqual(imp.map(x => x.recipe.id), ['dish', 'sauce']);              // the dish changes through its sub-recipe; 'other' untouched
-  close(imp[0].before, 0.9); close(imp[0].after, 1.1);                         // half of a 1.8 -> 2.2 batch
-  close(imp[0].afterPct, 1.1 / 10 * 100);                                       // vs $10 ex GST
-  const w = foodCostWatch([sauce, dish, { ...other, items: [{ ingredientId: 'g', qty: 200, unit: 'g' }] }], after, 30);
-  assert.deepEqual(w.map(x => x.recipe.id), ['other', 'dish']);                // highest % first; only recipes with a menu price
-  assert.equal(w[0].over, true);                                                // 0.2 kg x $22 = $4.40 on $10 ex GST = 44%
-  assert.equal(w[1].over, false);
-  const moves = priceMoves(new Map([['g', g1]]));
-  close(moves[0].change, (22 - 18) / 18 * 100);
 }
 
 // Menu engineering: textbook four-dish example
@@ -432,44 +350,8 @@ assert.equal(niceAmount(2, 'portion'), '2 portion');
   assert.equal(examReadiness({ recipeIds: [] }, []).target, 3);     // default target
 }
 
-// Stocktake and waste
+// Checklists
 {
-  assert.deepEqual(stockValue([{ qty: 2, price: 4.5 }, { qty: 0, price: null }, { qty: 3, price: null }]), { value: 9, missing: 1 });
-  const counts = [
-    { date: '2026-09-21', lines: [{ qty: 10, price: 4 }, { qty: 2, price: 12 }] },                       // $64
-    { date: '2026-09-28', lines: [{ qty: 6, price: 4 }], purchases: 300, sales: 1000 },                   // $24
-    { date: '2026-09-14', lines: [{ qty: 5, price: 4 }] },                                                // first count: opening only
-  ];
-  const waste = [{ date: '2026-09-21', cost: 50 }, { date: '2026-09-25', cost: 20 }, { date: '2026-09-28', cost: 14 }];
-  const [latest, first] = stockPeriods(counts, waste);
-  assert.equal(stockPeriods(counts).length, 2);
-  assert.deepEqual([latest.from, latest.to, latest.opening, latest.closing, latest.used], ['2026-09-21', '2026-09-28', 64, 24, 340]);
-  close(latest.pct, 34);
-  assert.equal(latest.waste, 34);                                   // the opening day's waste belongs to the period before
-  close(latest.wastePct, 10);
-  assert.ok(Number.isNaN(first.pct));                              // no sales entered
-  const wings = new Map([['tom', { id: 'tom', name: 'Tomatoes', unit: 'kg', price: 4, yieldPct: 50 }], ['bas', { id: 'bas', name: 'Basil', unit: 'each', price: null }]]);
-  close(wasteCost({ ingredientId: 'tom', qty: 500, unit: 'g' }, wings), 2);   // as bought, not grossed up for trim
-  assert.ok(Number.isNaN(wasteCost({ ingredientId: 'bas', qty: 1, unit: 'each' }, wings)));
-  const sauce = { id: 'sauce', portions: 4, items: [{ ingredientId: 'tom', qty: 1, unit: 'kg' }] };   // $8 a batch, $2 a portion
-  close(wasteCost({ recipeId: 'sauce', qty: 3, unit: 'portion' }, wings, new Map([['sauce', sauce]])), 6);
-  const s = wasteSummary([{ name: 'Basil', reason: 'spoiled', cost: 7 }, { name: 'Ragù', reason: 'over', cost: 20 }, { name: 'Basil', reason: 'spoiled', cost: 3.5 }, { name: 'Bread', reason: 'over', cost: null }]);
-  close(s.total, 30.5);
-  assert.deepEqual(s.byReason.map(x => [x.key, x.cost]), [['over', 20], ['spoiled', 10.5]]);
-  assert.deepEqual(s.topItems.map(x => x.key), ['Ragù', 'Basil', 'Bread']);
-}
-
-// Par levels, checklists
-{
-  const ings = new Map([['flo', { id: 'flo', name: 'Flour', unit: 'kg', price: 2, yieldPct: 100, par: 10 }], ['oil', { id: 'oil', name: 'Oil', unit: 'L', price: 12, yieldPct: 100 }],
-    ['egg', { id: 'egg', name: 'Eggs', unit: 'each', price: 0.5, yieldPct: 100, par: 30 }]]);
-  const recs = new Map([['dough', { id: 'dough', portions: 1, items: [{ ingredientId: 'flo', qty: 2, unit: 'kg' }, { ingredientId: 'oil', qty: 0.5, unit: 'L' }] }]]);
-  const plan = [{ recipeId: 'dough', portions: 1 }];
-  assert.deepEqual(orderList(plan, ings, recs, { flo: 3 }).lines.map(l => [l.id, l.order]), [['flo', 0], ['oil', 0.5]]);   // no par: 2 needed, 3 on hand
-  const o = orderList(plan, ings, recs, { flo: 3, egg: 12 }, true);
-  assert.deepEqual(o.lines.map(l => [l.id, l.order, l.par]), [['egg', 18, 30], ['flo', 7, 10], ['oil', 0.5, 0]]);         // max(2, 10) − 3; eggs by par alone
-  assert.equal(orderList([{ recipeId: 'dough', portions: 8 }], ings, recs, { flo: 3 }, true).lines.find(l => l.id === 'flo').order, 13); // a big plan beats par: 16 − 3
-  assert.equal(orderList([], ings, recs, {}, true).lines.length, 2);                                                       // par works with nothing planned
   assert.equal(periodKey('day', '2026-10-07'), '2026-10-07');
   assert.equal(periodKey('week', '2026-10-07'), '2026-10-05');                                                             // Wednesday -> Monday
   assert.equal(periodKey('week', '2026-10-05'), '2026-10-05');
@@ -516,7 +398,7 @@ assert.equal(niceAmount(2, 'portion'), '2 portion');
 // Korean UI
 {
   assert.equal(tr('Save'), '저장');
-  assert.equal(tr('  3 of 8 items counted '), '  8개 중 3개 셈 ');                                  // spaces kept
+  assert.equal(tr('  2 of 3 practices '), '  3회 중 2회 연습 ');                                      // spaces kept
   assert.equal(tr('Make 2.2 L (10 portions), about 45 min of cooking time'), '2.2 L (10인분) 만들기, 조리 시간 약 45분'); // nested parts
   assert.equal(tr(' for 30.0% food cost'), '에 팔면 원가율 30.0%');                                   // joins onto the price before it
   assert.equal(tr('Fresh egg pasta'), 'Fresh egg pasta');                                              // what people typed stays as is

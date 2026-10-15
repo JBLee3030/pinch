@@ -6,13 +6,12 @@ const PERIOD = { Breakfast: '조식', Lunch: '점심', Dinner: '저녁', Functio
 
 export const KO = {
   // Shell, navigation, common actions
-  'Recipes': '레시피', 'Pantry': '팬트리', 'Log': '기록', 'Study': '공부', 'Settings': '설정',
+  'Recipes': '레시피', 'Log': '기록', 'Study': '공부', 'Settings': '설정',
   'New': '추가', 'Back': '뒤로', 'Edit': '수정', 'Save': '저장', 'Delete': '삭제', 'Remove': '삭제', 'Print': '인쇄',
   'Today': '오늘', 'Tomorrow': '내일', 'Done': '완료', 'Saved': '저장했어요', 'Copied': '복사했어요', 'Sending…': '보내는 중…',
   'Demo with sample data.': '샘플 데이터로 보는 데모예요.', 'Open Pinch': 'Pinch 열기',
   '(optional)': '(선택)', 'Notes': '메모', 'Note': '메모', 'Date': '날짜', 'Type': '종류', 'Title': '제목', 'Name': '이름', 'None': '없음',
-  'Choose…': '선택…', 'Choose recipe…': '레시피 선택…', 'Choose dish…': '요리 선택…', 'Choose from Pantry…': '팬트리에서 선택…',
-  'Photo': '사진', 'Remove photo': '사진 삭제', 'Portions': '인분', 'portion': '인분', 'each': '개', 'Ingredient': '재료', 'Ingredients': '재료',
+  'Choose…': '선택…', 'Choose recipe…': '레시피 선택…', 'Choose dish…': '요리 선택…',   'Photo': '사진', 'Remove photo': '사진 삭제', 'Portions': '인분', 'portion': '인분', 'each': '개', 'Ingredient': '재료', 'Ingredients': '재료',
   'Recipe': '레시피', 'Method': '만드는 법', 'Total': '합계', 'Cost': '원가', 'Amount': '양', 'Unit': '단위', 'Qty': '양', 'Quantity': '양',
   'Search ingredients': '재료 검색', 'Search recipes or ingredients': '레시피나 재료 검색', 'Category': '카테고리', 'All': '전체',
   'Uncategorised': '미분류', '(deleted)': '(삭제됨)', 'No price': '가격 없음', 'per portion': '1인분', 'Incomplete': '미완성',
@@ -22,24 +21,18 @@ export const KO = {
   // Allergens (FSANZ)
   'Gluten': '글루텐', 'Wheat': '밀', 'Crustacean': '갑각류', 'Mollusc': '연체류', 'Fish': '생선', 'Egg': '달걀', 'Milk': '우유',
   'Peanut': '땅콩', 'Tree nuts': '견과류', 'Sesame': '참깨', 'Soy': '대두', 'Lupin': '루핀', 'Sulphites': '아황산염',
-  'contains': '포함', 'Recipe card': '레시피 카드', 'Allergens': '알레르기 유발 성분', 'Based on Pantry data. Always check supplier labels.': '팬트리 정보 기준이에요. 공급업체 라벨을 꼭 확인하세요.',
-
+  'contains': '포함', 'Recipe card': '레시피 카드', 'Allergens': '알레르기 유발 성분', 
   // Home
   'Home': '홈', 'Tools': '도구', 'To do': '할 일', 'All done for now': '지금은 할 일이 없어요', 'Nothing needs doing. Nice work.': '모두 끝냈어요. 잘했어요.',
-  'Calculator': '계산기', 'Prep': '프렙', 'Temps': '온도', 'Order': '발주', 'Stock count': '재고 실사', 'Costs': '원가', 'Allergy chart': '알레르기 표',
+  'Calculator': '계산기', 'Prep': '프렙', 'Temps': '온도', 'Allergy chart': '알레르기 표',
 
-  // Checklists, par levels, storage areas
+  // Checklists
   'Checklists': '체크리스트', 'Every day': '매일', 'Every week': '매주', 'this week': '이번 주', 'today': '오늘', 'This week': '이번 주', 'Earlier': '지난 기록',
   'Ticks are saved with the date, so the lists double as your cleaning records.': '체크는 날짜와 함께 저장돼서 청소 기록으로도 쓸 수 있어요.',
   'No checklists.': '체크리스트가 없어요.', 'Make one for opening, closing or cleaning.': '오픈, 마감, 청소용으로 만들어 보세요.',
   'New checklist': '새 체크리스트', 'Edit checklist': '체크리스트 수정', 'e.g. Closing, Pastry section': '예: 마감, 페이스트리 파트', 'How often': '주기',
   'Items, one per line': '항목 (한 줄에 하나씩)', 'Opening': '오픈', 'Closing': '마감', 'Weekly clean': '주간 청소',
-  'Stored in': '보관 위치', 'Par level': '적정 재고 (Par)', 'Optional': '선택', 'Dry store': '건식 창고',
-  'Par is how much you want on the shelf, in the purchase unit. The order list can top up to it.': '적정 재고는 늘 있어야 할 양이에요(구매 단위). 발주 리스트가 이만큼 채워 줘요.',
-  'Top up to par levels': '적정 재고까지 채우기', 'par levels': '적정 재고', 'Set a par level on an ingredient to order by par too.': '재료에 적정 재고를 정하면 그 기준으로도 발주할 수 있어요.',
-  'Add recipes, or set par levels in Pantry, to make an order list.': '레시피를 추가하거나 팬트리에서 적정 재고를 정하면 발주 리스트를 만들 수 있어요.',
-  'Order = need ÷ trim yield, or par if that’s more, − on hand. Count stock in the purchase unit (kg, L, each).': '발주량 = 필요량 ÷ 수율과 적정 재고 중 큰 값 − 보유량. 재고는 구매 단위(kg, L, 개)로 세요.',
-
+          
   // Reading a recipe photo
   'Read a recipe photo': '레시피 사진으로 읽기', 'Reading the photo… this takes about 10 to 30 seconds.': '사진을 읽는 중… 10~30초 정도 걸려요.',
   'Paste a recipe link, or take a photo of a printed or handwritten recipe. Pinch fills in the form for you to check.': '레시피 링크를 붙여넣거나, 인쇄되거나 손으로 쓴 레시피를 찍으세요. Pinch가 칸을 채워 주면 확인만 하면 돼요.',
@@ -58,11 +51,9 @@ export const KO = {
 
   // Recipes tab
   'Recipe tools': '레시피 도구', 'Allergen chart': '알레르기 표', 'Kitchen calculator': '주방 계산기', 'Timers': '타이머', 'Prep list': '프렙 리스트', 'Menus': '메뉴',
-  'Temperature check still open': '마치지 않은 온도 체크', 'Study cards to review': '복습할 카드', 'Over target food cost': '목표 원가율 초과',
-  'Welcome to Pinch': 'Pinch에 오신 걸 환영해요', 'Write a recipe.': '레시피 쓰기.',
+  'Temperature check still open': '마치지 않은 온도 체크', 'Study cards to review': '복습할 카드',   'Welcome to Pinch': 'Pinch에 오신 걸 환영해요', 'Write a recipe.': '레시피 쓰기.',
   'Type ingredients as you go. Pinch works out cost per portion, allergens and a recipe card.': '재료를 적기만 하면 1인분 원가, 알레르기 성분, 레시피 카드를 Pinch가 계산해요.',
-  'Add prices': '가격 입력', 'in': ':', 'whenever you have them.': '~에서 알게 될 때마다 넣으세요.',
-  'Log your services': '서비스 기록', 'to build your portfolio.': '~ 탭에 남기면 포트폴리오가 만들어져요.',
+    'Log your services': '서비스 기록', 'to build your portfolio.': '~ 탭에 남기면 포트폴리오가 만들어져요.',
   'Write your first recipe': '첫 레시피 쓰기', 'Load sample recipes': '샘플 레시피 불러오기', 'Install on your phone': '휴대폰에 설치하기',
   'In Safari, tap': 'Safari에서', 'Share': '공유', 'Add to Home Screen': '홈 화면에 추가', '. Then always open Pinch from its icon.': '~를 누르세요. 그다음부터는 아이콘으로 Pinch를 여세요.',
   'In Chrome, tap': 'Chrome에서', 'Install app': '앱 설치', '(or Add to Home screen).': '~(또는 홈 화면에 추가)를 누르세요.',
@@ -73,16 +64,15 @@ export const KO = {
   'Suggested price ex GST': '권장 가격 (GST 제외)', 'Suggested price inc GST': '권장 가격 (GST 포함)', 'Menu price inc GST': '메뉴 가격 (GST 포함)',
   'Actual food cost': '실제 원가율', 'Costed recipe card (PDF)': '원가 레시피 카드 (PDF)', 'Scale to': '', 'portions': '인분 기준으로 보기',
   'Sub-recipe': '서브 레시피', 'Log practice': '연습 기록', 'No allergens recorded': '알레르기 성분 없음', 'Fewer portions': '인분 줄이기', 'More portions': '인분 늘리기',
-  'Allergens come from Pantry data. Always check supplier labels.': '알레르기 성분은 팬트리 정보 기준이에요. 공급업체 라벨을 꼭 확인하세요.', "Scale by ingredient or baker's %": "재료 양이나 베이커스 %로 조정", 'Practice': '연습', 'Next time:': '다음엔:',
+  "Scale by ingredient or baker's %": "재료 양이나 베이커스 %로 조정", 'Practice': '연습', 'Next time:': '다음엔:',
   'No notes': '메모 없음', 'Log an attempt': '연습 기록하기', 'Start cooking': '요리 시작', 'Used in:': '사용처:', 'Sell at': '',
-  'None declared in Pantry.': '팬트리에 등록된 성분이 없어요.', 'Not rated': '평가 없음',
+  'Not rated': '평가 없음',
   'Each time you cook this, note how it went and what to change. Your notes show up when you start cooking.': '만들 때마다 어땠는지, 다음엔 뭘 바꿀지 적어 두세요. 다음에 요리를 시작하면 그 메모가 보여요.',
 
   // Recipe edit
   'New recipe': '새 레시피', 'Edit recipe': '레시피 수정', 'e.g. Pomodoro sauce': '예: 포모도로 소스', 'Ingredients, one per line': '재료 (한 줄에 하나씩)',
   'One per line, e.g.\n500 g tipo 00 flour\n5 eggs\n2 cloves garlic\n1/2 cup olive oil': '한 줄에 하나씩, 예:\n500 g tipo 00 flour\n5 eggs\n2 cloves garlic\n1/2 cup olive oil',
-  'Type or paste. Amounts and units are read for you, and names are matched to your Pantry.': '입력하거나 붙여넣으세요. 양과 단위를 읽고, 이름은 팬트리와 맞춰 줘요.',
-  'From a printed recipe:': '인쇄된 레시피라면:', 'open the Camera, point it at the page, tap the text icon, select the ingredients and tap Copy. Then paste here.': '카메라로 페이지를 비추고 텍스트 아이콘을 눌러 재료를 선택한 뒤 복사하세요. 그리고 여기에 붙여넣으세요.',
+    'From a printed recipe:': '인쇄된 레시피라면:', 'open the Camera, point it at the page, tap the text icon, select the ingredients and tap Copy. Then paste here.': '카메라로 페이지를 비추고 텍스트 아이콘을 눌러 재료를 선택한 뒤 복사하세요. 그리고 여기에 붙여넣으세요.',
   'Add to recipe': '레시피에 추가', 'Ingredient or sub-recipe': '재료 또는 서브 레시피', '+ Add ingredient': '+ 재료 추가', 'Paste a list': '목록 붙여넣기',
   'Add one at a time': '하나씩 추가', 'More details': '자세히', 'category, pricing, batch yield': '카테고리, 가격, 배치 완성량', 'Pasta, Sauce…': '파스타, 소스…',
   'Source': '출처', 'My own': '내 레시피', 'Web': '웹', 'Target food cost %': '목표 원가율 %', 'Batch yield': '배치 완성량', '(for sub-recipes)': '(서브 레시피용)',
@@ -155,25 +145,17 @@ export const KO = {
   "What's assessed, equipment, time limit…": '평가 내용, 준비물, 제한 시간…', 'Add the recipes first, then pick them here.': '먼저 레시피를 추가한 뒤 여기서 고르세요.',
   'Delete this exam? Practice records stay.': '이 시험을 삭제할까요? 연습 기록은 남아요.',
 
-  // Pantry
-  'Pantry tools': '팬트리 도구', 'Order list': '발주 리스트', 'Yield test': '수율 테스트 (Yield test)', 'Import prices': '가격 가져오기', 'Food cost watch': '원가 모니터링',
-  'Stocktake': '재고 실사 (Stocktake)', 'Waste log': '폐기 기록', 'No ingredients yet.': '아직 재료가 없어요.', 'Add what you buy, with price per kg, litre or each.': '사는 재료를 kg, 리터, 개당 가격과 함께 추가하세요.',
-  'Prices updated': '가격이 바뀌었어요', 'No recipe costs changed.': '원가가 바뀐 레시피는 없어요.',
-  'Edit ingredient': '재료 수정', 'New ingredient': '새 재료', 'Price (AUD)': '가격 (AUD)', 'Add later': '나중에 입력', 'Per': '단위',
+  // Ingredients
+  'Prices are optional: add them when a recipe needs costing. Allergens set here show on every recipe that uses the ingredient.': '가격은 선택이에요. 원가 계산이 필요한 레시피가 있을 때 넣으세요. 여기서 정한 알레르기 성분은 이 재료를 쓰는 모든 레시피에 표시돼요.',
+  'They are added for you as you write recipes.': '레시피를 쓰면 재료가 자동으로 추가돼요.',
+  'Allergens come from your ingredient list. Always check supplier labels.': '알레르기 성분은 재료 목록 기준이에요. 공급업체 라벨을 꼭 확인하세요.',
+  'Based on your ingredient list. Always check supplier labels.': '재료 목록 기준이에요. 공급업체 라벨을 꼭 확인하세요.',
+  'Type or paste. Amounts and units are read for you, and names are matched to your ingredients.': '입력하거나 붙여넣으세요. 양과 단위를 읽고, 이름은 기존 재료와 맞춰 줘요.',
+  'Choose an ingredient…': '재료 선택…', 'Choose an ingredient above to save this yield to it.': '위에서 재료를 고르면 이 수율을 그 재료에 저장해요.',
+  'An ingredient was deleted': '재료가 삭제됐어요', 'Practise it.': '연습하기.', 'After each cook, rate it and note what to change next time.': '만들 때마다 별점을 주고 다음엔 뭘 바꿀지 적어 두세요.',
+  'Yield test': '수율 테스트 (Yield test)',   'No ingredients yet.': '아직 재료가 없어요.',     'Edit ingredient': '재료 수정', 'New ingredient': '새 재료', 'Price (AUD)': '가격 (AUD)', 'Add later': '나중에 입력', 'Per': '단위',
   'Yield %': '수율 %', '(usable after trimming/peeling)': '(손질 후 쓸 수 있는 비율)', 'Run a yield test': '수율 테스트 하기', 'Used in': '사용하는 레시피',
   'Not used in any recipe yet.': '아직 어떤 레시피에도 쓰이지 않아요.',
-
-  // Food cost watch
-  'Over target': '목표 초과', 'Add a menu price to a recipe (More details) to track its food cost.': '레시피에 메뉴 가격(자세히)을 넣으면 원가율을 추적해요.',
-  'some prices missing': '일부 가격 없음', 'Latest price changes': '최근 가격 변동',
-
-  // Import prices
-  'Paste rows from a supplier price list or spreadsheet, or pick a CSV file.': '공급업체 가격표나 스프레드시트의 행을 붙여넣거나 CSV 파일을 고르세요.',
-  'Columns:': '열:', 'name': '이름', 'price': '가격', 'unit or pack': '단위 또는 포장', '(kg, L, each, or a pack size like 5kg, 500g, dozen). Optional:': '(kg, L, each 또는 5kg, 500g, dozen 같은 포장 단위). 선택:',
-  'yield': '수율', '%. Pack prices are converted to the price per kg / L / each.': '%. 포장 가격은 kg / L / 개당 가격으로 바꿔 줘요.', 'Paste': '붙여넣기', '…or choose a file': '…또는 파일 선택', 'Preview': '미리보기',
-  'Nothing to import yet. Paste some rows first.': '가져올 내용이 없어요. 먼저 행을 붙여넣으세요.', 'Check before importing': '가져오기 전에 확인하세요',
-  'Matched items get the new price. Pick “New ingredient” if a match is wrong.': '맞춰진 재료는 새 가격으로 바뀌어요. 잘못 맞춰졌다면 “새 재료”를 고르세요.', '(no name)': '(이름 없음)',
-  'Update which ingredient': '업데이트할 재료',
 
   // Yield test
   'Bought': '구매량', 'e.g. 5': '예: 5', 'Price per': '가격 /', 'Usable after trimming': '손질 후 사용 가능량', 'e.g. 3.6': '예: 3.6', 'Trim': '트림',
@@ -182,34 +164,7 @@ export const KO = {
   'Enter what you bought and what was usable after trimming.': '구매량과 손질 후 사용 가능량을 넣으세요.', 'Usable weight can’t be more than what you bought.': '사용 가능량은 구매량보다 많을 수 없어요.',
   'Yield': '수율', '⚠ Usable weight plus trim is more than you bought. Check the weights.': '⚠ 사용 가능량과 트림을 더한 값이 구매량보다 많아요. 무게를 확인하세요.',
   'Total cost': '총원가', 'Value of reused trim': '재사용 트림 가치', 'Usable': '사용 가능량', 'Unaccounted loss': '알 수 없는 손실',
-  'Choose an ingredient above to save this yield to your Pantry.': '위에서 재료를 고르면 이 수율을 팬트리에 저장할 수 있어요.',
-
-  // Order list
-  'What are you cooking?': '무엇을 만드나요?', 'To order': '발주할 것', 'On hand': '보유', 'In stock': '재고 있음', 'Estimated total': '예상 합계',
-  'Order = need ÷ trim yield − on hand. Count stock in the purchase unit (kg, L, each).': '발주량 = 필요량 ÷ 수율 − 보유량. 재고는 구매 단위(kg, L, 개)로 세요.',
-  'Share list': '리스트 공유', 'Reset on hand': '보유량 초기화', 'Clear all on-hand amounts?': '보유량을 모두 지울까요?',
-  'Choose recipes and portions to see what to order.': '레시피와 인분을 고르면 발주할 것을 보여줘요.',
-
-  // Stocktake
-  'Opening stock': '기초 재고', '+ Purchases': '+ 매입', '− Closing stock': '− 기말 재고', '= Food used': '= 사용 원가', 'Sales, ex GST': '매출 (GST 제외)',
-  'Waste logged': '기록된 폐기', 'Counts': '실사 기록', 'stock value': '재고 금액', 'Add sales': '매출 입력', 'Target': '목표', 'on paper': '',
-  'Actual food cost = (opening stock + purchases − closing stock) ÷ food sales. Compare it with what the recipes say it should be: the gap is waste, over-portioning or price changes.': '실제 원가율 = (기초 재고 + 매입 − 기말 재고) ÷ 매출. 레시피상 원가율과 비교하세요. 차이는 폐기, 과다 포션, 가격 변동에서 와요.',
-  'Count stock': '재고 세기', 'Stock value': '재고 금액', 'Counted': '센 양', 'Purchases ($)': '매입 ($)', 'Invoices total': '인보이스 합계', 'Food sales ($)': '매출 ($)',
-  'Ex GST': 'GST 제외', 'Compare with menu': '비교할 메뉴', 'No stocktakes yet.': '아직 재고 실사가 없어요.',
-  "Count what's in the fridges, freezers and dry store. Pinch values it at your Pantry prices.": '냉장, 냉동, 건식 창고에 있는 걸 세세요. 팬트리 가격으로 금액을 계산해요.',
-  "Count in the purchase unit (kg, L, each). Values use today's Pantry prices and stay fixed once saved. Saving the latest count also fills On hand in the Order list.": '구매 단위(kg, L, 개)로 세세요. 금액은 오늘 팬트리 가격으로 계산되고 저장하면 고정돼요. 가장 최근 실사를 저장하면 발주 리스트의 보유량도 채워져요.',
-  'This first count is your opening stock. From the next one, add purchases and sales to get your actual food cost.': '첫 실사는 기초 재고예요. 다음 실사부터 매입과 매출을 넣으면 실제 원가율이 나와요.',
-  'Your first count is the opening stock. Count again at the end of the week (or period) and add purchases and sales to see your actual food cost.': '첫 실사가 기초 재고예요. 주말(또는 기간 말)에 다시 세고 매입과 매출을 넣으면 실제 원가율이 보여요.',
-  'Add ingredients to the Pantry first.': '먼저 팬트리에 재료를 추가하세요.', 'Delete this count?': '이 실사를 삭제할까요?',
-
-  // Waste
-  'Last 30 days': '최근 30일', 'Why, last 30 days': '폐기 이유 (최근 30일)', 'Costing the most': '손실이 큰 품목', 'Logged': '기록', 'Log waste': '폐기 기록하기',
-  'Waste': '폐기', 'What': '품목', 'Why': '이유', 'e.g. walk-in left open overnight': '예: 워크인 문이 밤새 열려 있었음',
-  'Spoiled or out of date': '상함·유통기한', 'Over-produced': '과잉 생산', 'Prep and trim': '손질 손실', 'Mistake or sent back': '실수·반품',
-  'spoiled or out of date': '상함·유통기한', 'over-produced': '과잉 생산', 'prep and trim': '손질 손실', 'mistake or sent back': '실수·반품', 'other': '기타',
-  'Nothing logged yet.': '아직 기록이 없어요.', 'Log what goes in the bin and why. A week of it shows where the money goes.': '버리는 것과 이유를 기록하세요. 일주일만 모아도 돈이 어디로 새는지 보여요.',
-  "Can't cost this": '원가를 계산할 수 없어요', 'Delete this entry?': '이 기록을 삭제할까요?',
-
+  
   // Service log
   'Service log': '서비스 기록', 'Log tools': '기록 도구', 'Temp log': '온도 기록', 'Portfolio': '포트폴리오', 'School service periods': '학교 서비스 횟수',
   'Work shifts': '근무 횟수', 'Takes a few seconds': '몇 초면 돼요', 'Same as last time': '지난번과 같음', 'No venue': '장소 없음',
@@ -270,8 +225,7 @@ export const KO = {
   'That doesn’t look like a web page link.': '웹페이지 링크가 아닌 것 같아요.', 'The site took too long to answer.': '사이트 응답이 너무 느려요.', 'Couldn’t open that page.': '그 페이지를 열 수 없어요.',
   'No recipe found on that page. Try the page of a single recipe, or copy the ingredients and paste them instead.': '그 페이지에서 레시피를 못 찾았어요. 레시피 하나만 있는 페이지로 해 보거나, 재료를 복사해 붙여넣으세요.',
   'This site doesn’t let apps read its recipes. Copy the ingredients from the page and paste them instead.': '이 사이트는 앱이 레시피를 읽지 못하게 막아요. 페이지에서 재료를 복사해 붙여넣으세요.',
-  'A sub-recipe was deleted': '서브 레시피가 삭제됐어요', 'An ingredient was deleted from Pantry': '팬트리에서 재료가 삭제됐어요',
-};
+  'A sub-recipe was deleted': '서브 레시피가 삭제됐어요', };
 
 const ALLERGEN_LIST = /^((?:Gluten|Wheat|Crustacean|Mollusc|Fish|Egg|Milk|Peanut|Tree nuts|Sesame|Soy|Lupin|Sulphites)(?:, (?:Gluten|Wheat|Crustacean|Mollusc|Fish|Egg|Milk|Peanut|Tree nuts|Sesame|Soy|Lupin|Sulphites))+)$/;
 const cap = x => x.charAt(0).toUpperCase() + x.slice(1);
@@ -320,7 +274,7 @@ export const KO_PATTERNS = [
   [/^([\d.]+) average, (\d+) attempts?$/, '평균 $1점, $2회 연습'],
   [/^(\d+) attempts?$/, '$1회 연습'],
   [/^Imported from (.+): (\d+) ingredients, (\d+) steps(, photo)?\. Check it, then Save\.$/, (site, i, s, p) => `${site}에서 가져왔어요: 재료 ${i}개, 단계 ${s}개${p ? ', 사진' : ''}. 확인하고 저장하세요.`],
-  [/^Added (\d+) ingredients: (\d+) from Pantry, (\d+) new\.(?: (\d+) highlighted row\(s\) need a quantity\.)?$/, (a, p, nw, u) => `재료 ${a}개 추가: 팬트리 ${p}개, 새 재료 ${nw}개.${u ? ` 표시된 ${u}줄은 양이 필요해요.` : ''}`],
+  [/^Added (\d+) ingredients: (\d+) already in your list, (\d+) new\.(?: (\d+) highlighted row\(s\) need a quantity\.)?$/, (a, p, nw, u) => `재료 ${a}개 추가: 기존 재료 ${p}개, 새 재료 ${nw}개.${u ? ` 표시된 ${u}줄은 양이 필요해요.` : ''}`],
   [/^Check this line: "(.*)"$/, '이 줄을 확인하세요: "$1"'],
   [/^Add an amount for the highlighted ingredient, or remove it with ×\.$/, '표시된 재료에 양을 넣거나 ×로 지우세요.'],
   [/^Add an amount for the (\d+) highlighted ingredients, or remove them with ×\.$/, '표시된 재료 $1개에 양을 넣거나 ×로 지우세요.'],
@@ -371,50 +325,18 @@ export const KO_PATTERNS = [
   [/^(\d+) of (\d+) dish(?:es)? ready \(practised (\d+)× with a last rating of 3\+\)$/, '$2개 중 $1개 준비됨 ($3회 이상 연습하고 마지막 평점 3점 이상)'],
   [/^(\d+) of (\d+) practices(?:, last rated (\d)\/5)?$/, (c, t, r) => `${t}회 중 ${c}회 연습${r ? `, 마지막 평점 ${r}/5` : ''}`],
 
-  // Pantry and food cost
+  // Ingredients and yield
   [/^Yield ([\d.]+%), in (\d+) recipes?$/, '수율 $1, 레시피 $2개에 사용'],
-  [/^Needs price \((\d+)\)$/, '가격 필요 ($1)'],
-  [/^(\d+) recipes? changed cost:$/, '원가가 바뀐 레시피 $1개:'],
-  [/^Imported: (\d+) updated, (\d+) added$/, '가져오기: $1개 업데이트, $2개 추가'],
-  [/^Food cost (\S+) to$/, '원가율 $1 →'],
   [/^Price history: (.+)$/, '가격 기록: $1'],
   [/^Last yield test (.+): (\S+)\.$/, '마지막 수율 테스트 $1: $2.'],
   [/^Recipes using (.+)$/, '$1을(를) 쓰는 레시피'],
-  [/^Recipes with a menu price, compared with their target food cost \(default (\S+)\)\.$/, '메뉴 가격이 있는 레시피를 목표 원가율(기본 $1)과 비교해요.'],
-  [/^(\S+) on a (\S+) menu price,?$/, '메뉴 가격 $2에 원가 $1'],
-  [/^target (\S+)$/, '목표 $1'],
-  [/^(\d+) recipes? without a menu price (?:isn’t|aren’t) shown\.$/, '메뉴 가격이 없는 레시피 $1개는 표시하지 않아요.'],
-  [/^(\S+) → (\S+) per (\S+)$/, '$3당 $1 → $2'],
-  [/^Update: (.+?)(?: \((\S+)\))?$/, (x, u) => `업데이트: ${x}${u ? ` (${u})` : ''}`],
-  [/^Couldn't read price or unit: (.*)$/, '가격이나 단위를 읽지 못했어요: $1'],
   [/^Each usable (\S+) really costs$/, '사용 가능한 $1당 실제 원가는'],
   [/^, not (\S+)\.$/, '~ (구매가 $1).'],
   [/^([\d.]+ \S+) at (\S+)$/, '$1 ($2)'],
   [/^Use (\S+) for (.+)$/, '$2에 $1 적용'],
   [/^Saved\. (.+) now uses (\S+) yield in every recipe\.$/, '저장했어요. 이제 모든 레시피에서 $1의 수율은 $2예요.'],
-  [/^For: (.+?)(, par levels)?$/, (f, p) => `대상: ${f}${p ? ', 적정 재고' : ''}`],
-  [/^Need (.+?)(?:, yield (\S+?))?(?:, par (.+))?$/, (q, y, p) => `필요량 ${q}${y ? `, 수율 ${y}` : ''}${p ? `, 적정 ${p}` : ''}`],
-  [/^Par (.+)$/, '적정 재고 $1'],
-  [/^par (.+)$/, '적정 $1'],
   [/^Week of (.+)$/, '$1 주'],
   [/^Delete "(.+)"\? Its past records go too\.$/, '"$1"을(를) 삭제할까요? 지난 기록도 함께 지워져요.'],
-  [/^(.+) on hand in (\S+)$/, '$1 보유량 ($2)'],
-
-  // Stocktake
-  [/^Actual food cost, (.+) to (.+)$/, '실제 원가율, $1 ~ $2'],
-  [/^· (.+) costs$/, '· $1 레시피상 원가율'],
-  [/^\((\S+) of used\)$/, '(사용 원가의 $1)'],
-  [/^(\d+) items(?:, food cost (\S+))?$/, (c, p) => `${c}개 품목${p ? `, 원가율 ${p}` : ''}`],
-  [/^(\d+) without a price$/, '가격 없는 품목 $1개'],
-  [/^(\d+) of (\d+) items counted$/, '$2개 중 $1개 셈'],
-  [/^(\$\S+) per (\S+)(?:, last count (.+))?$/, (p, u, l) => `${u}당 ${p}${l ? `, 지난 실사 ${l}` : ''}`],
-  [/^(.+) counted in (\S+)$/, '$1 센 양 ($2)'],
-  [/^Since the last count \((.+)\)$/, '지난 실사 이후 ($1)'],
-  [/^Count, (.+)$/, '실사, $1'],
-
-  // Waste
-  [/^Waste, last 7 days$/, '폐기, 최근 7일'],
-  [/^([\d.]+ \S+), (.+)$/, '$1, $2'],
 
   // Log, temperatures, settings
   [/^(\d\d:\d\d) · (.+)$/, '$1 · $2'],
@@ -435,5 +357,7 @@ export const KO_PATTERNS = [
   [/^Read (\d+) ingredients and (\d+) steps\. Check them, then Save\.$/, '재료 $1개, 단계 $2개를 읽었어요. 확인하고 저장하세요.'],
   [/^That's (\d+) photos today\. Try again tomorrow, or paste the text instead\.$/, '오늘은 사진 $1장을 다 썼어요. 내일 다시 하거나 글을 붙여넣으세요.'],
   [/^Couldn’t read the photo \((.+)\)\.(?: Try again\.)?$/, '사진을 읽지 못했어요 ($1). 다시 해 보세요.'],
+  [/^(\d+) without a price\. Recipes using them show an incomplete cost\.$/, '가격 없는 재료 $1개. 이 재료를 쓰는 레시피는 원가가 미완성으로 나와요.'],
+  [/^in (\d+) recipes?$/, '레시피 $1개에 사용'],
   [/^Password should be at least (\d+) characters\.?$/, '비밀번호는 $1자 이상이어야 해요.'],
 ];

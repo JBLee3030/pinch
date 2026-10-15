@@ -1,6 +1,6 @@
 # Pinch
 
-**A pocket kitchen notebook for cooks** — recipes, food costing, allergens, ordering, food safety records and a service log, in one installable app that works offline.
+**A study companion for culinary students**: your class recipes, practice, exams, flash cards and service log in one installable app that works offline.
 
 **[Open the app](https://jblee3030.github.io/pinch/)** · **[Try the demo with sample data](https://jblee3030.github.io/pinch/?demo)**
 
@@ -8,80 +8,49 @@
   <tr>
     <td><img src="docs/recipe.png" width="220" alt="Recipe with costing and allergens"></td>
     <td><img src="docs/card.png" width="220" alt="Costed standard recipe card"></td>
-    <td><img src="docs/order.png" width="220" alt="Order list with stock on hand"></td>
-  </tr>
-  <tr>
-    <td align="center">Recipe costing &amp; allergens</td>
-    <td align="center">Costed recipe card (PDF)</td>
-    <td align="center">Order list</td>
-  </tr>
-  <tr>
-    <td><img src="docs/temps.png" width="220" alt="Food safety temperature log"></td>
     <td><img src="docs/portfolio.png" width="220" alt="Culinary portfolio"></td>
-    <td><img src="docs/recipes.png" width="220" alt="Recipe book"></td>
   </tr>
   <tr>
-    <td align="center">Temperature log</td>
+    <td align="center">Recipe, costing &amp; allergens</td>
+    <td align="center">Costed recipe card (PDF)</td>
     <td align="center">Portfolio (PDF)</td>
-    <td align="center">Recipe book</td>
   </tr>
 </table>
 
 ## Why
 
-I built Pinch while studying Commercial Cookery and Kitchen Management in Melbourne. Cooks keep recipes in notebooks, cost them in spreadsheets, write orders on paper and log fridge temperatures on clipboards. Pinch puts all of that in the phone that's already in your pocket, built around how an Australian commercial kitchen works: GST-inclusive menu prices, trim yield, FSANZ allergen declarations and food safety temperature limits.
+I built Pinch while studying Commercial Cookery and Kitchen Management (Cert IV) in Melbourne. Class recipes arrive as handouts and whiteboards, practice notes end up in a phone's camera roll, and the service-period logbook is on paper. Pinch keeps the whole course in one place: write or snap a recipe, practise it and rate each attempt, see which exam dishes still need work, revise the theory with flash cards, and log every service toward the course requirement. It follows Australian kitchen practice: AU cup and spoon measures, FSANZ allergens and food safety limits, GST-inclusive prices.
 
 ## Features
 
-**Recipes & costing**
-- Recipe book with photos, method and scaling to any number of portions
-- Sub-recipes (a sauce or dough inside a dish) by portion or by weight/volume; cost and allergens roll up through every level, and circular references are blocked
-- Cost per portion, suggested menu price from a target food cost %, actual food cost % against the menu price (GST-aware)
-- Yield test: bought vs usable weight (and reusable trim) gives yield % and the real cost per usable kg, saved to the Pantry in one tap
-- Food cost watch: price history per ingredient; after any price change or import, the recipes whose cost moved (through sub-recipes too) with before and after; recipes over their target food cost; latest price rises
-- Pantry of ingredient prices per kg / L / each with trim yield %; type a new ingredient straight into a recipe and price it later — missing prices are flagged, never counted as $0
-- Costed standard recipe card, printable to A4 / PDF
-- Practice log per recipe: rating, photo, how it went and what to change next time; the last note shows when you start cooking, and finishing cooking mode asks how it went
-- Scale three ways: by portions, from an ingredient you have ("3 kg mince makes 37 portions"), or by baker's percentage
-- Kitchen timers without a recipe (presets and custom), running in the background across screens
-- Find recipes by ingredient: search matches ingredient names, and each Pantry item lists the recipes that use it
-- Kitchen calculator: cups and spoons to grams per ingredient (Australian or US measures), °F/°C with fan-forced, oz/lb/fl oz
-- Cooking mode: one big step at a time, timers found in the method ("simmer 45 min"), a scaled ingredient checklist, and the screen kept awake
-- Share a recipe as a link: the recipe, its sub-recipes and their ingredients travel inside the link (compressed, no server or account), and the person opening it saves it to their own book, reusing Pantry items they already have
-- Favourites: star a recipe to keep it on Home
-- Read a recipe photo: printed, handwritten, a screen or a whiteboard; Claude (Anthropic API, via a Supabase Edge Function) reads it and fills the form to check and save. Signed-in users only, with a daily limit
-- Import from a link: paste any recipe page URL (schema.org Recipe) to fill name, ingredients, method, servings and photo, with the source kept
-- Quick capture: name + ingredient lines + Save; on iPhone, copy a printed recipe with the Camera's Live Text and paste it
-- Paste a whole ingredient list: quantities, fractions and units are read (Australian cup / tbsp / tsp), names are matched to the Pantry
-- Import supplier price lists from CSV or a spreadsheet; pack prices (5kg bag, dozen, 500g) become price per kg / L / each
+**Recipes**
+- Recipe book with photos, method, sub-recipes (a sauce or dough inside a dish), favourites on Home and search by ingredient
+- Get recipes in fast: quick capture (name + ingredient lines), read a photo of a handout, book page, handwritten note or whiteboard (Claude via a Supabase Edge Function; signed-in users, daily limit), import a recipe web page, or paste a list (fractions, ranges, AU cup / tbsp / tsp)
+- Share a recipe with classmates as a link: the recipe, its sub-recipes and ingredients travel inside the link (compressed, no server or account) and save into their own book
+- Scale by portions, from an ingredient you have ("3 kg mince makes 37 portions") or by baker's percentage
+- Cooking mode: one big step at a time, timers found in the method ("simmer 45 min"), a scaled ingredient checklist, screen kept awake
+- Costing for assignments: ingredient prices (optional), trim yield and yield tests, cost per portion, suggested price from a target food cost %, actual food cost % (GST-aware); missing prices are flagged, never counted as $0
+- Costed standard recipe card, printable to A4 / PDF; allergen chart across all recipes (Australian mandatory allergens)
+- Kitchen calculator (cups and spoons to grams per ingredient, °F/°C with fan-forced, oz/lb/fl oz) and kitchen timers that keep running across screens
 
-**Kitchen operations**
-- Prep list for a service: recipes and portions become ordered task cards (stocks and sauces before the dishes that use them, longest jobs first) with weigh-out and method checklists, step timers and saved ticks
-- Order list: choose recipes and portions → sub-recipes expand to raw ingredients, grossed up for trim yield, minus stock on hand, with estimated cost; share as text or print
-- Menus with menu engineering (Kasavana & Smith): price and sales per dish give contribution margin, food cost on sales and a Star / Plowhorse / Puzzle / Dog matrix with advice; a printable customer allergen menu per menu
-- Stocktake: count stock by purchase unit, valued at the day's prices; each count closes a period with actual food cost % (opening + purchases − closing ÷ sales), shown against your target and what a menu costs on paper. The latest count fills On hand in the order list
-- Par levels and storage areas: each ingredient can have a par level and a place (fridge, freezer, dry store); stocktakes are grouped by area in walking order, and the order list can top everything up to par (ordering whichever is more, the plan's need or par)
-- Checklists: opening, closing and weekly cleaning lists to start from (editable, add your own); ticks are saved by date, so they double as cleaning records, and the next unfinished list shows on Home
-- Waste log: what went in the bin, how much and why (spoiled, over-produced, prep and trim, mistakes), costed as bought or at recipe cost; totals by reason and the items costing the most, and waste as a share of food used per stocktake period
-- Allergen chart across all recipes (Australian mandatory allergens)
-- Food safety temperature log: fridge, freezer, deliveries, hot holding, cooking and 2-stage cooling (60 → 21 °C within 2 h → 5 °C within 6 h), each marked PASS / FAIL / OPEN with corrective actions
+**Practice and exams**
+- Practice log per recipe: rating, photo, how it went and what to change next time; the last note shows when you start cooking, and finishing cooking mode asks how it went
+- Exam and assessment planner: date, type and the dishes being assessed; each dish shows how often it's been practised and its last rating
+- Prep list for a practical: recipes and portions become ordered task cards (sub-recipes first, longest jobs first) with weigh-out and method checklists and step timers
+- Menus with menu engineering (Kasavana & Smith) and a printable customer allergen menu, for menu design assignments
 
 **Study**
-- Reference decks with flash cards: knife cuts, food safety temperatures (FSANZ), steak doneness, mother sauces, ratios and kitchen terms; spaced repetition (1, 3, 7, 14, 30 days), progress synced
-- Exam and assessment planner: date, type and the dishes being assessed; each dish shows how often it's been practised and its last rating, so you can see what still needs work before the day
-- Home: what needs doing today (the next exam, cards due, open temperature checks, prep progress, today's service to log and recipes over target food cost) and every tool in one grid
+- Flash card decks: knife cuts, food safety temperatures (FSANZ), steak doneness, mother sauces, ratios and kitchen terms; spaced repetition (1, 3, 7, 14, 30 days)
+- Home: what needs doing today (the next exam and dishes to practise, cards due, prep progress, today's service to log) and every tool in one grid
 
-**Career**
-- Log today's service in two taps (venue, station, hours and the current service filled in)
-- Service log for training-kitchen service periods and work shifts (station, hours, dishes, chef feedback) with progress toward the course requirement
+**Service log and portfolio**
+- Log today's service in two taps; school service periods and work shifts with progress toward the course requirement
+- Food safety temperature log and opening, closing and cleaning checklists for kitchen practicals and placements
 - Portfolio page generated from the log and featured dishes, printable to PDF
 
 **Data**
 - English or Korean, switched in Settings. Recipe cards, the portfolio and study cards stay in English for school and work
-- Works offline; data lives on the device
-- Phone and laptop: a side-menu layout on wider screens; sign in on both to keep them in sync
-- Optional account: email + password sign-in syncs across devices, with in-app password reset
-- First-run guide, in-app feedback and a share link for inviting classmates
+- Works offline; data lives on the device. Optional account: email + password sign-in syncs phone and laptop
 - JSON backup export / import
 
 ## Design
@@ -96,18 +65,19 @@ Mobile-first and Toss-inspired: grey canvas, flat white cards, the key number bi
 | **App shell** | Installable PWA with a network-first service worker: always fresh online, fully usable offline. |
 | **Storage** | IndexedDB is the source of truth (local-first). Schema upgrades only add stores, so existing data is never touched. |
 | **Sync** | Supabase (Postgres) through its REST API. One `items` table protected by row-level security. Each device pushes changed rows and pulls rows past its own cursor; deletes are tombstones; conflicts resolve last-edit-wins on both client and server (a Postgres trigger rejects older writes). Schema: [`supabase.sql`](supabase.sql). |
-| **Costing engine** | Pure functions in [`calc.js`](calc.js): unit conversion, recursive sub-recipe costing with cycle detection, order quantities, food safety rules. |
-| **Parsing** | [`parse.js`](parse.js): ingredient-line parser (fractions, ranges, `2 x 400g`, AU measures), word-based matching to the Pantry, CSV/TSV price lists with pack-size conversion. |
+| **Costing engine** | Pure functions in [`calc.js`](calc.js): unit conversion, recursive sub-recipe costing with cycle detection, scaling, prep batches, menu engineering, food safety rules. |
+| **Parsing** | [`parse.js`](parse.js): ingredient-line parser (fractions, ranges, `2 x 400g`, AU measures), word-based matching to saved ingredients, method steps and timers. |
 | **Recipe import** | Supabase Edge Function [`recipe-import`](supabase/functions/recipe-import/index.js) reads the page's schema.org Recipe (JSON-LD) and returns only the recipe; public http(s) pages only, size and time limits. |
-| **Tests** | `node calc.test.js` — assertion-based checks for costing, sub-recipes, circular references, order lists, stock on hand, temperature limits, sync conflict rules, and recipe / price-list parsing. |
+| **Tests** | `node calc.test.js` — assertion-based checks for costing, sub-recipes, circular references, temperature limits, sync conflict rules, recipe parsing and import, sharing, and the Korean UI. |
+| **Recipe photos** | Supabase Edge Function [`recipe-photo`](supabase/functions/recipe-photo/index.js) sends the photo to Claude (Anthropic API) and returns the name, servings, ingredient lines and steps as structured JSON; signed-in users only, 30 a day each, photos not stored. |
 | **Hosting** | GitHub Pages; every push to `main` deploys. |
 
 ```
 index.html   app shell and tab bar
 app.js       screens and routing
-calc.js      costing, ordering and food safety rules (pure, tested)
+calc.js      costing, scaling and food safety rules (pure, tested)
 study.js     reference decks and spaced repetition (pure, tested)
-parse.js     pasted recipes and supplier price lists (pure, tested)
+parse.js     pasted recipes, method steps and timers (pure, tested)
 db.js        IndexedDB storage, change tracking, backup
 sync.js      optional Supabase auth and sync
 sw.js        offline support

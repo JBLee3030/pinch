@@ -79,7 +79,6 @@ small, .muted { color: var(--text-3); font: var(--t-sub); }
 .alert-text { color: var(--danger); }
 .ok-text { color: var(--accent); font-weight: 600; }
 .big { font: 700 24px/1.2 var(--font); letter-spacing: -.02em; }
-.big-ish { font-weight: 700; }
 .method { white-space: pre-wrap; }
 [hidden] { display: none !important; }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
@@ -265,10 +264,6 @@ fieldset.reading legend small { font-weight: 500; }
 .item.uncertain [name=qty] { border-color: var(--warn); background: var(--warn-weak); }
 .paste textarea, #csvText { min-height: 150px; font: 400 15px/1.5 ui-monospace, Menlo, monospace; }
 .plan-row { display: grid; grid-template-columns: 1fr 104px 44px; gap: var(--s2); margin-bottom: var(--s2); align-items: center; }
-.import-row { padding: var(--s3) 0; }
-.import-row + .import-row { border-top: 1px solid var(--line); }
-.import-row.bad { opacity: .7; }
-.import-row .row3 { display: grid; grid-template-columns: auto 88px 1fr; gap: var(--s2); align-items: center; margin-top: var(--s2); }
 
 /* ---------- Chips, badges, progress ---------- */
 .chips { display: flex; flex-wrap: wrap; gap: var(--s2); margin-bottom: var(--s3); }
@@ -289,8 +284,6 @@ thead th { font: 600 13px/1.3 var(--font); color: var(--text-3); padding-top: 0;
 tbody tr + tr td, tbody tr + tr th { border-top: 1px solid var(--line); }
 tfoot th, tfoot td { border-top: 1px solid var(--line); font-weight: 700; }
 td.n, th.n { text-align: right; white-space: nowrap; }
-table.order input.have { width: 72px; min-height: 40px; padding: 0 var(--s2); text-align: right; font-size: 16px; }
-table.order td.n small { display: block; margin-top: 2px; }
 
 .matrix { overflow-x: auto; }
 .matrix th.v { writing-mode: vertical-rl; transform: rotate(180deg); font: 500 12.5px/1 var(--font); padding: var(--s2) 2px; white-space: nowrap; color: var(--text-2); }
@@ -355,17 +348,6 @@ form:not(.card) :is(input, select, textarea):focus { background-color: var(--sur
 .item { grid-template-columns: 1fr 104px 44px; padding-bottom: var(--s3); margin-bottom: var(--s3); border-bottom: 1px solid var(--line); }
 .item [name=ing] { grid-column: 1 / -1; }
 /* Order list rows */
-.order-rows { list-style: none; margin: 0; padding: 0; }
-.order-rows li { display: flex; gap: var(--s3); padding: var(--s4) 0; }
-.order-rows li + li { border-top: 1px solid var(--line); }
-.order-rows b { display: block; font: var(--t-row); }
-.order-rows .grow { flex: 1; min-width: 0; }
-.order-rows .order { font: 700 18px/1.2 var(--font); }
-.have-field { display: flex; align-items: center; gap: var(--s2); margin: var(--s2) 0 0; font: 500 14px/1 var(--font); color: var(--text-2); }
-.have-field input { width: 88px; min-height: 40px; margin: 0; padding: 0 var(--s3); text-align: right; font-size: 16px; }
-.have-field span { color: var(--text-3); }
-.total-row { display: flex; justify-content: space-between; align-items: baseline; padding: var(--s4) 0 0; border-top: 1px solid var(--line); font-weight: 600; }
-.total-row b { font: 700 20px/1.2 var(--font); }
 form:not(.card) .checks label:not(:has(input:checked)) { background: var(--surface); }
 
 /* Recipe editor: quick capture */
@@ -440,7 +422,6 @@ input, select, textarea { min-width: 0; }
 input[type=date], input[type=datetime-local], input[type=time] { display: block; min-height: var(--h-md); -webkit-appearance: none; appearance: none; text-align: left; }
 input::-webkit-date-and-time-value { text-align: left; }
 fieldset { min-width: 0; }
-.have-field input, table.order input.have { min-height: var(--h-sm); }
 .checks label { min-height: var(--h-md); }
 input[type=file]::file-selector-button { border: 0; border-radius: 10px; margin-right: var(--s3); padding: var(--s2) var(--s3); background: var(--surface); color: var(--text); font: 600 15px/1 var(--font); }
 
@@ -498,7 +479,6 @@ body.sub form .actions > button[type=submit] { grid-column: auto; }
 .checks label { min-width: 0; overflow-wrap: anywhere; }
 label.btn { margin: 0; color: var(--text); font: 600 16px/1 var(--font); }   /* a label styled as a button carries no field spacing */
 .actions { align-items: stretch; }
-.have-field input, table.order input.have { min-height: var(--h-md); }
 #cups .seg { margin-bottom: var(--s4); }
 #cupOut { margin: var(--s2) 0 var(--s1); }
 #scStat:empty { display: none; }
@@ -610,11 +590,8 @@ main > .btn.ghost, main > .actions > :is(button, .btn).ghost { background: var(-
 body.sub .card form .actions:has(> button[type=submit]) { position: static; margin: var(--s4) 0 0; padding: 0; background: none; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
 body.sub .card form .actions > button[type=submit] { min-height: var(--h-md); font-size: 16px; border-radius: var(--r-control); }
 
-/* ---- v23: par levels, storage areas, checklists ---- */
+/* ---- v23: checklists ---- */
 .list li .row-static { display: flex; align-items: center; gap: var(--s3); min-height: 56px; padding: var(--s2) var(--s5); }
-.have-field .par { margin-left: auto; color: var(--text-3); font: 500 13px/1 var(--font); }
-.par-toggle { margin: 0 0 var(--s4); padding-bottom: var(--s4); border-bottom: 1px solid var(--line); font-weight: 600; }
-.card.area h2 { margin-bottom: 0; }
 .card > .checklist:first-child { margin-top: calc(var(--s2) * -1); margin-bottom: calc(var(--s2) * -1); }
 
 /* ---- v25: share, favourites ---- */

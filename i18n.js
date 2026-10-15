@@ -16,7 +16,7 @@ export function setLang(l) {
 
 const exact = new Map(Object.entries(KO));
 
-// '  3 of 8 items counted ' -> '  8개 중 3개 셈 ': keeps the surrounding spaces, translates the core.
+// '  2 of 3 practices ' -> '  3회 중 2회 연습 ': keeps the surrounding spaces, translates the core.
 // Captured parts of a pattern are translated too (a unit, a service name), up to a few levels deep.
 // A translation starting with '~' joins onto the text before it (Korean particles take no space).
 export function tr(s, depth = 0) {

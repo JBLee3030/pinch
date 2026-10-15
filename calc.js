@@ -7,7 +7,7 @@ export const PURCHASE_UNITS = ['kg', 'L', 'each'];
 export const UNITS = ['g', 'kg', 'ml', 'L', 'each'];
 export const GST = 0.1;
 
-// Ingredients added while writing a recipe have no price until filled in Pantry.
+// Ingredients added while writing a recipe have no price until one is added.
 export const hasPrice = ing => ing.price != null && ing.price !== '';
 
 const BASE = { g: ['kg', 0.001], kg: ['kg', 1], ml: ['L', 0.001], L: ['L', 1], each: ['each', 1] };
@@ -70,7 +70,7 @@ export function itemCost(it, ings, recs = new Map(), seen = new Set()) {
     return { cost: c.total * q / sub.yieldQty, problems };
   }
   const ing = ings.get(it.ingredientId);
-  if (!ing) return { cost: NaN, problems: ['An ingredient was deleted from Pantry'] };
+  if (!ing) return { cost: NaN, problems: ['An ingredient was deleted'] };
   if (!hasPrice(ing)) return { cost: NaN, problems: [`Price missing: ${ing.name}`] };
   const q = convertFor(qty, it.unit, ing.unit, ing.name);
   if (!Number.isFinite(q)) return { cost: NaN, problems: [`${ing.name}: can't convert ${it.unit} to ${ing.unit}`] };
@@ -115,55 +115,6 @@ export const usesRecipe = (recipe, id) => (recipe.items ?? []).some(it => it.rec
 
 export const money = n => Number.isFinite(n) ? '$' + n.toFixed(2) : '-';
 export const pct = n => Number.isFinite(n) ? n.toFixed(1) + '%' : '-';
-
-// Expand a recipe (scaled by `factor` batches) into raw ingredient needs, in each
-// ingredient's purchase unit, before trim yield. Sub-recipes are expanded recursively.
-export function ingredientNeeds(recipe, factor, ings, recs, needs = new Map(), problems = [], seen = new Set([recipe.id])) {
-  for (const it of recipe.items ?? []) {
-    const qty = Number(it.qty) * factor;
-    if (it.recipeId) {
-      const sub = recs.get(it.recipeId);
-      if (!sub) { problems.push('A sub-recipe was deleted'); continue; }
-      if (seen.has(sub.id)) { problems.push(`${sub.name}: circular sub-recipe`); continue; }
-      const subFactor = it.unit === 'portion'
-        ? qty / Math.max(1, Number(sub.portions) || 1)
-        : sub.yieldQty > 0 ? convert(qty, it.unit, sub.yieldUnit) / sub.yieldQty : NaN;
-      if (!Number.isFinite(subFactor)) { problems.push(`${sub.name}: set its batch yield in ${it.unit}, or use portions`); continue; }
-      ingredientNeeds(sub, subFactor, ings, recs, needs, problems, new Set([...seen, sub.id]));
-      continue;
-    }
-    const ing = ings.get(it.ingredientId);
-    if (!ing) { problems.push('An ingredient was deleted from Pantry'); continue; }
-    const q = convertFor(qty, it.unit, ing.unit, ing.name);
-    if (!Number.isFinite(q)) { problems.push(`${ing.name}: can't convert ${it.unit} to ${ing.unit}`); continue; }
-    needs.set(it.ingredientId, (needs.get(it.ingredientId) ?? 0) + q);
-  }
-  return { needs, problems };
-}
-
-// plan: [{ recipeId, portions }]; onHand: { ingredientId: qty in purchase unit }.
-// gross = need grossed up for trim yield; order = gross - on hand (min 0); 'each' rounds up.
-// usePar: never leave an ingredient below its par level either: order up to whichever is more, the need or par.
-export function orderList(plan, ings, recs, onHand = {}, usePar = false) {
-  const needs = new Map(), problems = [];
-  for (const { recipeId, portions } of plan) {
-    const r = recs.get(recipeId);
-    if (r && portions > 0) ingredientNeeds(r, portions / Math.max(1, Number(r.portions) || 1), ings, recs, needs, problems);
-  }
-  if (usePar) for (const ing of ings.values()) if (Number(ing.par) > 0 && !needs.has(ing.id)) needs.set(ing.id, 0);
-  const lines = [...needs].map(([id, usable]) => {
-    const ing = ings.get(id);
-    const par = usePar ? Math.max(0, Number(ing.par) || 0) : 0;
-    const gross = Math.max(usable / ((Number(ing.yieldPct) || 100) / 100), par);
-    const have = Math.max(0, Number(onHand[id]) || 0);
-    let order = Math.max(0, gross - have);
-    if (ing.unit === 'each') order = Math.ceil(order - 1e-9);
-    if (order > 0 && !hasPrice(ing)) problems.push(`Price missing: ${ing.name}`);
-    return { id, ing, usable, par, gross, have, order, cost: hasPrice(ing) ? order * Number(ing.price) : order > 0 ? NaN : 0 };
-  }).sort((a, b) => a.ing.name.localeCompare(b.ing.name));
-  const total = lines.reduce((n, l) => n + (Number.isFinite(l.cost) ? l.cost : 0), 0);
-  return { lines, total, problems: [...new Set(problems)] };
-}
 
 // 0.04 kg -> "40 g", 3.3 kg -> "3.3 kg", 6 each -> "6 each"
 export function fmtAmount(q, unit) {
@@ -317,7 +268,7 @@ export function niceParts(q, unit) {
 }
 export const niceAmount = (q, unit) => niceParts(q, unit).join(' ');
 
-// ---- Food cost watch
+// ---- Ingredient prices
 
 // Price history kept on the ingredient: a new entry only when price or unit actually changes (newest last, max 24).
 export function withPriceHistory(old, next, date) {
@@ -327,33 +278,6 @@ export function withPriceHistory(old, next, date) {
   if (hasPrice(next) && (!last || last.price !== Number(next.price) || last.unit !== next.unit)) hist.push({ date, price: Number(next.price), unit: next.unit });
   return { ...next, priceHistory: hist.slice(-24) };
 }
-
-// Recipes whose cost per portion changes between two ingredient maps (sub-recipes included).
-export function costImpact(recipes, before, after) {
-  const recs = new Map(recipes.map(r => [r.id, r]));
-  return recipes.map(r => {
-    const a = recipeCost(r, before, recs).perPortion, b = recipeCost(r, after, recs).perPortion;
-    return { recipe: r, before: a, after: b, beforePct: actualCostPct(a, r.menuPrice), afterPct: actualCostPct(b, r.menuPrice) };
-  }).filter(x => Number.isFinite(x.before) && Number.isFinite(x.after) && Math.abs(x.after - x.before) >= 0.005)
-    .sort((x, y) => Math.abs(y.after - y.before) - Math.abs(x.after - x.before));
-}
-
-// Recipes with a menu price, by actual food cost %, flagged when above their target.
-export function foodCostWatch(recipes, ings, defaultTarget) {
-  const recs = new Map(recipes.map(r => [r.id, r]));
-  return recipes.filter(r => r.menuPrice > 0).map(r => {
-    const c = recipeCost(r, ings, recs), target = r.targetCostPct || defaultTarget, actual = actualCostPct(c.perPortion, r.menuPrice);
-    return { recipe: r, perPortion: c.perPortion, actual, target, over: actual > target, incomplete: c.problems.length > 0 };
-  }).sort((a, b) => b.actual - a.actual);
-}
-
-// Latest change for each ingredient with history: { ing, from, to, change % }
-export const priceMoves = ings => [...ings.values()].map(ing => {
-  const h = (ing.priceHistory ?? []).filter(x => x.unit === ing.unit);
-  if (h.length < 2) return null;
-  const from = h.at(-2), to = h.at(-1);
-  return { ing, from, to, change: from.price > 0 ? (to.price - from.price) / from.price * 100 : NaN };
-}).filter(Boolean).sort((a, b) => b.change - a.change);
 
 // ---- Menu engineering (Kasavana & Smith)
 // items: [{ recipeId, price (inc GST; falls back to the recipe's menu price), sold }]
@@ -402,49 +326,7 @@ export function examReadiness(exam, attempts) {
   return { target, rows, ready: rows.filter(r => r.ready).length };
 }
 
-// ---- Stocktake and actual food cost
-// A count line is { qty, price } in the ingredient's purchase unit, with the price as it was on the day.
-// Lines without a price are counted as missing, never as $0.
-export function stockValue(lines) {
-  let value = 0, missing = 0;
-  for (const l of lines) if (Number(l.qty) > 0) { if (Number.isFinite(l.price)) value += l.qty * l.price; else missing++; }
-  return { value, missing };
-}
-
-// Each count after the first closes a period: food used = opening stock + purchases − closing stock,
-// actual food cost % = food used ÷ food sales (ex GST). Waste is summed from the day after the opening count.
-export function stockPeriods(counts, waste = []) {
-  const sorted = [...counts].sort((a, b) => a.date.localeCompare(b.date));
-  return sorted.slice(1).map((c, i) => {
-    const open = sorted[i], opening = stockValue(open.lines ?? []).value, closing = stockValue(c.lines ?? []).value;
-    const purchases = Number(c.purchases) || 0, sales = Number(c.sales) || 0;
-    const used = opening + purchases - closing;
-    const wasted = waste.filter(w => w.date > open.date && w.date <= c.date).reduce((n, w) => n + (Number(w.cost) || 0), 0);
-    return { count: c, from: open.date, to: c.date, opening, purchases, closing, used, sales,
-      pct: sales > 0 ? used / sales * 100 : NaN, waste: wasted, wastePct: used > 0 ? wasted / used * 100 : NaN };
-  }).reverse();
-}
-
-// ---- Waste
-export const WASTE_REASONS = { spoiled: 'Spoiled or out of date', over: 'Over-produced', prep: 'Prep and trim', mistake: 'Mistake or sent back', other: 'Other' };
-
-// Raw ingredients cost as bought (no trim gross-up); prepared food costs what the recipe costs.
-export function wasteCost(w, ings, recs = new Map()) {
-  if (w.recipeId) return itemCost({ recipeId: w.recipeId, qty: w.qty, unit: w.unit }, ings, recs).cost;
-  const ing = ings.get(w.ingredientId);
-  if (!ing || !hasPrice(ing)) return NaN;
-  return convertFor(Number(w.qty), w.unit, ing.unit, ing.name) * Number(ing.price);
-}
-
-// Total, by reason (largest first) and the items that cost the most.
-export function wasteSummary(entries) {
-  const sum = key => [...entries.reduce((m, w) => m.set(key(w), (m.get(key(w)) ?? 0) + (Number(w.cost) || 0)), new Map())]
-    .map(([k, cost]) => ({ key: k, cost })).sort((a, b) => b.cost - a.cost);
-  return { total: entries.reduce((n, w) => n + (Number(w.cost) || 0), 0), byReason: sum(w => w.reason), topItems: sum(w => w.name).slice(0, 3) };
-}
-
-// ---- Storage areas and checklists
-export const AREAS = { fridge: 'Fridge / cool room', freezer: 'Freezer', dry: 'Dry store', other: 'Other' };
+// ---- Checklists
 
 // The record a checklist tick belongs to: the day, or the Monday of the week for weekly lists.
 export function periodKey(every, date) {

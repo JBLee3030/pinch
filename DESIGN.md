@@ -58,8 +58,9 @@ System UI font (SF Pro on iPhone, Roboto on Android): native feel, zero download
 
 ## Navigation
 
-- Five tabs: **Home, Recipes, Pantry, Log, Study**. Each tab holds one thing (the recipe book, the ingredient list, the service log, the decks). No tool links stacked on top of a tab.
+- Four tabs: **Home, Recipes, Log, Study** (Settings joins them as a side menu on laptops). Each tab holds one thing (the recipe book, the service log, the decks and exams). No tool links stacked on top of a tab.
 - **Home** is the hub: what needs doing today, then every tool as an icon tile (4 per row). A new tool gets a tile there, not a link on a tab.
+- Pinch is a study companion, not a restaurant system: a new feature has to help with class, practice, assessments or the portfolio.
 - Settings is a sub page behind the gear on Home. Tools are sub pages whose back button returns to Home.
 - On a detail screen, secondary actions sit up top as equal quick-action tiles (the recipe's Scale, Recipe card, Log practice); the one primary action is the bottom CTA. Long reference data (costing breakdown) is folded.
 - Settings save as you go; no Save button.

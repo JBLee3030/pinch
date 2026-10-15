@@ -76,7 +76,7 @@ export function parseIngredientLine(raw) {
   return { qty: qty == null ? null : Math.round(qty * 1000) / 1000, unit, name, raw: raw.trim(), ok: qty != null && !!name };
 }
 
-// ---- Matching names to Pantry ("olive oil" -> "Olive oil, extra virgin")
+// ---- Matching names to saved ingredients ("olive oil" -> "Olive oil, extra virgin")
 
 const STOP = new Set(['of', 'and', 'the', 'a', 'an', 'fresh', 'large', 'small', 'medium', 'chopped', 'diced', 'sliced',
   'minced', 'finely', 'roughly', 'peeled', 'ground', 'to', 'taste']);
@@ -96,72 +96,6 @@ export function matchIngredient(name, list, minScore = 2) {
     if (score >= minScore && (score > bestScore || (score === bestScore && extra < bestExtra))) { best = it; bestScore = score; bestExtra = extra; }
   }
   return best;
-}
-
-// ---- Supplier price lists (CSV file, or cells pasted from a spreadsheet)
-
-export function parseCSV(text) {
-  const first = text.split(/\r?\n/, 1)[0];
-  const d = first.includes('\t') ? '\t' : first.split(';').length > first.split(',').length ? ';' : ',';
-  const rows = [];
-  let row = [], cell = '', quoted = false;
-  for (let i = 0; i < text.length; i++) {
-    const ch = text[i];
-    if (quoted) {
-      if (ch !== '"') cell += ch;
-      else if (text[i + 1] === '"') { cell += '"'; i++; }
-      else quoted = false;
-    } else if (ch === '"') quoted = true;
-    else if (ch === d) { row.push(cell); cell = ''; }
-    else if (ch === '\n' || ch === '\r') {
-      if (ch === '\r' && text[i + 1] === '\n') i++;
-      row.push(cell); rows.push(row); row = []; cell = '';
-    } else cell += ch;
-  }
-  if (cell || row.length) { row.push(cell); rows.push(row); }
-  return rows.map(r => r.map(c => c.trim())).filter(r => r.some(Boolean));
-}
-
-// Pack or unit text -> [purchase unit, how many of it the price covers].
-// "kg" -> ['kg', 1], "5kg" -> ['kg', 5], "500g" -> ['kg', 0.5], "dozen" -> ['each', 12], "bunch" -> ['each', 1]
-export function packUnit(text) {
-  const m = String(text ?? '').toLowerCase().trim().replace(/^(?:per|\/)\s*/, '').match(/^([\d.]+)?\s*([a-z]*)/);
-  const n = m[1] ? parseFloat(m[1]) : 1, w = m[2];
-  if (/^(kg|kgs|kilos?)$/.test(w)) return ['kg', n];
-  if (/^(g|gm|grams?)$/.test(w)) return ['kg', n / 1000];
-  if (/^(l|lt|ltr|lit(re|er)s?)$/.test(w)) return ['L', n];
-  if (/^(ml|mls)$/.test(w)) return ['L', n / 1000];
-  if (/^(dozen|doz)$/.test(w)) return ['each', 12 * n];
-  if (/^(ea|each|pcs?|pieces?|units?|bunch(es)?|heads?|cans?|tins?|bags?|box(es)?|packs?|packets?|trays?|punnets?|bottles?|jars?)$/.test(w)) return ['each', n];
-  if (!w && m[1]) return ['each', n];
-  return null;
-}
-
-// Rows of { name, price (per purchase unit), unit, yieldPct, ok }. Recognises headers like
-// Name/Item/Product, Price/Cost, Unit/Pack/Size, Yield; without headers: name, price, unit.
-export function parsePriceList(text) {
-  const rows = parseCSV(text);
-  if (!rows.length) return [];
-  const h = rows[0].map(c => c.toLowerCase());
-  const find = (re, not = -1) => h.findIndex((c, i) => i !== not && re.test(c));
-  let ni = find(/name|item|product|description|ingredient/), pi = find(/price|cost|\$|amount/, ni);
-  const header = ni >= 0 && pi >= 0;
-  let ui = header ? find(/unit|uom|per|pack|size/, pi) : rows[0].length > 2 ? 2 : -1;
-  const yi = header ? find(/yield/) : -1;
-  if (!header) { ni = 0; pi = 1; }
-  // "Price per kg" / "Price/L" header supplies the unit when there's no unit column
-  const headerUnit = header && ui < 0 ? packUnit((h[pi].match(/(?:per|\/)\s*(.+)$/) ?? [])[1]) : null;
-  return rows.slice(header ? 1 : 0).map(r => {
-    const name = r[ni] ?? '';
-    // "$1,234.50" -> 1234.5, but "12,50" (decimal comma) -> 12.5
-    const p = String(r[pi] ?? '').replace(/[$\s]/g, '');
-    const price = parseFloat(/^\d+,\d{1,2}$/.test(p) ? p.replace(',', '.') : p.replace(/,/g, ''));
-    const pack = ui >= 0 ? packUnit(r[ui]) : headerUnit ?? ['kg', 1];
-    const y = yi >= 0 ? parseFloat(r[yi]) : NaN;
-    const ok = !!name && Number.isFinite(price) && price >= 0 && !!pack;
-    return { name, unit: pack?.[0] ?? 'kg', price: ok ? Math.round(price / pack[1] * 10000) / 10000 : null,
-      yieldPct: y > 0 && y <= 100 ? y : null, ok, raw: r.join(', ') };
-  });
 }
 
 // ---- Cooking mode: method steps and timers
