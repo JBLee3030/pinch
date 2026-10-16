@@ -3,7 +3,7 @@ import * as sync from './sync.js';
 import { LANG, locale, setLang } from './i18n.js';
 import { DECKS, review, pickSession, isDue, isLearned } from './study.js';
 import { cardArt } from './cardart.js';
-import { captionHooks, captionBody, captionTags, buildCaption, lintCaption, VISIBLE } from './caption.js';
+import { recipeCaption, postNumber, LIMIT } from './caption.js';
 import { parseIngredientLine, matchIngredient, splitSteps, findDurations, fmtDuration } from './parse.js';
 import { ALLERGENS, PURCHASE_UNITS, UNITS, recipeCost, itemCost, suggestedPrice, actualCostPct, recipeAllergens, usesRecipe, hasPrice, fmtAmount, TEMP_CHECKS, tempStatus, yieldTest, MEASURES, convertFor, densityFor, scaleFromIngredient, bakersPercent, bakersBase, fToC, cToF, prepBatches, niceAmount, niceParts, withPriceHistory, menuEngineering, MENU_CLASSES, daysUntil, examReadiness, periodKey, checkProgress, shareBundle, importBundle, money, pct } from './calc.js';
 
@@ -170,7 +170,7 @@ async function shareView(id) {
   page('recipes', 'Share', `
     <ul class="list share-opts">
       <li><a href="#" id="sendLink">${ICON.share}<div class="grow"><b>Send to a classmate</b><small>A link with the recipe, its sub-recipes and ingredients. They save it into their own Pinch.</small></div></a></li>
-      <li><a href="#/recipe/${esc(r.id)}/instagram">${ICON.camera}<div class="grow"><b>Post on Instagram</b><small>A caption from your notes, chef's feedback and the method, ready to paste.</small></div></a></li>
+      <li><a href="#/recipe/${esc(r.id)}/instagram">${ICON.camera}<div class="grow"><b>Post on Instagram</b><small>A numbered caption with the recipe in short, ready to paste.</small></div></a></li>
     </ul>
     <p id="shareMsg" class="muted center"></p>`, { back: `#/recipe/${esc(r.id)}` });
   document.getElementById('sendLink').onclick = async e => {
@@ -182,47 +182,33 @@ async function shareView(id) {
   };
 }
 
-// A caption built from the recipe's own record; every part stays editable. Captions are written in English.
+// The caption: "01. Dish name", then the recipe in short. The number is remembered per recipe.
 async function instagramView(id) {
   const r = await db.get('recipes', id);
   if (!r) return go('#/recipes');
-  const [ings, recipes, attempts] = await Promise.all([ingMap(), db.all('recipes'), attemptsFor(id)]);
-  const recs = toMap(recipes), steps = splitSteps(r.method);
+  const [ings, recipes, saved] = await Promise.all([ingMap(), db.all('recipes'), db.get('settings', 'instagram')]);
+  const recs = toMap(recipes), numbers = saved?.numbers ?? {};
   const items = (r.items ?? []).map(it => ({ qty: it.qty, amount: niceAmount(it.qty, it.unit),
-    name: it.recipeId ? recs.get(it.recipeId)?.name ?? '' : ings.get(it.ingredientId)?.name.split(',')[0] ?? '' }));
-  const hooks = captionHooks(r, { attempts, steps, items });
-  const body = kind => captionBody(r, { attempts, steps, skip: kind }).join('\n\n');
-  let bodyEdited = false; // once you write in the body yourself, picking a first line leaves it alone
+    name: it.recipeId ? recs.get(it.recipeId)?.name ?? '' : ings.get(it.ingredientId)?.name ?? '' }));
+  const caption = n => recipeCaption(r, { number: n, items, steps: splitSteps(r.method) });
+  const n0 = postNumber(numbers, r.id);
   page('recipes', 'Instagram caption', `
-    <p class="muted">Only the first line shows before "more", so it has to make people stop. Pick one, then edit anything.</p>
-    <h2>First line</h2>
-    <div class="hooks" translate="no">${hooks.map((h, i) => `<label><input type="radio" name="pick" value="${i}" ${i ? '' : 'checked'}><span>${esc(h.text)}</span></label>`).join('')}</div>
-    <label>Edit the first line<textarea id="hook" rows="2">${esc(hooks[0].text)}</textarea></label>
-    <label>The rest<textarea id="body" rows="7">${esc(body(hooks[0].kind))}</textarea></label>
-    <label>Ask for one thing<select id="ask"><option value="recipe">Comment RECIPE (DM them the link)</option><option value="save">Save this for later</option><option value="none">Nothing</option></select></label>
-    <label>Hashtags <small>(up to 5)</small><input id="tags" autocapitalize="off" value="${esc(captionTags(r).join(' '))}"></label>
-    <label>Alt text <small>(Advanced settings, for screen readers and search)</small><input id="alt" value="${esc(`A plate of ${r.name.toLowerCase()}`)}"></label>
-    <div class="card ig-preview"><p class="stat-label">How the feed shows it</p><p class="ig-fold" id="fold" translate="no"></p><ul class="ig-lint" id="lint"></ul></div>
+    <form onsubmit="return false">
+    <label>Post number<input id="num" type="number" min="1" step="1" inputmode="numeric" value="${n0}"></label>
+    <label>Caption<textarea id="cap" rows="16" translate="no">${esc(caption(n0))}</textarea></label>
+    <p class="muted"><small id="len"></small></p></form>
     <div class="cta-bar"><button type="button" id="copy">Copy caption</button></div>`, { back: `#/recipe/${esc(r.id)}/share` });
-  const $ = id => document.getElementById(id), main = document.querySelector('main');
-  const text = () => buildCaption({ hook: $('hook').value, body: $('body').value, ask: $('ask').value, tags: $('tags').value });
-  const draw = () => {
-    const t = text(), l = lintCaption(t);
-    $('fold').innerHTML = `${esc(t.slice(0, VISIBLE)).replace(/\n/g, '<br>')}${t.length > VISIBLE ? '<span class="muted">… more</span>' : ''}`;
-    const row = (ok, msg) => `<li class="${ok ? 'ok-text' : 'warn-text'}">${ok ? '✓' : '!'} ${msg}</li>`;
-    $('lint').innerHTML = [row(l.firstFits, `First line: ${l.firstLine} of ${VISIBLE} characters`), row(l.tagsOk, `${l.tags} hashtags (up to 5)`),
-      row(l.asksOk, l.asks > 1 ? `${l.asks} asks: keep one` : 'One ask'), ...(l.links ? [row(false, 'Remove the link: captions can’t be tapped')] : [])].join('');
-  };
-  main.addEventListener('change', e => {
-    if (e.target.name === 'pick') { const h = hooks[Number(e.target.value)]; $('hook').value = h.text; if (!bodyEdited) $('body').value = body(h.kind); }
-    draw();
-  });
-  main.addEventListener('input', e => { if (e.target.id === 'body') bodyEdited = true; draw(); });
-  $('copy').onclick = async e => {
-    await navigator.clipboard.writeText(text());
+  const num = document.getElementById('num'), cap = document.getElementById('cap'), len = document.getElementById('len');
+  const count = () => { len.textContent = `${cap.value.length} of ${LIMIT} characters`; len.className = cap.value.length > LIMIT ? 'warn-text' : ''; };
+  // A new number rewrites the title line and leaves your edits to the rest alone
+  num.addEventListener('input', () => { cap.value = cap.value.replace(/^\d+\. /, `${String(Math.max(1, Number(num.value) || 1)).padStart(2, '0')}. `); count(); });
+  cap.addEventListener('input', count);
+  document.getElementById('copy').onclick = async e => {
+    await navigator.clipboard.writeText(cap.value);
+    await db.put('settings', { id: 'instagram', numbers: { ...numbers, [r.id]: Math.max(1, Number(num.value) || n0) } });
     e.target.textContent = 'Copied. Paste it into Instagram';
   };
-  draw();
+  count();
 }
 
 // ---------- Recipes ----------

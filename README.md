@@ -27,7 +27,7 @@ I built Pinch while studying Commercial Cookery and Kitchen Management (Cert IV)
 - Recipe book with photos, method, sub-recipes (a sauce or dough inside a dish), favourites on Home and search by ingredient
 - Amounts are optional: oil, salt or anything "to taste" is saved as q.b. (quanto basta), shown as q.b. everywhere and left out of costing
 - Get recipes in fast: quick capture (name + ingredient lines), read a photo of a handout, book page, handwritten note or whiteboard (Claude via a Supabase Edge Function; signed-in users, daily limit), import a recipe web page, or paste a list (fractions, ranges, AU cup / tbsp / tsp)
-- Instagram captions from your own record: pick a first line built from chef's feedback, your "next time" note, a number from the method or your practice count; the body, one ask and up to 5 specific hashtags are filled in, every part editable, checked for what the feed shows before "more", and copied in one tap ([`caption.js`](caption.js))
+- Instagram captions: "01. Dish name" (each recipe keeps its post number, new ones get the next) and the recipe in short, ingredients and method, ready to copy ([`caption.js`](caption.js))
 - Share a recipe with classmates as a link: the recipe, its sub-recipes and ingredients travel inside the link (compressed, no server or account) and save into their own book
 - Scale by portions, from an ingredient you have ("3 kg mince makes 37 portions") or by baker's percentage
 - Cooking mode: every step on one screen, the current one big and outlined, done ones ticked; Next moves on and scrolls to it, tap any step to jump; timers found in the method ("simmer 45 min"), a scaled ingredient checklist, screen kept awake

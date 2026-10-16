@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { remoteWins } from './db.js';
 import { tr } from './i18n.js';
-import { captionHooks, captionBody, captionTags, buildCaption, lintCaption, VISIBLE } from './caption.js';
+import { recipeCaption, postNumber } from './caption.js';
 import { toRecipe, SCHEMA } from './supabase/functions/recipe-photo/index.js';
 import { DECKS, ALL_CARDS, review, pickSession, isDue, isLearned } from './study.js';
 import { extractRecipe, safeUrl } from './supabase/functions/recipe-import/index.js';
@@ -430,38 +430,17 @@ assert.equal(niceAmount(2, 'portion'), '2 portion');
   assert.equal(tr('Fresh egg pasta'), 'Fresh egg pasta');                                              // what people typed stays as is
 }
 
-// Instagram captions from recipe data
+// Instagram caption: number + name, then the recipe in short
 {
-  const r = { name: 'Tagliatelle al pomodoro', category: 'Main' };
-  const attempts = [
-    { logId: 'l1', notes: 'Season the pasta water more, it tastes flat', rating: 4, next: '' },
-    { notes: 'Overcooked', next: 'Pull the pasta at 90 seconds', rating: 3 },
-  ];
-  const steps = ['Cook tagliatelle 2 min in salted boiling water.', 'Toss with hot pomodoro.'];
-  const hooks = captionHooks(r, { attempts, steps, items: [] }).map(h => h.text);
-  assert.equal(hooks[0], 'Chef\'s note on my tagliatelle al pomodoro: "Season the pasta water more, it tastes flat."');
-  assert.ok(hooks.some(h => h.startsWith("What I'm changing next time I make tagliatelle al pomodoro: pull the pasta at 90 seconds")));
-  assert.ok(hooks.some(h => h.includes('2 min')));                                   // a number from the method
-  assert.ok(hooks.some(h => h === 'Practice cook number 2 of tagliatelle al pomodoro, and the best one yet.'));
-  assert.ok(hooks.every(h => h.length <= VISIBLE));                                    // every first line fits before "more"
-  const long = captionHooks(r, { attempts: [{ logId: 'x', notes: 'word '.repeat(60) }] })[0].text;
-  assert.ok(long.length <= VISIBLE && long.endsWith('…'));
-  assert.deepEqual(captionHooks({ name: 'Brodo' }), [{ kind: 'plain', text: 'Brodo, cooked in class this week.' }]); // nothing recorded yet
-  const body = captionBody(r, { attempts, steps });
-  assert.equal(body[0], "Tagliatelle al pomodoro, from this week's class at culinary school in Melbourne.");   // 'Main' says nothing
-  assert.ok(!captionBody(r, { attempts, steps, skip: 'next' }).some(p => p.startsWith('Next time')));                 // not said twice
-  assert.equal(captionBody({ name: 'Ragù', category: 'Sauce' })[0], "Ragù (sauce), from this week's class at culinary school in Melbourne.");
-  assert.equal(body[1], 'Cook tagliatelle 2 min in salted boiling water.');
-  assert.equal(body[2], 'Next time: pull the pasta at 90 seconds.');
-  assert.deepEqual(captionTags(r), ['#tagliatellealpomodoro', '#tagliatelle', '#culinaryschool', '#melbournefood']);
-  assert.deepEqual(captionTags({ name: 'Giardiniera di verdure sott\'aceto' }).slice(0, 1), ['#giardiniera']);  // long names: the first word
-  assert.equal(captionTags({ name: 'Béchamel' })[0], '#bechamel');
-  const text = buildCaption({ hook: hooks[0], body: body.join('\n\n'), ask: 'recipe', tags: captionTags(r).join(' ') });
-  const l = lintCaption(text);
-  assert.ok(l.firstFits && l.tagsOk && l.asksOk && !l.links && l.lengthOk);
-  assert.equal(l.tags, 4);
-  assert.equal(lintCaption('Hi\n\nSave this. Comment PASTA. #a #b #c #d #e #f https://x.y').asks, 2);
-  assert.ok(lintCaption('x #a #b #c #d #e #f').tags === 6 && lintCaption('see https://pinch.app').links);
+  const r = { name: 'Tagliatelle al pomodoro', portions: 1 };
+  const items = [{ qty: 150, amount: '150 g', name: 'Fresh egg pasta' }, { qty: null, amount: 'q.b.', name: 'Olive oil' }];
+  assert.equal(recipeCaption(r, { number: 3, items, steps: ['Cook 2 min.', 'Toss with sauce.'] }),
+    '03. Tagliatelle al pomodoro\n\nIngredients (1 portion)\n150 g Fresh egg pasta\nOlive oil, q.b.\n\nMethod\n1. Cook 2 min.\n2. Toss with sauce.');
+  assert.equal(recipeCaption({ name: 'Brodo', portions: 10 }, { number: 12 }), '12. Brodo');              // nothing else recorded: just the title
+  assert.ok(recipeCaption({ name: 'Ragù', portions: 6 }, { items }).includes('Ingredients (6 portions)'));
+  assert.equal(postNumber({}, 'a'), 1);
+  assert.equal(postNumber({ a: 1, b: 4 }, 'c'), 5);                                                       // the next one
+  assert.equal(postNumber({ a: 1, b: 4 }, 'a'), 1);                                                       // posted before: keeps its number
 }
 
 // One release version for every file (index.html), so a deploy never mixes old and new files
