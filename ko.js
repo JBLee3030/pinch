@@ -44,6 +44,13 @@ export const KO = {
   'Couldn’t read the photo. Try again.': '사진을 읽지 못했어요. 다시 해 보세요.',
 
   // Sharing and favourites
+  'Share': '공유', 'Send to a classmate': '동기에게 보내기', 'A link with the recipe, its sub-recipes and ingredients. They save it into their own Pinch.': '레시피, 서브 레시피, 재료가 담긴 링크예요. 받은 사람이 자기 Pinch에 저장해요.',
+  'Post on Instagram': '인스타그램에 올리기', "A caption from your notes, chef's feedback and the method, ready to paste.": '내 메모, 셰프 피드백, 만드는 법으로 캡션을 만들어 줘요. 붙여넣기만 하면 돼요.',
+  'Instagram caption': '인스타그램 캡션', 'Only the first line shows before "more", so it has to make people stop. Pick one, then edit anything.': '피드에는 "더 보기" 전 첫 줄만 보여서, 첫 줄이 사람을 멈추게 해야 해요. 하나 고른 뒤 무엇이든 고쳐 쓰세요.',
+  'First line': '첫 줄', 'The rest': '나머지', 'Ask for one thing': '요청은 하나만', 'Comment RECIPE (DM them the link)': 'RECIPE 댓글 받기 (링크는 DM으로)', 'Edit the first line': '첫 줄 고치기',
+  'Save this for later': '저장해 달라고 하기', 'Nothing': '요청 없음', 'Hashtags': '해시태그', '(up to 5)': '(최대 5개)', 'Alt text': '대체 텍스트',
+  '(Advanced settings, for screen readers and search)': '(고급 설정에 넣어요. 스크린 리더와 검색에 쓰여요)', 'How the feed shows it': '피드에 보이는 모습', 'Copy caption': '캡션 복사',
+  'Copied. Paste it into Instagram': '복사했어요. 인스타그램에 붙여넣으세요', 'One ask': '요청 하나', 'Remove the link: captions can’t be tapped': '링크를 빼세요: 캡션 링크는 눌리지 않아요', '… more': '… 더 보기',
   'Favourite': '즐겨찾기', 'Favourites': '즐겨찾기', 'Shared recipe': '공유받은 레시피', 'Shared with you': '공유받은 레시피', 'Shared with me': '공유받음', 'Shared': '공유받음',
   'This link is broken or cut short.': '링크가 깨졌거나 잘렸어요.', 'Ask for the recipe to be shared again.': '레시피를 다시 공유해 달라고 해 주세요.',
   'Save to my recipes': '내 레시피에 저장', 'Copy link': '링크 복사', 'Using Pinch from your home screen?': '홈 화면의 Pinch 앱을 쓰나요?',
@@ -391,5 +398,8 @@ export const KO_PATTERNS = [
   [/^(\d+) to (\d+) h$/, '$1~$2시간'],
   [/^over (\d+) h$/, '$1시간 초과'],
   [/^(\d+) to (\d+)( °C| ml)?$/, (a, b, u) => `${a}~${b}${u}`],
+  [/^First line: (\d+) of (\d+) characters$/, '첫 줄: $2자 중 $1자'],
+  [/^(\d+) hashtags \(up to 5\)$/, '해시태그 $1개 (최대 5개)'],
+  [/^(\d+) asks: keep one$/, '요청 $1개: 하나만 남기세요'],
   [/^Password should be at least (\d+) characters\.?$/, '비밀번호는 $1자 이상이어야 해요.'],
 ];
