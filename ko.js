@@ -245,7 +245,18 @@ export const KO = {
   'That doesn’t look like a web page link.': '웹페이지 링크가 아닌 것 같아요.', 'The site took too long to answer.': '사이트 응답이 너무 느려요.', 'Couldn’t open that page.': '그 페이지를 열 수 없어요.',
   'No recipe found on that page. Try the page of a single recipe, or copy the ingredients and paste them instead.': '그 페이지에서 레시피를 못 찾았어요. 레시피 하나만 있는 페이지로 해 보거나, 재료를 복사해 붙여넣으세요.',
   'This site doesn’t let apps read its recipes. Copy the ingredients from the page and paste them instead.': '이 사이트는 앱이 레시피를 읽지 못하게 막아요. 페이지에서 재료를 복사해 붙여넣으세요.',
-  'A sub-recipe was deleted': '서브 레시피가 삭제됐어요', };
+  'A sub-recipe was deleted': '서브 레시피가 삭제됐어요',
+
+  // Work flow plan
+  'Work flow': '워크플로우', 'Work flow plan': '워크플로우 플랜', 'Form': '양식', 'Your school\'s form': '학교 양식',
+  'Add the Work Flow Plan Word file (.docx) once. Pinch fills it in for every practical.': 'Work Flow Plan 워드 파일(.docx)을 한 번만 올리면 실습 때마다 Pinch가 채워줘요.',
+  'Change form': '양식 바꾸기', 'Choose the Word file': '워드 파일 선택', 'From your book': '내 레시피북에서',
+  'Or paste recipes': '또는 레시피 붙여넣기', 'Paste recipes': '레시피 붙여넣기', 'Your details': '내 정보',
+  'Student ID': '학번', 'Trainer': '트레이너', 'Group': '그룹', 'Assessment no.': '평가 번호', 'Time plan': '시간 계획',
+  'Download Word file': '워드 파일 받기', 'Add your school\'s form first.': '학교 양식을 먼저 올려주세요.',
+  'Tick recipes or paste them above. The time plan shows here.': '위에서 레시피를 고르거나 붙여넣으세요. 시간 계획이 여기 나와요.',
+  'The form has 7 recipe cards. Only the first 7 go in.': '양식에 레시피 카드가 7장이라 앞의 7개만 들어가요.',
+  'Not a Word file (.docx)': '워드 파일(.docx)이 아니에요', 'This Word file has no time plan or recipe cards': '이 워드 파일에는 시간 계획표나 레시피 카드가 없어요', };
 
 const ALLERGEN_LIST = /^((?:Gluten|Wheat|Crustacean|Mollusc|Fish|Egg|Milk|Peanut|Tree nuts|Sesame|Soy|Lupin|Sulphites)(?:, (?:Gluten|Wheat|Crustacean|Mollusc|Fish|Egg|Milk|Peanut|Tree nuts|Sesame|Soy|Lupin|Sulphites))+)$/;
 const cap = x => x.charAt(0).toUpperCase() + x.slice(1);
@@ -395,4 +406,9 @@ export const KO_PATTERNS = [
   [/^(\d+) to (\d+)( °C| ml)?$/, (a, b, u) => `${a}~${b}${u}`],
   [/^(\d+) of (\d+) characters$/, '$2자 중 $1자'],
   [/^Password should be at least (\d+) characters\.?$/, '비밀번호는 $1자 이상이어야 해요.'],
+  // Work flow plan
+  [/^(\d+) ingredients · (\d+) steps$/, '재료 $1개 · 단계 $2개'],
+  [/^Runs (\d+) min past 2:00 pm\. Check the long steps\.$/, '오후 2시를 $1분 넘겨요. 오래 걸리는 단계를 확인하세요.'],
+  [/^No ingredients found for (.+)\.$/, n => `${n}에서 재료를 못 찾았어요.`],
+  [/^(\d+) ingredients on the list\. Lunch at 12:00, plating after set up\.$/, '재료 목록 $1개. 12시 점심, 플레이팅은 셋업 뒤에 해요.'],
 ];

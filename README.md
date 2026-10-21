@@ -38,6 +38,7 @@ I built Pinch while studying Commercial Cookery and Kitchen Management (Cert IV)
 **Practice and exams**
 - Practice log per recipe: rating, photo, how it went and what to change next time; the last note shows when you start cooking, and finishing cooking mode asks how it went
 - Exam and assessment planner: date, type and the dishes being assessed; each dish shows how often it's been practised and its last rating
+- Work flow plan for practicals: tick recipes from the book or paste them, and Pinch fills the school's Work Flow Plan Word form: recipe cards, a timed task plan with equipment (long jobs like simmering or setting start first, other work fits around them, plating waits for setup after lunch) and the combined ingredients list. Rules only, no AI; the form is uploaded once and stays with your data ([`workflow.js`](workflow.js), [`docx.js`](docx.js))
 - Prep list for a practical: recipes and portions become ordered task cards (sub-recipes first, longest jobs first) with weigh-out and method checklists and step timers
 - Menus with menu engineering (Kasavana & Smith) and a printable customer allergen menu, for menu design assignments
 
@@ -84,6 +85,8 @@ calc.js      costing, scaling and food safety rules (pure, tested)
 study.js     reference decks and spaced repetition (pure, tested)
 cardart.js   drawn SVG diagrams for the study cards
 parse.js     pasted recipes, method steps and timers (pure, tested)
+workflow.js  practical day plan: recipes, time plan, ingredients list (pure, tested)
+docx.js      fills the Work Flow Plan Word form (zip + WordprocessingML, no library)
 db.js        IndexedDB storage, change tracking, backup
 sync.js      optional Supabase auth and sync
 sw.js        offline support

@@ -3,6 +3,8 @@ import * as sync from './sync.js';
 import { LANG, locale, setLang } from './i18n.js';
 import { DECKS, review, pickSession, isDue, isLearned } from './study.js';
 import { cardArt } from './cardart.js';
+import { parseRecipes, plan as workflowPlan } from './workflow.js';
+import { fillPlan, templateProblem } from './docx.js';
 import { recipeCaption, postNumber, LIMIT } from './caption.js';
 import { parseIngredientLine, matchIngredient, splitSteps, findDurations, fmtDuration } from './parse.js';
 import { ALLERGENS, PURCHASE_UNITS, UNITS, recipeCost, itemCost, suggestedPrice, actualCostPct, recipeAllergens, usesRecipe, hasPrice, fmtAmount, TEMP_CHECKS, tempStatus, yieldTest, MEASURES, convertFor, densityFor, scaleFromIngredient, bakersPercent, bakersBase, fToC, cToF, prepBatches, niceAmount, niceParts, withPriceHistory, menuEngineering, MENU_CLASSES, daysUntil, examReadiness, periodKey, checkProgress, shareBundle, importBundle, money, pct } from './calc.js';
@@ -29,6 +31,14 @@ async function ingMap() {
   return new Map((await db.all('ingredients')).map(i => [i.id, i]));
 }
 const toMap = list => new Map(list.map(x => [x.id, x]));
+// Share sheet on phones (Save to Files), a plain download elsewhere. False when the share sheet was closed.
+async function saveFile(file) {
+  try {
+    if (navigator.canShare?.({ files: [file] })) await navigator.share({ files: [file] });
+    else Object.assign(document.createElement('a'), { href: URL.createObjectURL(file), download: file.name }).click();
+    return true;
+  } catch (err) { if (err.name === 'AbortError') return false; throw err; }
+}
 
 // Tabler Icons (MIT), outline set: https://tabler.io/icons
 const ICON = {
@@ -46,6 +56,7 @@ const ICON = {
   briefcase: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7m0 2a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v9a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2z"/><path d="M8 7v-2a2 2 0 0 1 2 -2h4a2 2 0 0 1 2 2v2"/><path d="M12 12l0 .01"/><path d="M3 13a20 20 0 0 0 18 0"/></svg>',
   resize: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 4l4 0l0 4"/><path d="M14 10l6 -6"/><path d="M8 20l-4 0l0 -4"/><path d="M4 20l6 -6"/><path d="M16 20l4 0l0 -4"/><path d="M14 14l6 6"/><path d="M8 4l-4 0l0 4"/><path d="M4 4l6 6"/></svg>',
   printer: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 17h2a2 2 0 0 0 2 -2v-4a2 2 0 0 0 -2 -2h-14a2 2 0 0 0 -2 2v4a2 2 0 0 0 2 2h2"/><path d="M17 9v-4a2 2 0 0 0 -2 -2h-6a2 2 0 0 0 -2 2v4"/><path d="M7 13m0 2a2 2 0 0 1 2 -2h6a2 2 0 0 1 2 2v4a2 2 0 0 1 -2 2h-6a2 2 0 0 1 -2 -2z"/></svg>',
+  doc: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3v4a1 1 0 0 0 1 1h4"/><path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2z"/><path d="M9 9l1 0"/><path d="M9 13l6 0"/><path d="M9 17l6 0"/></svg>',
   checkbox: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 11l3 3l8 -8"/><path d="M20 12v6a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h9"/></svg>',
   share: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12m-3 0a3 3 0 1 0 6 0a3 3 0 1 0 -6 0"/><path d="M18 6m-3 0a3 3 0 1 0 6 0a3 3 0 1 0 -6 0"/><path d="M18 18m-3 0a3 3 0 1 0 6 0a3 3 0 1 0 -6 0"/><path d="M8.7 10.7l6.6 -3.4"/><path d="M8.7 13.3l6.6 3.4"/></svg>',
   camera: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h1a2 2 0 0 0 2 -2a1 1 0 0 1 1 -1h6a1 1 0 0 1 1 1a2 2 0 0 0 2 2h1a2 2 0 0 1 2 2v9a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-9a2 2 0 0 1 2 -2"/><path d="M9 13a3 3 0 1 0 6 0a3 3 0 0 0 -6 0"/></svg>',
@@ -54,7 +65,7 @@ const ICON = {
 
 // Every tool lives on Home, so each tab stays about one thing. Most used in class first.
 const TOOLS = [
-  ['#/timers', 'Timers', 'timer'], ['#/calc', 'Calculator', 'calculator'], ['#/prep', 'Prep', 'prep'], ['#/ingredients', 'Ingredients', 'basket'],
+  ['#/timers', 'Timers', 'timer'], ['#/calc', 'Calculator', 'calculator'], ['#/prep', 'Prep', 'prep'], ['#/workflow', 'Work flow', 'doc'], ['#/ingredients', 'Ingredients', 'basket'],
   ['#/allergens', 'Allergy chart', 'alert'], ['#/yield', 'Yield', 'scaleIc'], ['#/menus', 'Menus', 'menu'], ['#/portfolio', 'Portfolio', 'briefcase'],
   ['#/temps', 'Temps', 'temp'], ['#/checks', 'Checklists', 'checkbox'],
 ];
@@ -1019,6 +1030,84 @@ async function studySession(deckId) {
   show(false);
 }
 
+// ---------- Work flow plan: recipes in, the school's Word form out ----------
+
+const DOCX = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+const toBase64 = file => new Promise(res => { const r = new FileReader(); r.onload = () => res(r.result.split(',')[1]); r.readAsDataURL(file); });
+const fromBase64 = b64 => Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+
+async function workflowView(examId) {
+  const [recipes, ings, s, saved, tpl, exam] = await Promise.all([db.all('recipes'), ingMap(), settings(),
+    db.get('settings', 'workflow'), db.get('settings', 'workflowTemplate'), examId ? db.get('exams', examId) : null]);
+  recipes.sort(byName);
+  const recs = toMap(recipes), w = { name: s.cookName, picked: [], ...saved };
+  if (exam) Object.assign(w, { picked: exam.recipeIds ?? [], paste: '', date: exam.date });
+  const fromBook = r => ({ name: r.name, yield: r.portions ? portionsLabel(r.portions) : '', prep: '', cook: '', equipment: '',
+    items: (r.items ?? []).map(it => ({ qty: it.qty, unit: it.unit, name: it.recipeId ? recs.get(it.recipeId)?.name ?? '' : ings.get(it.ingredientId)?.name ?? '' })).filter(it => it.name),
+    steps: splitSteps(r.method) });
+  const field = (k, label, attrs = '') => `<label>${label}<input name="${k}" value="${esc(w[k])}" ${attrs}></label>`;
+  page('home', 'Work flow plan', `
+    <div class="card" id="tpl">${tpl ? `<p class="muted"><small>Form</small></p><p translate="no"><b>${esc(tpl.name)}</b></p>` : `<h2>Your school's form</h2>
+      <p class="muted"><small>Add the Work Flow Plan Word file (.docx) once. Pinch fills it in for every practical.</small></p>`}
+      <label class="btn ${tpl ? 'ghost sm' : ''}">${tpl ? 'Change form' : 'Choose the Word file'}<input type="file" id="tplFile" accept=".docx,${DOCX}" hidden></label>
+      <p id="tplMsg"></p></div>
+    <form id="f" onsubmit="return false">
+      ${recipes.length ? `<h2>From your book</h2><div class="checks">${recipes.map(r => `<label><input type="checkbox" name="picked" value="${esc(r.id)}" ${w.picked.includes(r.id) ? 'checked' : ''}> ${esc(r.name)}</label>`).join('')}</div>` : ''}
+      <label style="margin-top:16px">${recipes.length ? 'Or paste recipes' : 'Paste recipes'}<textarea name="paste" rows="8" placeholder="Beef ragu&#10;Yield: 4 portions&#10;Ingredients&#10;500 g beef mince&#10;1 onion&#10;Method&#10;1. Dice the onion.&#10;2. Simmer for 90 minutes.">${esc(w.paste)}</textarea></label>
+      <details class="more"><summary>Your details</summary>
+        <div class="row2">${field('name', 'Name')}${field('studentId', 'Student ID')}</div>
+        <div class="row2">${field('trainer', 'Trainer')}${field('group', 'Group')}</div>
+        <div class="row2"><label>Date<input name="date" type="date" value="${esc(w.date ?? today())}"></label>${field('assessment', 'Assessment no.', 'inputmode="numeric"')}</div>
+      </details>
+    </form>
+    <div id="out"></div>
+    <div class="cta-bar"><button type="button" id="dl">Download Word file</button></div>`, { back: exam ? `#/exam/${esc(exam.id)}/edit` : '#/home' });
+
+  const form = document.getElementById('f'), out = document.getElementById('out'), dl = document.getElementById('dl');
+  let current = null;
+  const read = () => {
+    const fd = new FormData(form);
+    return { ...Object.fromEntries(['name', 'studentId', 'trainer', 'group', 'date', 'assessment', 'paste'].map(k => [k, fd.get(k).trim()])), picked: fd.getAll('picked') };
+  };
+  const draw = () => {
+    const v = read(), list = [...v.picked.map(id => recs.get(id)).filter(Boolean).map(fromBook), ...parseRecipes(v.paste)];
+    current = list.length ? workflowPlan(list) : null;
+    dl.disabled = !current;
+    if (!current) { out.innerHTML = '<p class="empty">Tick recipes or paste them above. The time plan shows here.</p>'; return; }
+    const { recipes: rs, timeline, totals } = current, warn = [];
+    if (rs.length > 7) warn.push('The form has 7 recipe cards. Only the first 7 go in.');
+    if (timeline.over) warn.push(`Runs ${timeline.over} min past 2:00 pm. Check the long steps.`);
+    rs.filter(r => !r.items.length).forEach(r => warn.push(`No ingredients found for ${r.name}.`));
+    out.innerHTML = `${warn.map(x => `<p class="warn-text"><small>${esc(x)}</small></p>`).join('')}
+      <h2 class="day">Recipes</h2><ul class="list">${rs.map(r => `<li><div class="row-static"><div class="grow"><b translate="no">${esc(r.name)}</b>
+        <small>${r.items.length} ingredients · ${r.steps.length} steps</small></div></div></li>`).join('')}</ul>
+      <h2 class="day">Time plan</h2><ul class="list">${timeline.rows.map(x => `<li><div class="row-static"><div class="grow"><b>${esc(x.time)}</b>
+        <small translate="no">${esc(x.task)}</small></div></div></li>`).join('')}</ul>
+      <p class="muted"><small>${totals.length} ingredients on the list. Lunch at 12:00, plating after set up.</small></p>`;
+  };
+  form.addEventListener('input', draw);
+  form.addEventListener('change', () => db.put('settings', { id: 'workflow', ...read() }));
+  draw();
+
+  document.getElementById('tplFile').onchange = async e => {
+    const file = e.target.files[0], msg = document.getElementById('tplMsg');
+    if (!file) return;
+    const problem = await templateProblem(new Uint8Array(await file.arrayBuffer()));
+    if (problem) { msg.innerHTML = `<small class="warn-text">${esc(problem)}</small>`; return; }
+    await db.put('settings', { id: 'workflow', ...read() });
+    await db.put('settings', { id: 'workflowTemplate', name: file.name, data: await toBase64(file) });
+    workflowView(examId);
+  };
+  dl.onclick = async () => {
+    const t = await db.get('settings', 'workflowTemplate');
+    if (!t) { document.getElementById('tplMsg').innerHTML = '<small class="warn-text">Add your school\'s form first.</small>'; return document.getElementById('tpl').scrollIntoView({ behavior: 'smooth' }); }
+    const v = read();
+    await db.put('settings', { id: 'workflow', ...v });
+    const bytes = await fillPlan(fromBase64(t.data), { ...current, ...v, date: v.date ? v.date.split('-').reverse().join('/') : '' });
+    await saveFile(new File([bytes], `Work flow plan ${v.date || today()}.docx`, { type: DOCX }));
+  };
+}
+
 // ---------- Exams and assessments ----------
 
 async function examEdit(id) {
@@ -1038,6 +1127,7 @@ async function examEdit(id) {
     <ul class="list">${r.rows.map(x => { const rec = byId.get(x.recipeId); return rec ? `<li><a href="#/recipe/${esc(rec.id)}">
       <div class="grow"><b>${esc(rec.name)}</b><small>${x.count} of ${r.target} practices${x.lastRating ? `, last rated ${x.lastRating}/5` : ''}</small></div>
       <span class="trail"><span class="badge ${x.ready ? 'pass' : 'pending'}">${x.ready ? 'Ready' : 'Practise'}</span></span></a></li>` : ''; }).join('')}</ul>` : ''}
+    ${!isNew && e.type === 'practical' ? `<div class="links" role="navigation" aria-label="Plan"><a href="#/workflow/${esc(e.id)}"><span>Work flow plan</span></a></div>` : ''}
     <form id="f">
       <label>Title<input name="title" required placeholder="e.g. Practical: pasta and sauces" value="${esc(e.title)}"></label>
       <div class="row2"><label>Date<input name="date" type="date" required value="${esc(e.date)}"></label>
@@ -2112,14 +2202,7 @@ async function settingsView() {
   });
 
   document.getElementById('export').onclick = async () => {
-    const file = new File([JSON.stringify(await db.exportAll())], `pinch-backup-${today()}.json`, { type: 'application/json' });
-    try {
-      if (navigator.canShare?.({ files: [file] })) await navigator.share({ files: [file] });
-      else Object.assign(document.createElement('a'), { href: URL.createObjectURL(file), download: file.name }).click();
-    } catch (err) {
-      if (err.name === 'AbortError') return; // user closed the share sheet
-      throw err;
-    }
+    if (!await saveFile(new File([JSON.stringify(await db.exportAll())], `pinch-backup-${today()}.json`, { type: 'application/json' }))) return;
     await db.put('settings', { ...(await settings()), id: 'settings', lastBackup: Date.now() });
     settingsView();
   };
@@ -2256,6 +2339,7 @@ const routes = [
   [/^#\/timers$/, timersView],
   [/^#\/exam\/([^/]+)\/edit$/, examEdit],
   [/^#\/prep$/, prepView],
+  [/^#\/workflow(?:\/([^/]+))?$/, workflowView],
   [/^#\/menus$/, menusView],
   [/^#\/menu\/([^/]+)$/, menuView],
   [/^#\/menu\/([^/]+)\/allergens$/, allergenMenuView],

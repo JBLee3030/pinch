@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import { remoteWins } from './db.js';
 import { tr } from './i18n.js';
 import { recipeCaption, postNumber } from './caption.js';
+import { parseRecipes, buildTimeline, ingredientTotals, equipmentIn, clockLabel, plan } from './workflow.js';
+import { fillPlanXml } from './docx.js';
 import { toRecipe, SCHEMA } from './supabase/functions/recipe-photo/index.js';
 import { DECKS, ALL_CARDS, review, pickSession, isDue, isLearned } from './study.js';
 import { extractRecipe, safeUrl } from './supabase/functions/recipe-import/index.js';
@@ -441,6 +443,60 @@ assert.equal(niceAmount(2, 'portion'), '2 portion');
   assert.equal(postNumber({}, 'a'), 1);
   assert.equal(postNumber({ a: 1, b: 4 }, 'c'), 5);                                                       // the next one
   assert.equal(postNumber({ a: 1, b: 4 }, 'a'), 1);                                                       // posted before: keeps its number
+}
+
+// Work flow plan: pasted recipes -> recipe cards, a time plan, the ingredients list, the Word form
+{
+  const text = `BEEF RAGU\nYield: 4\nPrep time: 20 min\nIngredients\n500 g beef mince\nOnion\t1\nOlive oil\nMethod\n1. Dice the onion.\n2. Simmer for 90 minutes.\n3. Season and serve.\n\n` +
+    `Recipe 2: Panna cotta\nIngredients\n500 ml cream\n0.1 L milk\n100 ml milk\nMethod\nHeat the cream in a saucepan.\nSet in the fridge for 4 hours.`;
+  const [ragu, panna] = parseRecipes(text);
+  assert.equal(ragu.name, 'Beef Ragu');                                        // ALL CAPS title tidied
+  assert.equal(ragu.yield, '4 portions');
+  assert.equal(ragu.prep, '20 min');
+  assert.deepEqual(ragu.items.map(i => [i.qty, i.unit, i.name]), [[500, 'g', 'Beef mince'], [1, 'each', 'Onion'], [null, 'each', 'Olive oil']]); // name first, q.b.
+  assert.deepEqual(ragu.steps, ['Dice the onion.', 'Simmer for 90 minutes.', 'Season and serve.']);
+  assert.equal(panna.name, 'Panna cotta');                                     // "Recipe 2:" dropped
+  assert.equal(parseRecipes('Pesto\n100 g basil\n50 g pine nuts\nBlend everything.')[0].steps[0], 'Blend everything.'); // no headings: amounts are ingredients
+
+  assert.deepEqual(equipmentIn('Dice the onion and simmer in a saucepan'), ['Saucepan', 'Knife and chopping board']);
+  assert.equal(clockLabel(8 * 60 + 5), '08:05 am');
+  assert.equal(clockLabel(13 * 60 + 10), '1:10 pm');
+
+  const { rows, over } = buildTimeline([ragu, panna]);
+  assert.equal(rows[0].task, 'Panna cotta: Heat the cream in a saucepan.');     // the longest job starts first
+  assert.ok(rows[1].task.endsWith('(until 12:30 pm)'));                       // 4 h set runs in the background
+  assert.ok(rows.some(r => r.task === 'Beef Ragu: Dice the onion.' && r.time === '08:30 am')); // other work fits in while it sets
+  const serve = rows.find(r => r.task.includes('serve'));
+  assert.equal(serve.time, '12:40 pm');                                      // plating waits for set up after lunch
+  assert.equal(serve.part, 'pm');
+  assert.equal(over, 0);
+  assert.ok(buildTimeline([{ name: 'Stock', steps: ['Simmer for 7 hours.'] }]).over > 0);
+
+  const totals = ingredientTotals([ragu, panna]);
+  const milk = totals.find(t => t.name === 'Milk');
+  assert.equal(milk.total, 200);                                             // 0.1 L + 100 ml
+  assert.deepEqual(milk.per, [null, 200]);
+  assert.equal(totals.find(t => t.name === 'Olive oil').per[0], 'q.b.');
+
+  const p = plan([ragu, panna]);
+  assert.equal(p.recipes[0].cook, '1 h 30 min');                              // from the simmer
+  assert.equal(p.recipes[1].equipment, 'Saucepan');
+
+  // The form, cut down: tables found by their header text, cells keep the paragraph's look
+  const tc = t => `<w:tc><w:tcPr/><w:p><w:pPr><w:rPr><w:b/></w:rPr></w:pPr>${t ? `<w:r><w:t>${t}</w:t></w:r>` : ''}</w:p></w:tc>`;
+  const tr = (...cells) => `<w:tr>${cells.map(tc).join('')}</w:tr>`;
+  const xml = `<w:p><w:r><w:t xml:space="preserve">Name: </w:t></w:r></w:p>` +
+    `<w:tbl>${tr('Time', 'Task description', 'Equipment/Tools')}${tr('08:00 am', 'Wash')}${tr('', 'Gather Ingredients')}${tr('', '', '')}` +
+    `${tr('12:00 pm', 'LUNCH BREAK')}${tr('12:30 pm', 'SETUP')}${tr('', '', '')}${tr('2:00 pm', 'PACK DOWN')}</w:tbl>` +
+    `<w:tbl>${tr('Recipe Name:', '')}${tr('Yield:', '')}${tr('Quantity (Unit)', 'Ingredients description')}${tr('', '')}${tr('Method:')}</w:tbl>`;
+  const filled = fillPlanXml(xml, { ...p, name: 'Jo & Co' });
+  const texts = [...filled.matchAll(/<w:t[^>]*>([^<]*)/g)].map(m => m[1]);
+  assert.ok(texts.includes('Jo &amp; Co'));                                   // escaped
+  assert.ok(texts.includes('Panna cotta: Heat the cream in a saucepan.'));
+  assert.equal(filled.match(/<w:tr>/g).length, 13 + 3 + 2);                 // copies of the empty rows: 4 morning tasks in 1 row, 3 ingredients in 1
+  assert.ok(filled.indexOf('Beef Ragu: Season and serve.') > filled.indexOf('SETUP'));
+  assert.ok(texts.includes('Beef mince') && texts.includes('500 g') && texts.includes('4 portions'));
+  assert.ok(filled.includes('<w:rPr><w:b/></w:rPr><w:t xml:space="preserve">Beef mince'));    // the cell's own formatting
 }
 
 // One release version for every file (index.html), so a deploy never mixes old and new files
