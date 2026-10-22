@@ -129,3 +129,12 @@ export function plan(recipes) {
   });
   return { recipes, timeline: buildTimeline(recipes), totals: ingredientTotals(recipes) };
 }
+
+// The whole day as it runs: the school's fixed blocks (wash and gather, lunch, set up, pack down) around the tasks
+const FIXED = [[0, 'Wash hands, sanitise work area, prepare workstation'], [0, 'Gather ingredients as per the ingredients list'],
+  ['lunch', 'Lunch break'], ['setup', 'Set up: wash hands, set up benches'], ['end', 'Pack down and clean up']];
+export function dayRows(timeline, day = DAY) {
+  const at = { 0: day.start - 15, lunch: day.lunch, setup: day.back - 10, end: day.end };
+  const fixed = FIXED.map(([k, task]) => ({ at: at[k], time: clockLabel(at[k]), task, equipment: '', fixed: true }));
+  return [...fixed, ...timeline.rows].sort((a, b) => a.at - b.at || (b.fixed ? 1 : 0) - (a.fixed ? 1 : 0));
+}

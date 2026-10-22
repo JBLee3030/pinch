@@ -248,14 +248,16 @@ export const KO = {
   'A sub-recipe was deleted': '서브 레시피가 삭제됐어요',
 
   // Work flow plan
-  'Work flow': '워크플로우', 'Work flow plan': '워크플로우 플랜', 'Form': '양식', 'Your school\'s form': '학교 양식',
-  'Add the Work Flow Plan Word file (.docx) once. Pinch fills it in for every practical.': 'Work Flow Plan 워드 파일(.docx)을 한 번만 올리면 실습 때마다 Pinch가 채워줘요.',
-  'Change form': '양식 바꾸기', 'Choose the Word file': '워드 파일 선택', 'From your book': '내 레시피북에서',
-  'Or paste recipes': '또는 레시피 붙여넣기', 'Paste recipes': '레시피 붙여넣기', 'Your details': '내 정보',
-  'Student ID': '학번', 'Trainer': '트레이너', 'Group': '그룹', 'Assessment no.': '평가 번호', 'Time plan': '시간 계획',
-  'Download Word file': '워드 파일 받기', 'Add your school\'s form first.': '학교 양식을 먼저 올려주세요.',
-  'Tick recipes or paste them above. The time plan shows here.': '위에서 레시피를 고르거나 붙여넣으세요. 시간 계획이 여기 나와요.',
-  'The form has 7 recipe cards. Only the first 7 go in.': '양식에 레시피 카드가 7장이라 앞의 7개만 들어가요.',
+  'Work flow': '워크플로우', 'Work flow plan': '워크플로우 플랜', 'Form:': '양식:', 'Choose the Word file': '워드 파일 선택',
+  'Student ID': '학번', 'Trainer': '트레이너', 'Group': '그룹', 'Assessment no.': '평가 번호',
+  'Download Word file': '워드 파일 받기', 'Change form': '양식 바꾸기', 'Paste your recipes': '레시피 붙여넣기', 'Add from your book': '내 레시피북에서 추가',
+  'Paste them all at once: each recipe\'s name, its ingredients and its method.': '여러 개를 한 번에 붙여넣어도 돼요. 레시피마다 이름, 재료, 만드는 법이 있으면 돼요.',
+  'Your work plan and ingredients list show here.': '워크 플랜과 재료 목록이 여기 나와요.', 'Work plan': '워크 플랜', 'Copy': '복사',
+  'Fill the school\'s Word form': '학교 워드 양식 채우기', 'Add the Work Flow Plan Word file (.docx) once. Pinch fills it in with this plan.': 'Work Flow Plan 워드 파일(.docx)을 한 번만 올리면 이 플랜으로 채워줘요.',
+  'Paste your recipes first.': '레시피를 먼저 붙여넣으세요.',
+  'Long jobs (simmering, setting, resting) start first and other work fits in while they wait. Plating goes after set up. Steps without a time count as 10 min.': '오래 걸리는 작업(졸이기, 굳히기, 휴지)을 먼저 시작하고 기다리는 동안 다른 작업을 넣어요. 플레이팅은 셋업 뒤에 해요. 시간이 안 적힌 단계는 10분으로 잡아요.',
+  'Wash hands, sanitise work area, prepare workstation': '손 씻기, 작업대 소독, 스테이션 준비', 'Gather ingredients as per the ingredients list': '재료 목록대로 재료 가져오기',
+  'Lunch break': '점심시간', 'Set up: wash hands, set up benches': '셋업: 손 씻기, 벤치 세팅', 'Pack down and clean up': '정리와 청소',
   'Not a Word file (.docx)': '워드 파일(.docx)이 아니에요', 'This Word file has no time plan or recipe cards': '이 워드 파일에는 시간 계획표나 레시피 카드가 없어요', };
 
 const ALLERGEN_LIST = /^((?:Gluten|Wheat|Crustacean|Mollusc|Fish|Egg|Milk|Peanut|Tree nuts|Sesame|Soy|Lupin|Sulphites)(?:, (?:Gluten|Wheat|Crustacean|Mollusc|Fish|Egg|Milk|Peanut|Tree nuts|Sesame|Soy|Lupin|Sulphites))+)$/;
@@ -407,8 +409,6 @@ export const KO_PATTERNS = [
   [/^(\d+) of (\d+) characters$/, '$2자 중 $1자'],
   [/^Password should be at least (\d+) characters\.?$/, '비밀번호는 $1자 이상이어야 해요.'],
   // Work flow plan
-  [/^(\d+) ingredients · (\d+) steps$/, '재료 $1개 · 단계 $2개'],
   [/^Runs (\d+) min past 2:00 pm\. Check the long steps\.$/, '오후 2시를 $1분 넘겨요. 오래 걸리는 단계를 확인하세요.'],
   [/^No ingredients found for (.+)\.$/, n => `${n}에서 재료를 못 찾았어요.`],
-  [/^(\d+) ingredients on the list\. Lunch at 12:00, plating after set up\.$/, '재료 목록 $1개. 12시 점심, 플레이팅은 셋업 뒤에 해요.'],
 ];

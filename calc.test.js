@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { remoteWins } from './db.js';
 import { tr } from './i18n.js';
 import { recipeCaption, postNumber } from './caption.js';
-import { parseRecipes, buildTimeline, ingredientTotals, equipmentIn, clockLabel, plan } from './workflow.js';
+import { parseRecipes, buildTimeline, ingredientTotals, equipmentIn, clockLabel, plan, dayRows } from './workflow.js';
 import { fillPlanXml } from './docx.js';
 import { toRecipe, SCHEMA } from './supabase/functions/recipe-photo/index.js';
 import { DECKS, ALL_CARDS, review, pickSession, isDue, isLearned } from './study.js';
@@ -470,6 +470,8 @@ assert.equal(niceAmount(2, 'portion'), '2 portion');
   assert.equal(serve.time, '12:40 pm');                                      // plating waits for set up after lunch
   assert.equal(serve.part, 'pm');
   assert.equal(over, 0);
+  assert.deepEqual(dayRows({ rows }).map(r => r.time).slice(0, 3), ['08:00 am', '08:00 am', '08:15 am']); // wash and gather first
+  assert.deepEqual(dayRows({ rows }).filter(r => r.fixed).map(r => r.time), ['08:00 am', '08:00 am', '12:00 pm', '12:30 pm', '2:00 pm']);
   assert.ok(buildTimeline([{ name: 'Stock', steps: ['Simmer for 7 hours.'] }]).over > 0);
 
   const totals = ingredientTotals([ragu, panna]);

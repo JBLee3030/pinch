@@ -3,7 +3,7 @@ import * as sync from './sync.js';
 import { LANG, locale, setLang } from './i18n.js';
 import { DECKS, review, pickSession, isDue, isLearned } from './study.js';
 import { cardArt } from './cardart.js';
-import { parseRecipes, plan as workflowPlan } from './workflow.js';
+import { parseRecipes, plan as workflowPlan, dayRows, amount } from './workflow.js';
 import { fillPlan, templateProblem } from './docx.js';
 import { recipeCaption, postNumber, LIMIT } from './caption.js';
 import { parseIngredientLine, matchIngredient, splitSteps, findDurations, fmtDuration } from './parse.js';
@@ -1047,46 +1047,63 @@ async function workflowView(examId) {
     steps: splitSteps(r.method) });
   const field = (k, label, attrs = '') => `<label>${label}<input name="${k}" value="${esc(w[k])}" ${attrs}></label>`;
   page('home', 'Work flow plan', `
-    <div class="card" id="tpl">${tpl ? `<p class="muted"><small>Form</small></p><p translate="no"><b>${esc(tpl.name)}</b></p>` : `<h2>Your school's form</h2>
-      <p class="muted"><small>Add the Work Flow Plan Word file (.docx) once. Pinch fills it in for every practical.</small></p>`}
-      <label class="btn ${tpl ? 'ghost sm' : ''}">${tpl ? 'Change form' : 'Choose the Word file'}<input type="file" id="tplFile" accept=".docx,${DOCX}" hidden></label>
-      <p id="tplMsg"></p></div>
     <form id="f" onsubmit="return false">
-      ${recipes.length ? `<h2>From your book</h2><div class="checks">${recipes.map(r => `<label><input type="checkbox" name="picked" value="${esc(r.id)}" ${w.picked.includes(r.id) ? 'checked' : ''}> ${esc(r.name)}</label>`).join('')}</div>` : ''}
-      <label style="margin-top:16px">${recipes.length ? 'Or paste recipes' : 'Paste recipes'}<textarea name="paste" rows="8" placeholder="Beef ragu&#10;Yield: 4 portions&#10;Ingredients&#10;500 g beef mince&#10;1 onion&#10;Method&#10;1. Dice the onion.&#10;2. Simmer for 90 minutes.">${esc(w.paste)}</textarea></label>
-      <details class="more"><summary>Your details</summary>
+      <label>Paste your recipes<textarea name="paste" rows="8" placeholder="Beef ragu&#10;Ingredients&#10;500 g beef mince&#10;1 onion&#10;Method&#10;1. Dice the onion.&#10;2. Simmer for 90 minutes.&#10;&#10;Panna cotta&#10;Ingredients&#10;…">${esc(w.paste)}</textarea></label>
+      <p class="muted"><small>Paste them all at once: each recipe's name, its ingredients and its method.</small></p>
+      ${recipes.length ? `<details class="more" ${w.picked.length ? 'open' : ''}><summary>Add from your book</summary>
+        <div class="checks">${recipes.map(r => `<label><input type="checkbox" name="picked" value="${esc(r.id)}" ${w.picked.includes(r.id) ? 'checked' : ''}> ${esc(r.name)}</label>`).join('')}</div></details>` : ''}
+    </form>
+    <div id="out"></div>
+    <details class="more" id="word"><summary>Fill the school's Word form</summary>
+      <p class="muted"><small>${tpl ? `Form: <span translate="no">${esc(tpl.name)}</span>` : 'Add the Work Flow Plan Word file (.docx) once. Pinch fills it in with this plan.'}</small></p>
+      <label class="btn ghost">${tpl ? 'Change form' : 'Choose the Word file'}<input type="file" id="tplFile" accept=".docx,${DOCX}" hidden></label>
+      <p id="tplMsg"></p>
+      <form id="details" onsubmit="return false">
         <div class="row2">${field('name', 'Name')}${field('studentId', 'Student ID')}</div>
         <div class="row2">${field('trainer', 'Trainer')}${field('group', 'Group')}</div>
         <div class="row2"><label>Date<input name="date" type="date" value="${esc(w.date ?? today())}"></label>${field('assessment', 'Assessment no.', 'inputmode="numeric"')}</div>
-      </details>
-    </form>
-    <div id="out"></div>
-    <div class="cta-bar"><button type="button" id="dl">Download Word file</button></div>`, { back: exam ? `#/exam/${esc(exam.id)}/edit` : '#/home' });
+      </form>
+      <button type="button" class="wide" id="dl" ${tpl ? '' : 'disabled'}>Download Word file</button>
+    </details>`, { back: exam ? `#/exam/${esc(exam.id)}/edit` : '#/home' });
 
-  const form = document.getElementById('f'), out = document.getElementById('out'), dl = document.getElementById('dl');
+  const form = document.getElementById('f'), details = document.getElementById('details'), out = document.getElementById('out');
   let current = null;
   const read = () => {
-    const fd = new FormData(form);
-    return { ...Object.fromEntries(['name', 'studentId', 'trainer', 'group', 'date', 'assessment', 'paste'].map(k => [k, fd.get(k).trim()])), picked: fd.getAll('picked') };
+    const fd = new FormData(form), dd = new FormData(details);
+    return { ...Object.fromEntries(['name', 'studentId', 'trainer', 'group', 'date', 'assessment'].map(k => [k, dd.get(k).trim()])),
+      paste: fd.get('paste').trim(), picked: fd.getAll('picked') };
   };
+  const save = () => db.put('settings', { id: 'workflow', ...read() });
+  // Tab-separated, so it pastes into a Word or Excel table as rows and columns
+  const tsv = rows => rows.map(r => r.join('\t')).join('\n');
   const draw = () => {
     const v = read(), list = [...v.picked.map(id => recs.get(id)).filter(Boolean).map(fromBook), ...parseRecipes(v.paste)];
     current = list.length ? workflowPlan(list) : null;
-    dl.disabled = !current;
-    if (!current) { out.innerHTML = '<p class="empty">Tick recipes or paste them above. The time plan shows here.</p>'; return; }
-    const { recipes: rs, timeline, totals } = current, warn = [];
-    if (rs.length > 7) warn.push('The form has 7 recipe cards. Only the first 7 go in.');
+    if (!current) { out.innerHTML = '<p class="empty">Your work plan and ingredients list show here.</p>'; return; }
+    const { recipes: rs, timeline, totals } = current, warn = [], day = dayRows(timeline);
     if (timeline.over) warn.push(`Runs ${timeline.over} min past 2:00 pm. Check the long steps.`);
     rs.filter(r => !r.items.length).forEach(r => warn.push(`No ingredients found for ${r.name}.`));
     out.innerHTML = `${warn.map(x => `<p class="warn-text"><small>${esc(x)}</small></p>`).join('')}
-      <h2 class="day">Recipes</h2><ul class="list">${rs.map(r => `<li><div class="row-static"><div class="grow"><b translate="no">${esc(r.name)}</b>
-        <small>${r.items.length} ingredients · ${r.steps.length} steps</small></div></div></li>`).join('')}</ul>
-      <h2 class="day">Time plan</h2><ul class="list">${timeline.rows.map(x => `<li><div class="row-static"><div class="grow"><b>${esc(x.time)}</b>
-        <small translate="no">${esc(x.task)}</small></div></div></li>`).join('')}</ul>
-      <p class="muted"><small>${totals.length} ingredients on the list. Lunch at 12:00, plating after set up.</small></p>`;
+      <div class="card wf"><div class="wf-head"><h2>Work plan</h2><button type="button" class="ghost sm" data-copy="plan">Copy</button></div>
+        <p class="muted"><small translate="no">${rs.map(r => esc(r.name)).join(', ')}</small></p>
+        <table><tbody>${day.map(x => `<tr class="${x.fixed ? 'fixed' : ''}"><td class="t">${esc(x.time)}</td>
+          <td><span translate="${x.fixed ? 'yes' : 'no'}">${esc(x.task)}</span>${x.equipment ? `<br><small translate="no">${esc(x.equipment)}</small>` : ''}</td></tr>`).join('')}</tbody></table></div>
+      <div class="card wf"><div class="wf-head"><h2>Ingredients</h2><button type="button" class="ghost sm" data-copy="ings">Copy</button></div>
+        <table><tbody>${totals.map(t => { const used = t.per.map((q, i) => q == null ? '' : `${rs[i].name} ${typeof q === 'number' ? niceAmount(q, t.unit) : q}`).filter(Boolean);
+          return `<tr><td><span translate="no">${esc(t.name)}</span>${used.length > 1 ? `<br><small translate="no">${esc(used.join(' · '))}</small>` : ''}</td>
+          <td class="n">${esc(t.total > 0 ? niceAmount(t.total, t.unit) : 'q.b.')}</td></tr>`; }).join('')}</tbody></table></div>
+      <p class="muted"><small>Long jobs (simmering, setting, resting) start first and other work fits in while they wait. Plating goes after set up. Steps without a time count as 10 min.</small></p>`;
+    out.querySelectorAll('[data-copy]').forEach(btn => btn.onclick = async () => {
+      const text = btn.dataset.copy === 'plan'
+        ? tsv([['Time', 'Task', 'Equipment'], ...day.map(x => [x.time, x.task, x.equipment])])
+        : tsv([['Ingredient', 'Unit', 'Total', ...rs.map(r => r.name)], ...totals.map(t => [t.name, t.total > 0 ? t.unit : '', t.total > 0 ? amount(t.total) : 'q.b.', ...t.per.map(amount)])]);
+      await navigator.clipboard.writeText(text);
+      btn.textContent = 'Copied';
+    });
   };
   form.addEventListener('input', draw);
-  form.addEventListener('change', () => db.put('settings', { id: 'workflow', ...read() }));
+  form.addEventListener('change', save);
+  details.addEventListener('change', save);
   draw();
 
   document.getElementById('tplFile').onchange = async e => {
@@ -1094,15 +1111,16 @@ async function workflowView(examId) {
     if (!file) return;
     const problem = await templateProblem(new Uint8Array(await file.arrayBuffer()));
     if (problem) { msg.innerHTML = `<small class="warn-text">${esc(problem)}</small>`; return; }
-    await db.put('settings', { id: 'workflow', ...read() });
+    await save();
     await db.put('settings', { id: 'workflowTemplate', name: file.name, data: await toBase64(file) });
-    workflowView(examId);
+    await workflowView(examId);
+    document.getElementById('word').open = true;
   };
-  dl.onclick = async () => {
-    const t = await db.get('settings', 'workflowTemplate');
-    if (!t) { document.getElementById('tplMsg').innerHTML = '<small class="warn-text">Add your school\'s form first.</small>'; return document.getElementById('tpl').scrollIntoView({ behavior: 'smooth' }); }
+  document.getElementById('dl').onclick = async () => {
+    const t = await db.get('settings', 'workflowTemplate'), msg = document.getElementById('tplMsg');
+    if (!current) { msg.innerHTML = '<small class="warn-text">Paste your recipes first.</small>'; return; }
     const v = read();
-    await db.put('settings', { id: 'workflow', ...v });
+    await save();
     const bytes = await fillPlan(fromBase64(t.data), { ...current, ...v, date: v.date ? v.date.split('-').reverse().join('/') : '' });
     await saveFile(new File([bytes], `Work flow plan ${v.date || today()}.docx`, { type: DOCX }));
   };
