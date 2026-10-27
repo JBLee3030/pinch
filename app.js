@@ -77,6 +77,7 @@ function page(tab, title, body, { back, action = '' } = {}) {
     a.toggleAttribute('aria-current', a.dataset.tab === tab);
   });
   document.body.classList.toggle('sub', !!back);
+  document.onpaste = null; // a screen that takes pasted photos sets its own
   view.innerHTML = `${db.DEMO ? '<div class="demo-bar">Demo with sample data. <a href="./">Open Pinch</a></div>' : ''}
     <header class="${back ? 'top' : 'top root'}">
       ${back ? `<a class="icon-btn" href="${back}" aria-label="Back">${ICON.back}</a><h1 class="bar-title">${esc(title)}</h1>` : `<h1 class="page-title">${esc(title)}</h1>`}
@@ -103,6 +104,8 @@ async function readPhoto(file, max = 1200, quality = 0.8) {
   c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
   return c.toDataURL('image/jpeg', quality);
 }
+// The image in a paste (a copied photo or screenshot), if there is one
+const pastedImage = e => [...(e.clipboardData?.files ?? [])].find(f => f.type.startsWith('image/'));
 const photoField = cur => `<label>Photo<input type="file" name="photo" accept="image/*"></label>
   ${cur ? `<img class="hero" src="${esc(cur)}" alt=""><label class="inline"><input type="checkbox" name="rmPhoto"> Remove photo</label>` : ''}`;
 const photoValue = async (fd, old) => fd.get('rmPhoto') ? null : (await readPhoto(fd.get('photo'))) ?? old ?? null;
@@ -464,7 +467,7 @@ async function recipeEdit(id) {
       <h2>Import a recipe</h2>
       <div class="bar"><input type="url" id="importUrl" inputmode="url" autocomplete="off" placeholder="Paste a recipe link" aria-label="Recipe link"><button type="button" id="importBtn">Import</button></div>
       <label class="btn ghost wide photo-read">${ICON.camera}Read a recipe photo<input type="file" id="photoRead" accept="image/*" hidden></label>
-      <p id="importMsg"><small>Paste a recipe link, or take a photo of a printed or handwritten recipe. Pinch fills in the form for you to check.</small></p>
+      <p id="importMsg"><small>Paste a recipe link, take a photo of a printed or handwritten recipe, or paste a copied photo or screenshot here. Pinch fills in the form for you to check.</small></p>
     </div>` : ''}
     <input type="hidden" name="sourceUrl" value="${esc(r.sourceUrl)}">
     <label>Name<input name="name" required placeholder="e.g. Pomodoro sauce" value="${esc(r.name)}"></label>
@@ -532,9 +535,9 @@ async function recipeEdit(id) {
     } finally { e.target.disabled = false; }
   });
   // Read a photo: Claude reads the recipe on the server; the form is filled for you to check, then Save
-  document.getElementById('photoRead')?.addEventListener('change', async e => {
-    const file = e.target.files[0], msg = document.getElementById('importMsg'), label = e.target.closest('label');
-    if (!file) return;
+  const photoRead = document.getElementById('photoRead');
+  const readRecipe = async file => {
+    const msg = document.getElementById('importMsg'), label = photoRead.closest('label');
     label.classList.add('busy');
     msg.innerHTML = '<small>Reading the photo… this takes about 10 to 30 seconds.</small>';
     try {
@@ -548,8 +551,12 @@ async function recipeEdit(id) {
       msg.innerHTML = `<small class="ok-text">Read ${rec.ingredients.length} ingredients and ${rec.steps.length} steps. Check them, then Save.</small>`;
     } catch (err) {
       msg.innerHTML = `<small class="warn-text">${esc(err.message)}</small>`;
-    } finally { label.classList.remove('busy'); e.target.value = ''; }
-  });
+    } finally { label.classList.remove('busy'); photoRead.value = ''; }
+  };
+  if (photoRead) {
+    photoRead.onchange = () => photoRead.files[0] && readRecipe(photoRead.files[0]);
+    document.onpaste = e => { const img = pastedImage(e); if (img) { e.preventDefault(); readRecipe(img); } };
+  }
   const pasteOpen = document.getElementById('pasteOpen');
   if (pasteOpen) pasteOpen.onclick = () => { paste.hidden = !paste.hidden; if (!paste.hidden) document.getElementById('pasteText').focus(); };
   // Turns the text box lines into ingredient rows. Runs from "Add to recipe", and on Save for anything still typed.
@@ -1049,7 +1056,7 @@ async function workflowView(examId) {
   page('home', 'Work flow plan', `
     <form id="f" onsubmit="return false">
       <label>Paste your recipes<textarea name="paste" rows="8" placeholder="Beef ragu&#10;Ingredients&#10;500 g beef mince&#10;1 onion&#10;Method&#10;1. Dice the onion.&#10;2. Simmer for 90 minutes.&#10;&#10;Panna cotta&#10;Ingredients&#10;…">${esc(w.paste)}</textarea></label>
-      <p class="muted"><small>Paste them all at once: each recipe's name, its ingredients and its method.</small></p>
+      <p class="muted" id="pasteNote"><small>Paste them all at once: each recipe's name, its ingredients and its method. A copied photo or screenshot of a recipe works too.</small></p>
       ${recipes.length ? `<details class="more" ${w.picked.length ? 'open' : ''}><summary>Add from your book</summary>
         <div class="checks">${recipes.map(r => `<label><input type="checkbox" name="picked" value="${esc(r.id)}" ${w.picked.includes(r.id) ? 'checked' : ''}> ${esc(r.name)}</label>`).join('')}</div></details>` : ''}
     </form>
@@ -1105,6 +1112,22 @@ async function workflowView(examId) {
   form.addEventListener('change', save);
   details.addEventListener('change', save);
   draw();
+  // A pasted photo of a recipe: read on the server, added to the box as text in the usual layout
+  const box = form.elements.paste, note = document.getElementById('pasteNote');
+  document.onpaste = async e => {
+    const img = pastedImage(e);
+    if (!img) return;
+    e.preventDefault();
+    note.innerHTML = '<small>Reading the photo… this takes about 10 to 30 seconds.</small>';
+    try {
+      const rec = await sync.readRecipePhoto((await readPhoto(img, 1600, 0.85)).split(',')[1], 'image/jpeg');
+      box.value = [box.value.trim(), [rec.name, rec.servings ? `Serves ${rec.servings}` : '', 'Ingredients', ...rec.ingredients, 'Method',
+        ...rec.steps.map((st, i) => `${i + 1}. ${st}`)].filter(Boolean).join('\n')].filter(Boolean).join('\n\n');
+      note.innerHTML = `<small class="ok-text">Added ${rec.name}. Check it below.</small>`;
+      draw();
+      save();
+    } catch (err) { note.innerHTML = `<small class="warn-text">${esc(err.message)}</small>`; }
+  };
 
   document.getElementById('tplFile').onchange = async e => {
     const file = e.target.files[0], msg = document.getElementById('tplMsg');

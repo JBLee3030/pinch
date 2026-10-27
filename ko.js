@@ -35,7 +35,7 @@ export const KO = {
           
   // Reading a recipe photo
   'Read a recipe photo': '레시피 사진으로 읽기', 'Reading the photo… this takes about 10 to 30 seconds.': '사진을 읽는 중… 10~30초 정도 걸려요.',
-  'Paste a recipe link, or take a photo of a printed or handwritten recipe. Pinch fills in the form for you to check.': '레시피 링크를 붙여넣거나, 인쇄되거나 손으로 쓴 레시피를 찍으세요. Pinch가 칸을 채워 주면 확인만 하면 돼요.',
+  'Paste a recipe link, take a photo of a printed or handwritten recipe, or paste a copied photo or screenshot here. Pinch fills in the form for you to check.': '레시피 링크를 붙여넣거나, 인쇄되거나 손으로 쓴 레시피를 찍거나, 복사한 사진·스크린샷을 여기에 붙여넣으세요. Pinch가 칸을 채워 주면 확인만 하면 돼요.',
   'Reading photos is turned off in the demo.': '데모에서는 사진 읽기가 꺼져 있어요.', 'Sign in (Settings → Account) to read recipe photos.': '사진을 읽으려면 로그인하세요 (설정 → 계정과 동기화).',
   'You’re offline. Connect to the internet to read a photo.': '오프라인이에요. 사진을 읽으려면 인터넷에 연결하세요.', 'Photo reading isn’t set up yet.': '사진 읽기가 아직 설정되지 않았어요.',
   'Send a JPEG, PNG or WebP photo under 4 MB.': '4 MB 이하의 JPEG, PNG, WebP 사진을 보내세요.', 'Busy right now. Try again in a minute.': '지금 바빠요. 1분 뒤에 다시 해 보세요.',
@@ -251,7 +251,7 @@ export const KO = {
   'Work flow': '워크플로우', 'Work flow plan': '워크플로우 플랜', 'Form:': '양식:', 'Choose the Word file': '워드 파일 선택',
   'Student ID': '학번', 'Trainer': '트레이너', 'Group': '그룹', 'Assessment no.': '평가 번호',
   'Download Word file': '워드 파일 받기', 'Change form': '양식 바꾸기', 'Paste your recipes': '레시피 붙여넣기', 'Add from your book': '내 레시피북에서 추가',
-  'Paste them all at once: each recipe\'s name, its ingredients and its method.': '여러 개를 한 번에 붙여넣어도 돼요. 레시피마다 이름, 재료, 만드는 법이 있으면 돼요.',
+  'Paste them all at once: each recipe\'s name, its ingredients and its method. A copied photo or screenshot of a recipe works too.': '여러 개를 한 번에 붙여넣어도 돼요. 레시피마다 이름, 재료, 만드는 법이 있으면 돼요. 레시피 사진이나 스크린샷을 복사해 붙여넣어도 돼요.',
   'Your work plan and ingredients list show here.': '워크 플랜과 재료 목록이 여기 나와요.', 'Work plan': '워크 플랜', 'Copy': '복사',
   'Fill the school\'s Word form': '학교 워드 양식 채우기', 'Add the Work Flow Plan Word file (.docx) once. Pinch fills it in with this plan.': 'Work Flow Plan 워드 파일(.docx)을 한 번만 올리면 이 플랜으로 채워줘요.',
   'Paste your recipes first.': '레시피를 먼저 붙여넣으세요.',
@@ -411,4 +411,5 @@ export const KO_PATTERNS = [
   // Work flow plan
   [/^Runs (\d+) min past 2:00 pm\. Check the long steps\.$/, '오후 2시를 $1분 넘겨요. 오래 걸리는 단계를 확인하세요.'],
   [/^No ingredients found for (.+)\.$/, n => `${n}에서 재료를 못 찾았어요.`],
+  [/^Added (.+)\. Check it below\.$/, n => `${n} 추가했어요. 아래에서 확인하세요.`],
 ];
