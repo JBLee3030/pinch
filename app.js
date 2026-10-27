@@ -1123,7 +1123,7 @@ async function workflowView(examId) {
       const rec = await sync.readRecipePhoto((await readPhoto(img, 1600, 0.85)).split(',')[1], 'image/jpeg');
       box.value = [box.value.trim(), [rec.name, rec.servings ? `Serves ${rec.servings}` : '', 'Ingredients', ...rec.ingredients, 'Method',
         ...rec.steps.map((st, i) => `${i + 1}. ${st}`)].filter(Boolean).join('\n')].filter(Boolean).join('\n\n');
-      note.innerHTML = `<small class="ok-text">Added ${rec.name}. Check it below.</small>`;
+      note.innerHTML = `<small class="ok-text">Added ${esc(rec.name)}. Check it below.</small>`;
       draw();
       save();
     } catch (err) { note.innerHTML = `<small class="warn-text">${esc(err.message)}</small>`; }
