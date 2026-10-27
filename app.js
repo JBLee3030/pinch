@@ -1048,27 +1048,32 @@ async function workflowView(examId) {
     db.get('settings', 'workflow'), db.get('settings', 'workflowTemplate'), examId ? db.get('exams', examId) : null]);
   recipes.sort(byName);
   const recs = toMap(recipes), w = { name: s.cookName, picked: [], ...saved };
-  if (exam) Object.assign(w, { picked: exam.recipeIds ?? [], paste: '', date: exam.date });
+  w.date = exam?.date ?? today(); // the plan is for one day: never yesterday's date
+  if (exam) Object.assign(w, { picked: exam.recipeIds ?? [], paste: '' });
   const fromBook = r => ({ name: r.name, yield: r.portions ? portionsLabel(r.portions) : '', prep: '', cook: '', equipment: '',
     items: (r.items ?? []).map(it => ({ qty: it.qty, unit: it.unit, name: it.recipeId ? recs.get(it.recipeId)?.name ?? '' : ings.get(it.ingredientId)?.name ?? '' })).filter(it => it.name),
     steps: splitSteps(r.method) });
   const field = (k, label, attrs = '') => `<label>${label}<input name="${k}" value="${esc(w[k])}" ${attrs}></label>`;
+  const SHOW = 8;
   page('home', 'Work flow plan', `
-    <form id="f" onsubmit="return false">
-      <label>Paste your recipes<textarea name="paste" rows="8" placeholder="Beef ragu&#10;Ingredients&#10;500 g beef mince&#10;1 onion&#10;Method&#10;1. Dice the onion.&#10;2. Simmer for 90 minutes.&#10;&#10;Panna cotta&#10;Ingredients&#10;…">${esc(w.paste)}</textarea></label>
+    <form id="f" class="no-print" onsubmit="return false">
+      ${recipes.length ? `<h2>Today's dishes</h2>
+        ${recipes.length > SHOW ? '<div class="bar"><input type="search" id="dq" placeholder="Search your recipes" aria-label="Search your recipes"></div>' : ''}
+        <div class="checks" id="dishPick">${recipes.map((r, i) => `<label data-q="${esc(r.name.toLowerCase())}" ${i >= SHOW && !w.picked.includes(r.id) ? 'hidden' : ''}>
+          <input type="checkbox" name="picked" value="${esc(r.id)}" ${w.picked.includes(r.id) ? 'checked' : ''}> ${esc(r.name)}</label>`).join('')}</div>
+        ${recipes.length > SHOW ? `<button type="button" class="link" id="allDishes">Show all ${recipes.length} recipes</button>` : ''}` : ''}
+      <label style="margin-top:16px">${recipes.length ? 'Or paste recipes' : 'Paste your recipes'}<textarea name="paste" rows="8" placeholder="Beef ragu&#10;Ingredients&#10;500 g beef mince&#10;1 onion&#10;Method&#10;1. Dice the onion.&#10;2. Simmer for 90 minutes.&#10;&#10;Panna cotta&#10;Ingredients&#10;…">${esc(w.paste)}</textarea></label>
       <p class="muted" id="pasteNote"><small>Paste them all at once: each recipe's name, its ingredients and its method. A copied photo or screenshot of a recipe works too.</small></p>
-      ${recipes.length ? `<details class="more" ${w.picked.length ? 'open' : ''}><summary>Add from your book</summary>
-        <div class="checks">${recipes.map(r => `<label><input type="checkbox" name="picked" value="${esc(r.id)}" ${w.picked.includes(r.id) ? 'checked' : ''}> ${esc(r.name)}</label>`).join('')}</div></details>` : ''}
     </form>
     <div id="out"></div>
-    <details class="more" id="word"><summary>Fill the school's Word form</summary>
+    <details class="more no-print" id="word"><summary>Fill the school's Word form</summary>
       <p class="muted"><small>${tpl ? `Form: <span translate="no">${esc(tpl.name)}</span>` : 'Add the Work Flow Plan Word file (.docx) once. Pinch fills it in with this plan.'}</small></p>
       <label class="btn ghost">${tpl ? 'Change form' : 'Choose the Word file'}<input type="file" id="tplFile" accept=".docx,${DOCX}" hidden></label>
       <p id="tplMsg"></p>
       <form id="details" onsubmit="return false">
         <div class="row2">${field('name', 'Name')}${field('studentId', 'Student ID')}</div>
         <div class="row2">${field('trainer', 'Trainer')}${field('group', 'Group')}</div>
-        <div class="row2"><label>Date<input name="date" type="date" value="${esc(w.date ?? today())}"></label>${field('assessment', 'Assessment no.', 'inputmode="numeric"')}</div>
+        <div class="row2"><label>Date<input name="date" type="date" value="${esc(w.date)}"></label>${field('assessment', 'Assessment no.', 'inputmode="numeric"')}</div>
       </form>
       <button type="button" class="wide" id="dl" ${tpl ? '' : 'disabled'}>Download Word file</button>
     </details>`, { back: exam ? `#/exam/${esc(exam.id)}/edit` : '#/home' });
@@ -1090,16 +1095,26 @@ async function workflowView(examId) {
     const { recipes: rs, timeline, totals } = current, warn = [], day = dayRows(timeline);
     if (timeline.over) warn.push(`Runs ${timeline.over} min past 2:00 pm. Check the long steps.`);
     rs.filter(r => !r.items.length).forEach(r => warn.push(`No ingredients found for ${r.name}.`));
-    out.innerHTML = `${warn.map(x => `<p class="warn-text"><small>${esc(x)}</small></p>`).join('')}
-      <div class="card wf"><div class="wf-head"><h2>Work plan</h2><button type="button" class="ghost sm" data-copy="plan">Copy</button></div>
+    out.innerHTML = `${warn.map(x => `<p class="warn-text no-print"><small>${esc(x)}</small></p>`).join('')}
+      <div class="card stat-card wf-sum"><p class="stat-label">${dateLabel(read().date || today())}</p>
+        <p class="stat">${rs.length} dish${rs.length === 1 ? '' : 'es'}</p>
+        <p class="stat-sub">${totals.length} ingredients · last task ${esc(timeline.rows.at(-1)?.time ?? '')}</p>
         <p class="muted"><small translate="no">${rs.map(r => esc(r.name)).join(', ')}</small></p>
+        <button type="button" class="ghost sm no-print" id="print">${ICON.printer}Print</button></div>
+      <div class="card wf"><div class="wf-head"><h2>Work plan</h2><button type="button" class="ghost sm no-print" data-copy="plan">Copy</button></div>
         <table><tbody>${day.map(x => `<tr class="${x.fixed ? 'fixed' : ''}"><td class="t">${esc(x.time)}</td>
           <td><span translate="${x.fixed ? 'yes' : 'no'}">${esc(x.task)}</span>${x.equipment ? `<br><small translate="no">${esc(x.equipment)}</small>` : ''}</td></tr>`).join('')}</tbody></table></div>
-      <div class="card wf"><div class="wf-head"><h2>Ingredients</h2><button type="button" class="ghost sm" data-copy="ings">Copy</button></div>
+      <div class="card wf"><div class="wf-head"><h2>Ingredients</h2><button type="button" class="ghost sm no-print" data-copy="ings">Copy</button></div>
         <table><tbody>${totals.map(t => { const used = t.per.map((q, i) => q == null ? '' : `${rs[i].name} ${typeof q === 'number' ? niceAmount(q, t.unit) : q}`).filter(Boolean);
           return `<tr><td><span translate="no">${esc(t.name)}</span>${used.length > 1 ? `<br><small translate="no">${esc(used.join(' · '))}</small>` : ''}</td>
           <td class="n">${esc(t.total > 0 ? niceAmount(t.total, t.unit) : 'q.b.')}</td></tr>`; }).join('')}</tbody></table></div>
-      <p class="muted"><small>Long jobs (simmering, setting, resting) start first and other work fits in while they wait. Plating goes after set up. Steps without a time count as 10 min.</small></p>`;
+      ${rs.map((r, k) => `<div class="card wf wf-recipe"><h2><span class="wf-n">${k + 1}</span><span translate="no">${esc(r.name)}</span></h2>
+        ${(meta => meta.length ? `<p class="muted"><small>${meta.map(x => `<span>${esc(x)}</span>`).join(' · ')}</small></p>` : '')([r.yield, r.prep && `Prep ${r.prep}`, r.cook && `Cook ${r.cook}`].filter(Boolean))}
+        ${r.items.length ? `<table><tbody>${r.items.map(it => `<tr><td class="n">${esc(niceAmount(it.qty, it.unit))}</td><td translate="no">${esc(it.name)}</td></tr>`).join('')}</tbody></table>` : ''}
+        ${r.steps.length ? `<ol class="wf-steps" translate="no">${r.steps.map(st => `<li>${esc(st)}</li>`).join('')}</ol>` : ''}
+        ${r.equipment ? `<p class="muted"><small>${esc(r.equipment)}</small></p>` : ''}</div>`).join('')}
+      <p class="muted no-print"><small>Long jobs (simmering, setting, resting) start first and other work fits in while they wait. Plating goes after set up. Steps without a time count as 10 min.</small></p>`;
+    document.getElementById('print').onclick = () => print();
     out.querySelectorAll('[data-copy]').forEach(btn => btn.onclick = async () => {
       const text = btn.dataset.copy === 'plan'
         ? tsv([['Time', 'Task', 'Equipment'], ...day.map(x => [x.time, x.task, x.equipment])])
@@ -1108,7 +1123,14 @@ async function workflowView(examId) {
       btn.textContent = 'Copied';
     });
   };
-  form.addEventListener('input', draw);
+  const pick = document.getElementById('dishPick');
+  document.getElementById('dq')?.addEventListener('input', e => {
+    const q = e.target.value.trim().toLowerCase();
+    pick.querySelectorAll('label').forEach((l, i) => { l.hidden = q ? !l.dataset.q.includes(q) : i >= SHOW && !l.querySelector('input').checked; });
+  });
+  const all = document.getElementById('allDishes');
+  if (all) all.onclick = () => { pick.querySelectorAll('label').forEach(l => { l.hidden = false; }); all.remove(); };
+  form.addEventListener('input', e => { if (e.target.id !== 'dq') draw(); });
   form.addEventListener('change', save);
   details.addEventListener('change', save);
   draw();

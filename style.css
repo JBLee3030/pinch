@@ -691,3 +691,15 @@ button.running { background: var(--accent); color: #fff; font-variant-numeric: t
 .wf tr.fixed td { color: var(--text-3); }
 .wf td small { color: var(--text-3); }
 #word button.wide { width: 100%; margin-top: var(--s3); }
+.wf-sum #print { margin-top: var(--s3); }
+.wf-sum #print svg { width: 18px; height: 18px; }
+.wf-recipe h2 { display: flex; align-items: center; gap: var(--s2); margin: 0 0 var(--s1); }
+.wf-n { display: inline-grid; place-items: center; flex: none; width: 24px; height: 24px; border-radius: 50%; background: var(--accent-weak); color: var(--accent); font: 700 13px/1 var(--font); }
+.wf-recipe td.n { width: 72px; text-align: left; color: var(--text-2); }
+.wf-steps { margin: var(--s3) 0 0; padding-left: var(--s5); }
+.wf-steps li { margin-bottom: var(--s2); }
+@media print {
+  .wf { break-inside: avoid; margin-bottom: 6mm; }
+  .wf-sum .stat { font-size: 16pt; }
+  .wf-n { border: 1px solid #191F28; background: none; color: #191F28; }
+}
