@@ -128,8 +128,8 @@ export const readRecipePhoto = (image, type) => askClaude({ image, type });
 export const translateNames = async names => (await askClaude({ names })).dishes;
 
 async function askClaude(body) {
-  if (db.DEMO) throw new Error('Reading photos is turned off in the demo.');
-  if (!state.session) throw new Error('Sign in (Settings → Account) to read recipe photos.');
+  if (db.DEMO) throw new Error(body.names ? 'Translating names is turned off in the demo.' : 'Reading photos is turned off in the demo.');
+  if (!state.session) throw new Error(body.names ? 'Sign in (Settings → Account) to translate names.' : 'Sign in (Settings → Account) to read recipe photos.');
   let res;
   try {
     res = await fetch(`${BASE}/functions/v1/recipe-photo`, {
