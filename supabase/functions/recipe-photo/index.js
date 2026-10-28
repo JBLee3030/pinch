@@ -1,5 +1,5 @@
 // Supabase Edge Function: a photo of a recipe (printed, handwritten, a screen or a whiteboard) -> the
-// recipe's name, servings, ingredient lines and steps, read by Claude. The app fills the New recipe form
+// recipe's English and Italian names, servings, ingredient lines and steps, read by Claude. The app fills the New recipe form
 // with the result; nothing is saved here and the photo is not stored.
 //
 // Signed-in Pinch users only, DAILY photos each per 24 hours (table photo_reads, see supabase.sql),
@@ -22,10 +22,11 @@ const reply = (body, status = 200) => new Response(JSON.stringify(body), { statu
 export const SCHEMA = {
   type: 'object',
   additionalProperties: false,
-  required: ['found', 'name', 'servings', 'ingredients', 'steps'],
+  required: ['found', 'name', 'italian', 'servings', 'ingredients', 'steps'],
   properties: {
     found: { type: 'boolean', description: 'false when the photo does not show a recipe' },
-    name: { type: 'string' },
+    name: { type: 'string', description: 'the dish name in English' },
+    italian: { type: 'string', description: 'the dish name in Italian; empty when it has none' },
     servings: { type: 'integer', description: 'portions the recipe makes; 0 when not stated' },
     ingredients: { type: 'array', items: { type: 'string' } },
     steps: { type: 'array', items: { type: 'string' } },
@@ -34,7 +35,8 @@ export const SCHEMA = {
 
 export const PROMPT = `This photo shows a recipe: printed, handwritten, on a screen or on a whiteboard. Transcribe it for a cook's recipe app.
 
-- name: the recipe's title. If there is none, a short plain name for the dish.
+- name: the dish's name in English. If the title is in another language, translate it the way an English menu would ("Tagliatelle al pomodoro" → "Tagliatelle with tomato sauce"). If there is no title, a short plain English name for the dish.
+- italian: the dish's Italian name: the title as written if it is Italian, otherwise the usual Italian name for an Italian dish ("Fresh egg pasta" → "Pasta fresca all'uovo"). Empty when the dish isn't Italian and has no Italian name.
 - servings: how many portions it makes, if the recipe says; otherwise 0.
 - ingredients: one line per ingredient, in this form: quantity, unit, name. For example "500 g tipo 00 flour", "2 tbsp olive oil", "3 eggs", "1/2 cup milk". Use these units where they apply: g, kg, ml, L, tsp, tbsp, cup; write counted items as just the number. Copy amounts exactly as written (keep fractions and ranges); never invent an amount. If no amount is written, give just the ingredient. Keep the recipe's own language for names. If the recipe has parts (for example a sauce and a dough), list every ingredient from every part.
 - steps: the method, one step per entry, in order, without step numbers. Keep times and temperatures exactly as written.
@@ -47,6 +49,7 @@ export function toRecipe(o) {
   const lines = a => (Array.isArray(a) ? a : []).map(x => String(x).replace(/\s+/g, ' ').trim()).filter(Boolean).slice(0, 80);
   return {
     name: String(o?.name ?? '').replace(/\s+/g, ' ').trim().slice(0, 120) || 'Recipe from a photo',
+    italian: String(o?.italian ?? '').replace(/\s+/g, ' ').trim().slice(0, 120),
     servings: Number.isInteger(o?.servings) && o.servings > 0 && o.servings < 1000 ? o.servings : null,
     ingredients: lines(o?.ingredients),
     steps: lines(o?.steps).map(s => s.replace(/^(step\s*)?\d+\s*[.):-]\s*/i, '')),

@@ -75,7 +75,7 @@ Mobile-first and Toss-inspired: grey canvas, flat white cards, the key number bi
 | **Parsing** | [`parse.js`](parse.js): ingredient-line parser (fractions, ranges, `2 x 400g`, AU measures), word-based matching to saved ingredients, method steps and timers. |
 | **Recipe import** | Supabase Edge Function [`recipe-import`](supabase/functions/recipe-import/index.js) reads the page's schema.org Recipe (JSON-LD) and returns only the recipe; public http(s) pages only, size and time limits. |
 | **Tests** | `node calc.test.js` — assertion-based checks for costing, sub-recipes, circular references, temperature limits, sync conflict rules, recipe parsing and import, sharing, and the Korean UI. |
-| **Recipe photos** | Supabase Edge Function [`recipe-photo`](supabase/functions/recipe-photo/index.js) sends the photo to Claude (Anthropic API) and returns the name, servings, ingredient lines and steps as structured JSON; signed-in users only, 30 a day each, photos not stored. |
+| **Recipe photos** | Supabase Edge Function [`recipe-photo`](supabase/functions/recipe-photo/index.js) sends the photo to Claude (Anthropic API) and returns the English and Italian names, servings, ingredient lines and steps as structured JSON; signed-in users only, 30 a day each, photos not stored. |
 | **Hosting** | GitHub Pages; every push to `main` deploys. index.html loads every file with one `?v=` release number (an import map for the modules), so the CDN can never serve a mix of old and new files. |
 
 ```

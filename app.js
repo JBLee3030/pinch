@@ -564,6 +564,7 @@ async function recipeEdit(id) {
       const rec = await sync.readRecipePhoto(jpeg.split(',')[1], 'image/jpeg');
       const f = document.getElementById('f');
       f.elements.name.value = rec.name;
+      if (rec.italian) f.elements.italian.value = rec.italian;
       document.getElementById('pasteText').value = rec.ingredients.join('\n');
       f.elements.method.value = rec.steps.map((st, i) => `${i + 1}. ${st}`).join('\n');
       if (rec.servings) f.elements.portions.value = rec.servings;
