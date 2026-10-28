@@ -37,7 +37,7 @@ export function tr(s, depth = 0) {
 }
 
 // Never translated: paper output, study card text, anything marked translate="no", and what people typed
-const SKIP = 'script, style, .sheet, [translate="no"]';
+const SKIP = 'script, style, .sheet, .method, .cook-step, .checklist.steps, [translate="no"]'; // the method is what people typed
 const ATTRS = ['placeholder', 'aria-label', 'title', 'alt'];
 
 function fixText(n) {

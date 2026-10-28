@@ -708,3 +708,25 @@ button.running { background: var(--accent); color: #fff; font-variant-numeric: t
 }
 .it-name { margin: 0 0 var(--s1); color: var(--text-2); font-style: italic; }
 .sheet .it-name { margin: 2px 0 0; }
+.cook-head { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); margin-bottom: var(--s3); }
+.cook-head .step-count { margin: 0; }
+.step-ko:not([hidden]) { display: block; margin-top: var(--s1); color: var(--text-2); font: 400 15px/1.5 var(--font); }
+.cook-steps li.now .step-ko { font-size: 17px; }
+.cook-steps li.done .step-ko { color: var(--text-3); }
+
+/* Recipe detail: the dish name big under the photo, the method as numbered steps */
+.detail-title { margin: var(--s2) 0 var(--s1); font: var(--t-title); letter-spacing: -.02em; }
+.detail-title + .it-name { font-size: 17px; }
+.step-list { list-style: none; margin: var(--s3) 0 0; padding: 0; white-space: normal; }
+.step-list li { display: flex; gap: var(--s3); padding: var(--s2) 0; font: 400 16px/1.6 var(--font); }
+.step-list .step-n { margin-top: 0; }
+.row-top { display: flex; align-items: center; justify-content: space-between; gap: var(--s2); }
+.practice .list small { margin-top: 2px; }
+
+/* Links: still underlined (not colour alone), but quietly */
+a { text-underline-offset: 3px; text-decoration-color: color-mix(in srgb, currentColor 35%, transparent); }
+h2.day { font: 700 15px/1.4 var(--font); color: var(--text-2); }
+.bar-title.on-scroll { opacity: 0; transition: opacity 160ms ease; }
+.bar-title.on-scroll.shown { opacity: 1; }
+@media (prefers-reduced-motion: reduce) { .bar-title.on-scroll { transition: none; } }
+button.ghost[aria-pressed=true] { background: var(--accent-weak); color: var(--accent); }

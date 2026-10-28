@@ -281,6 +281,18 @@ async function recipeList() {
   document.getElementById('sample')?.addEventListener('click', async () => { await loadSample(); recipeList(); });
 }
 
+// A method as numbered steps, the numbers drawn like cook mode's.
+const stepItems = text => splitSteps(text).map((t, i) => `<li><span class="step-n" aria-hidden="true">${i + 1}</span><span>${esc(t)}</span></li>`).join('');
+
+// The method in Korean: translated once by Claude, kept with the recipe until the method changes.
+async function methodKo(r) {
+  if (r.methodKo?.from !== r.method) {
+    r.methodKo = { from: r.method, text: await sync.methodInKorean(r.method) };
+    await db.put('recipes', { ...(await db.get('recipes', r.id)), methodKo: r.methodKo }); // not an edit: "Last edited" stays
+  }
+  return r.methodKo.text;
+}
+
 // Every recipe's English name (the title) and Italian name (the subtitle) on one screen; Claude can fill them.
 async function recipeNames() {
   const recipes = (await db.all('recipes')).sort(byName);
@@ -332,6 +344,7 @@ async function recipeView(id) {
 
   page('recipes', r.name, `
     ${r.photo ? `<img class="hero" src="${esc(r.photo)}" alt="">` : ''}
+    <h1 class="detail-title">${esc(r.name)}</h1>
     ${r.italian ? `<p class="it-name" translate="no">${esc(r.italian)}</p>` : ''}
     <p class="muted">${esc(r.category || 'Uncategorised')} · ${/^https?:\/\//.test(r.sourceUrl ?? '') ? `From <a href="${esc(r.sourceUrl)}" target="_blank" rel="noopener">${esc(new URL(r.sourceUrl).hostname.replace(/^www\./, ''))}</a>` : esc({ school: 'From school', work: 'From work', own: 'My own', web: 'From the web', shared: 'Shared with me' }[r.source] || '')}${r.yieldQty ? ` · Yields ${esc(r.yieldQty)} ${esc(r.yieldUnit)}` : ''}</p>
     ${usedIn.length ? `<p class="muted">Used in: ${usedIn.map(x => `<a href="#/recipe/${esc(x.id)}">${esc(x.name)}</a>`).join(', ')}</p>` : ''}
@@ -365,46 +378,45 @@ async function recipeView(id) {
           <button type="button" class="ghost" data-step="1" aria-label="More portions">+</button></div></div>
       <table><tbody id="items"></tbody></table></div>
     ${r.method ? `<div class="card"><div class="wf-head"><h2>Method</h2><button type="button" class="ghost sm" id="ko">${r.methodKo?.from === r.method ? 'Show Korean' : 'Translate to Korean'}</button></div>
-      <div class="method" id="method">${esc(r.method)}</div><p id="koMsg"></p></div>` : ''}
+      <ol class="method step-list" id="method">${stepItems(r.method)}</ol><p id="koMsg"></p></div>` : ''}
     <div class="card practice"><h2>Practice</h2>
       ${attempts.length ? `
         <p class="practice-sum">${stars(avg)}<span class="muted">${rated.length ? `${fmtQty(avg)} average, ` : ''}${attempts.length} attempt${attempts.length === 1 ? '' : 's'}</span></p>
         ${lastNext ? `<p class="tip"><small><b>Next time:</b> ${esc(lastNext)}</small></p>` : ''}
         <ul class="list">${attempts.slice(0, 3).map(a => `<li><a href="#/attempt/${esc(a.id)}/edit">
           ${a.photo ? `<img src="${esc(a.photo)}" alt="">` : '<span class="ph" aria-hidden="true"></span>'}
-          <div class="grow"><b>${esc(dateLabel(a.date))}</b><small>${esc(a.logId ? ['Class service', a.notes].filter(Boolean).join('. ') : a.notes || a.next || 'No notes')}</small></div>
-          <span class="trail">${stars(a.rating)}</span></a></li>`).join('')}</ul>`
+          <div class="grow"><span class="row-top"><b>${esc(dateLabel(a.date))}</b>${stars(a.rating)}</span><small>${esc(a.logId ? ['Class service', a.notes].filter(Boolean).join('. ') : a.notes || a.next || 'No notes')}</small></div>
+          </a></li>`).join('')}</ul>`
         : '<p class="muted">Each time you cook this, note how it went and what to change. Your notes show up when you start cooking.</p>'}</div>
     <div class="cta-bar"><a class="btn" href="#/recipe/${esc(r.id)}/cook">Start cooking</a></div>`,
     { back: '#/recipes', action: `<button type="button" class="icon-btn fav" id="fav" aria-pressed="${!!r.fav}" aria-label="Favourite"><svg viewBox="0 0 24 24" aria-hidden="true">${STAR}</svg></button>
       <a class="btn sm tint" href="#/recipe/${esc(r.id)}/edit">Edit</a>` });
 
+  // The small title in the top bar appears only once the big one has scrolled away.
+  const barTitle = document.querySelector('.bar-title');
+  barTitle.classList.add('on-scroll');
+  new IntersectionObserver(([e]) => barTitle.classList.toggle('shown', !e.isIntersecting), { rootMargin: '-56px 0px 0px' })
+    .observe(document.querySelector('.detail-title'));
   const favBtn = document.getElementById('fav');
   favBtn.onclick = async () => {
     const now = await db.get('recipes', r.id), fav = !now.fav;
     favBtn.setAttribute('aria-pressed', String(fav));
     await db.put('recipes', { ...now, fav, updatedAt: Date.now() });
   };
-  // The method in Korean: translated once by Claude, kept with the recipe until the method changes.
   const koBtn = document.getElementById('ko');
   if (koBtn) koBtn.onclick = async () => {
     const box = document.getElementById('method'), msg = document.getElementById('koMsg');
-    if (box.dataset.ko) { delete box.dataset.ko; box.textContent = r.method; koBtn.textContent = 'Show Korean'; return; }
-    if (r.methodKo?.from !== r.method) {
-      koBtn.classList.add('busy');
-      msg.innerHTML = '<small>Translating…</small>';
-      try {
-        r.methodKo = { from: r.method, text: await sync.methodInKorean(r.method) };
-        await db.put('recipes', { ...(await db.get('recipes', r.id)), methodKo: r.methodKo }); // not an edit: "Last edited" stays
-        msg.textContent = '';
-      } catch (err) {
-        msg.innerHTML = `<small class="warn-text">${esc(err.message)}</small>`;
-        return;
-      } finally { koBtn.classList.remove('busy'); }
-    }
-    box.dataset.ko = '1';
-    box.textContent = r.methodKo.text;
-    koBtn.textContent = 'Show original';
+    if (box.dataset.ko) { delete box.dataset.ko; box.innerHTML = stepItems(r.method); koBtn.textContent = 'Show Korean'; return; }
+    koBtn.classList.add('busy');
+    msg.innerHTML = '<small>Translating…</small>';
+    try {
+      box.innerHTML = stepItems(await methodKo(r));
+      box.dataset.ko = '1';
+      koBtn.textContent = 'Show original';
+      msg.textContent = '';
+    } catch (err) {
+      msg.innerHTML = `<small class="warn-text">${esc(err.message)}</small>`;
+    } finally { koBtn.classList.remove('busy'); }
   };
   const scale = document.getElementById('scale');
   const drawItems = () => {
@@ -1680,7 +1692,7 @@ document.addEventListener('visibilitychange', () => {
 async function cookView(id) {
   const r = await db.get('recipes', id);
   if (!r) return go('#/recipes');
-  const [ings, recipes, attempts] = await Promise.all([ingMap(), db.all('recipes'), attemptsFor(id)]);
+  const [ings, recipes, attempts, koPref] = await Promise.all([ingMap(), db.all('recipes'), attemptsFor(id), db.get('settings', 'cookKo')]);
   const lastNext = attempts.find(a => a.next);
   const recs = toMap(recipes);
   const steps = splitSteps(r.method);
@@ -1693,10 +1705,11 @@ async function cookView(id) {
     <details class="more cook-ings" ${steps.length ? '' : 'open'}><summary>Ingredients (${(r.items ?? []).length})</summary>
       <label class="inline">Portions <input id="cookPortions" type="number" min="1" step="1" inputmode="numeric" value="${esc(r.portions)}"></label>
       <ul class="checklist" id="checklist"></ul></details>
-    ${steps.length ? `<p class="step-count" id="stepCount"></p>
+    ${steps.length ? `<div class="cook-head"><p class="step-count" id="stepCount"></p>
+      <button type="button" class="ghost sm" id="ko" aria-pressed="false">Korean</button></div><p id="koMsg"></p>
       <ol class="cook-steps" id="steps">${steps.map((t, i) => {
         const ds = findDurations(t);
-        return `<li data-i="${i}"><button type="button" class="cook-step" data-go="${i}"><span class="step-n" aria-hidden="true">${i + 1}</span><span>${esc(t)}</span></button>
+        return `<li data-i="${i}"><button type="button" class="cook-step" data-go="${i}"><span class="step-n" aria-hidden="true">${i + 1}</span><span>${esc(t)}<small class="step-ko" translate="no" hidden></small></span></button>
           ${ds.length ? `<div class="step-timers">${ds.map(d => `<button type="button" class="tint sm" data-timer="${d.seconds}" data-label="${esc(`Step ${i + 1}: ${fmtDuration(d.seconds)}`)}">Start ${esc(fmtDuration(d.seconds))} timer</button>`).join('')}</div>` : ''}</li>`;
       }).join('')}</ol>
       <div class="cook-dock"><div id="cookTimers" aria-live="polite"></div>
@@ -1728,6 +1741,26 @@ async function cookView(id) {
     }).join('') || '<li class="muted">No ingredients yet.</li>';
   };
   drawChecklist();
+  // Korean under each step, for reading along; the choice is remembered for every recipe.
+  const koBtn = document.getElementById('ko');
+  const showKo = async on => {
+    const msg = document.getElementById('koMsg');
+    let ko = [];
+    if (on) {
+      koBtn.classList.add('busy');
+      msg.innerHTML = '<small>Translating…</small>';
+      try { ko = splitSteps(await methodKo(r)); msg.textContent = ''; }
+      catch (err) { msg.innerHTML = `<small class="warn-text">${esc(err.message)}</small>`; on = false; }
+      finally { koBtn.classList.remove('busy'); }
+    }
+    stepsEl.querySelectorAll('.step-ko').forEach((el, i) => { el.textContent = ko[i] ?? ''; el.hidden = !ko[i]; });
+    koBtn.setAttribute('aria-pressed', String(on));
+    return on;
+  };
+  if (koBtn) {
+    if (koPref?.on && r.methodKo?.from === r.method) showKo(true); // cached: no call to Claude on open
+    koBtn.onclick = async () => db.put('settings', { id: 'cookKo', on: await showKo(koBtn.getAttribute('aria-pressed') !== 'true') });
+  }
   if (steps.length) {
     drawSteps(false);
     prev.onclick = () => { at = Math.max(0, at - 1); drawSteps(true); };
