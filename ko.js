@@ -36,7 +36,8 @@ export const KO = {
   // Reading a recipe photo
   'Read a recipe photo': '레시피 사진으로 읽기', 'Reading the photo… this takes about 10 to 30 seconds.': '사진을 읽는 중… 10~30초 정도 걸려요.',
   'Paste a recipe link, take a photo of a printed or handwritten recipe, or paste a copied photo or screenshot here. Pinch fills in the form for you to check.': '레시피 링크를 붙여넣거나, 인쇄되거나 손으로 쓴 레시피를 찍거나, 복사한 사진·스크린샷을 여기에 붙여넣으세요. Pinch가 칸을 채워 주면 확인만 하면 돼요.',
-  'Reading photos is turned off in the demo.': '데모에서는 사진 읽기가 꺼져 있어요.', 'Translating names is turned off in the demo.': '데모에서는 이름 번역이 꺼져 있어요.', 'Sign in (Settings → Account) to translate names.': '이름을 번역하려면 로그인하세요 (설정 → 계정과 동기화).', 'Sign in (Settings → Account) to read recipe photos.': '사진을 읽으려면 로그인하세요 (설정 → 계정과 동기화).',
+  'Reading photos is turned off in the demo.': '데모에서는 사진 읽기가 꺼져 있어요.', 'Translating is turned off in the demo.': '데모에서는 번역이 꺼져 있어요.', 'Sign in (Settings → Account) to translate.': '번역하려면 로그인하세요 (설정 → 계정과 동기화).',
+  'Translate to Korean': '한국어로 번역', 'Show original': '원문 보기', 'Show Korean': '한국어 보기', 'Translating…': '번역하는 중…', 'Sign in (Settings → Account) to read recipe photos.': '사진을 읽으려면 로그인하세요 (설정 → 계정과 동기화).',
   'You’re offline. Connect to the internet to read a photo.': '오프라인이에요. 사진을 읽으려면 인터넷에 연결하세요.', 'Photo reading isn’t set up yet.': '사진 읽기가 아직 설정되지 않았어요.',
   'Send a JPEG, PNG or WebP photo under 4 MB.': '4 MB 이하의 JPEG, PNG, WebP 사진을 보내세요.', 'Busy right now. Try again in a minute.': '지금 바빠요. 1분 뒤에 다시 해 보세요.',
   'This photo couldn’t be read. Try another photo, or paste the text.': '이 사진은 읽을 수 없어요. 다른 사진으로 하거나 글을 붙여넣으세요.',

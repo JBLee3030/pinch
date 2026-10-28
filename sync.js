@@ -126,10 +126,13 @@ export const readRecipePhoto = (image, type) => askClaude({ image, type });
 
 // Recipe names -> [{ name (English), italian }], same order. Same function and daily limit as photos.
 export const translateNames = async names => (await askClaude({ names })).dishes;
+// A recipe method -> the same method in Korean.
+export const methodInKorean = async text => (await askClaude({ translate: text })).text;
 
 async function askClaude(body) {
-  if (db.DEMO) throw new Error(body.names ? 'Translating names is turned off in the demo.' : 'Reading photos is turned off in the demo.');
-  if (!state.session) throw new Error(body.names ? 'Sign in (Settings → Account) to translate names.' : 'Sign in (Settings → Account) to read recipe photos.');
+  const words = body.image ? 'read recipe photos' : 'translate';
+  if (db.DEMO) throw new Error(body.image ? 'Reading photos is turned off in the demo.' : 'Translating is turned off in the demo.');
+  if (!state.session) throw new Error(`Sign in (Settings → Account) to ${words}.`);
   let res;
   try {
     res = await fetch(`${BASE}/functions/v1/recipe-photo`, {

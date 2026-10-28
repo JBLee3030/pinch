@@ -364,7 +364,8 @@ async function recipeView(id) {
           <input type="number" id="scale" min="1" step="1" inputmode="numeric" value="${esc(r.portions)}" aria-label="Portions">
           <button type="button" class="ghost" data-step="1" aria-label="More portions">+</button></div></div>
       <table><tbody id="items"></tbody></table></div>
-    ${r.method ? `<div class="card"><h2>Method</h2><div class="method">${esc(r.method)}</div></div>` : ''}
+    ${r.method ? `<div class="card"><div class="wf-head"><h2>Method</h2><button type="button" class="ghost sm" id="ko">${r.methodKo?.from === r.method ? 'Show Korean' : 'Translate to Korean'}</button></div>
+      <div class="method" id="method">${esc(r.method)}</div><p id="koMsg"></p></div>` : ''}
     <div class="card practice"><h2>Practice</h2>
       ${attempts.length ? `
         <p class="practice-sum">${stars(avg)}<span class="muted">${rated.length ? `${fmtQty(avg)} average, ` : ''}${attempts.length} attempt${attempts.length === 1 ? '' : 's'}</span></p>
@@ -383,6 +384,27 @@ async function recipeView(id) {
     const now = await db.get('recipes', r.id), fav = !now.fav;
     favBtn.setAttribute('aria-pressed', String(fav));
     await db.put('recipes', { ...now, fav, updatedAt: Date.now() });
+  };
+  // The method in Korean: translated once by Claude, kept with the recipe until the method changes.
+  const koBtn = document.getElementById('ko');
+  if (koBtn) koBtn.onclick = async () => {
+    const box = document.getElementById('method'), msg = document.getElementById('koMsg');
+    if (box.dataset.ko) { delete box.dataset.ko; box.textContent = r.method; koBtn.textContent = 'Show Korean'; return; }
+    if (r.methodKo?.from !== r.method) {
+      koBtn.classList.add('busy');
+      msg.innerHTML = '<small>Translating…</small>';
+      try {
+        r.methodKo = { from: r.method, text: await sync.methodInKorean(r.method) };
+        await db.put('recipes', { ...(await db.get('recipes', r.id)), methodKo: r.methodKo }); // not an edit: "Last edited" stays
+        msg.textContent = '';
+      } catch (err) {
+        msg.innerHTML = `<small class="warn-text">${esc(err.message)}</small>`;
+        return;
+      } finally { koBtn.classList.remove('busy'); }
+    }
+    box.dataset.ko = '1';
+    box.textContent = r.methodKo.text;
+    koBtn.textContent = 'Show original';
   };
   const scale = document.getElementById('scale');
   const drawItems = () => {

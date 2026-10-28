@@ -1,7 +1,8 @@
 // Supabase Edge Function: a photo of a recipe (printed, handwritten, a screen or a whiteboard) -> the
 // recipe's English and Italian names, servings, ingredient lines and steps, read by Claude. The app fills the New recipe form
 // with the result; nothing is saved here and the photo is not stored.
-// Also { names: [...] } -> each recipe name in English and Italian, for the app's Recipe names screen.
+// Also { names: [...] } -> each recipe name in English and Italian, for the app's Recipe names screen,
+// and { translate: method } -> the method in Korean, for the recipe screen.
 //
 // Signed-in Pinch users only, DAILY photos each per 24 hours (table photo_reads, see supabase.sql),
 // so the public app can't be used to run up the API bill.
@@ -67,7 +68,22 @@ Return exactly one entry per name.
 Names:
 `;
 
-const MAX_NAMES = 200;
+export const KO_SCHEMA = {
+  type: 'object', additionalProperties: false, required: ['text'],
+  properties: { text: { type: 'string' } },
+};
+
+export const KO_PROMPT = `Translate this recipe method into natural Korean for a Korean cookery student in Australia.
+
+- Keep the line breaks and step numbers exactly as they are.
+- Keep every number, amount, unit, time and temperature exactly as written.
+- For Italian or French dish and ingredient names and kitchen terms (soffritto, al dente, brunoise), keep the original word and add the Korean in brackets the first time it appears.
+- Translate only; don't add or leave out anything.
+
+Method:
+`;
+
+const MAX_NAMES = 200, MAX_TEXT = 8000;
 const tidy = s => String(s ?? '').replace(/\s+/g, ' ').trim().slice(0, 120);
 
 // One entry per name sent, whatever came back; a missing English name keeps the original.
@@ -108,7 +124,15 @@ async function allow(auth) {
 async function handle(req) {
   if (req.method === 'OPTIONS') return new Response(null, { headers: CORS });
   if (req.method !== 'POST') return reply({ error: 'Use POST' }, 405);
-  const { image, type, names } = await req.json().catch(() => ({}));
+  const { image, type, names, translate } = await req.json().catch(() => ({}));
+  if (translate !== undefined) {
+    if (typeof translate !== 'string' || !translate.trim() || translate.length > MAX_TEXT) return reply({ error: 'Send a method under 8,000 characters.' }, 400);
+    const denied = await allow(req.headers.get('Authorization') ?? '');
+    if (denied) return denied;
+    return ask([{ type: 'text', text: KO_PROMPT + translate.trim() }], KO_SCHEMA, 'low', out => out?.text
+      ? reply({ text: String(out.text).trim() })
+      : reply({ error: 'Couldn’t read that. Try again.' }, 502));
+  }
   if (names !== undefined) {
     if (!Array.isArray(names) || !names.length || names.length > MAX_NAMES || names.some(n => typeof n !== 'string' || !n.trim() || n.length > 120)) {
       return reply({ error: `Send 1 to ${MAX_NAMES} recipe names.` }, 400);
