@@ -230,17 +230,28 @@ async function instagramView(id) {
 const costLine = c => `${money(c.perPortion)}<small>${c.problems.length ? '<span class="warn-text">Incomplete</span>' : 'per portion'}</small>`;
 
 async function recipeList() {
-  const [recipes, ings] = await Promise.all([db.all('recipes'), ingMap()]);
-  recipes.sort(byName);
+  const [recipes, ings, saved] = await Promise.all([db.all('recipes'), ingMap(), db.get('settings', 'recipeSort')]);
   const recs = toMap(recipes);
+  const costs = new Map(recipes.map(r => [r.id, recipeCost(r, ings, recs)]));
+  const per = r => { const c = costs.get(r.id); return c.problems.length ? Infinity : c.perPortion; }; // incomplete last
+  const SORTS = {
+    name: byName,
+    new: (a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0) || byName(a, b),
+    edited: (a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0) || byName(a, b),
+    cost: (a, b) => per(a) - per(b) || byName(a, b),
+  };
+  let by = SORTS[saved?.by] ? saved.by : 'name';
+  recipes.sort(SORTS[by]);
   const cats = [...new Set(recipes.map(r => r.category).filter(Boolean))].sort();
   page('recipes', 'Recipes', recipes.length ? `
     <div class="bar"><input type="search" id="q" placeholder="Search recipes or ingredients" aria-label="Search recipes or ingredients">
-      <select id="cat" aria-label="Category"><option value="">All</option>${opts(cats)}</select></div>
-    <ul class="list">${recipes.map(r => `<li data-q="${esc([r.name, ...(r.items ?? []).map(it => it.recipeId ? recs.get(it.recipeId)?.name : ings.get(it.ingredientId)?.name)].filter(Boolean).join(' ').toLowerCase())}" data-cat="${esc(r.category)}"><a href="#/recipe/${esc(r.id)}">
+      <select id="cat" aria-label="Category"><option value="">All</option>${opts(cats)}</select>
+      <select id="sort" aria-label="Sort">${[['name', 'A–Z'], ['new', 'Newest'], ['edited', 'Last edited'], ['cost', 'Lowest cost']]
+        .map(([v, l]) => `<option value="${v}"${v === by ? ' selected' : ''}>${l}</option>`).join('')}</select></div>
+    <ul class="list">${recipes.map(r => `<li data-id="${esc(r.id)}" data-q="${esc([r.name, ...(r.items ?? []).map(it => it.recipeId ? recs.get(it.recipeId)?.name : ings.get(it.ingredientId)?.name)].filter(Boolean).join(' ').toLowerCase())}" data-cat="${esc(r.category)}"><a href="#/recipe/${esc(r.id)}">
       ${r.photo ? `<img src="${esc(r.photo)}" alt="">` : '<span class="ph" aria-hidden="true"></span>'}
       <div class="grow"><b>${esc(r.name)}</b><small>${esc(r.category || 'Uncategorised')}</small></div>
-      <span class="trail">${costLine(recipeCost(r, ings, recs))}</span></a></li>`).join('')}</ul>`
+      <span class="trail">${costLine(costs.get(r.id))}</span></a></li>`).join('')}</ul>`
     : `<div class="card welcome"><h2>Welcome to Pinch</h2>
         <ol class="steps">
           <li><b>Write a recipe.</b> Type ingredients as you go. Pinch works out cost per portion, allergens and a recipe card.</li>
@@ -260,6 +271,12 @@ async function recipeList() {
   });
   q?.addEventListener('input', filter);
   cat?.addEventListener('change', filter);
+  document.getElementById('sort')?.addEventListener('change', e => {
+    by = e.target.value;
+    const ul = document.querySelector('.list'), li = new Map([...ul.children].map(x => [x.dataset.id, x]));
+    ul.append(...recipes.sort(SORTS[by]).map(r => li.get(r.id)));
+    db.put('settings', { id: 'recipeSort', by });
+  });
   document.getElementById('sample')?.addEventListener('click', async () => { await loadSample(); recipeList(); });
 }
 
@@ -629,9 +646,18 @@ async function recipeEdit(id) {
 }
 
 async function allergenChart() {
-  const [recipes, ings] = await Promise.all([db.all('recipes'), ingMap()]);
-  recipes.sort(byName);
+  const [recipes, ings, saved] = await Promise.all([db.all('recipes'), ingMap(), db.get('settings', 'recipeSort')]);
   const recs = toMap(recipes);
+  const costs = new Map(recipes.map(r => [r.id, recipeCost(r, ings, recs)]));
+  const per = r => { const c = costs.get(r.id); return c.problems.length ? Infinity : c.perPortion; }; // incomplete last
+  const SORTS = {
+    name: byName,
+    new: (a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0) || byName(a, b),
+    edited: (a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0) || byName(a, b),
+    cost: (a, b) => per(a) - per(b) || byName(a, b),
+  };
+  let by = SORTS[saved?.by] ? saved.by : 'name';
+  recipes.sort(SORTS[by]);
   page('recipes', 'Allergen chart', recipes.length ? `
     <div class="matrix"><table><thead><tr><th>Recipe</th>${ALLERGENS.map(a => `<th class="v">${a}</th>`).join('')}</tr></thead>
     <tbody>${recipes.map(r => {
@@ -687,9 +713,18 @@ async function menusView() {
 }
 
 async function menuView(id) {
-  const [recipes, ings] = await Promise.all([db.all('recipes'), ingMap()]);
-  recipes.sort(byName);
+  const [recipes, ings, saved] = await Promise.all([db.all('recipes'), ingMap(), db.get('settings', 'recipeSort')]);
   const recs = toMap(recipes);
+  const costs = new Map(recipes.map(r => [r.id, recipeCost(r, ings, recs)]));
+  const per = r => { const c = costs.get(r.id); return c.problems.length ? Infinity : c.perPortion; }; // incomplete last
+  const SORTS = {
+    name: byName,
+    new: (a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0) || byName(a, b),
+    edited: (a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0) || byName(a, b),
+    cost: (a, b) => per(a) - per(b) || byName(a, b),
+  };
+  let by = SORTS[saved?.by] ? saved.by : 'name';
+  recipes.sort(SORTS[by]);
   let m = id === 'new' ? { id: uid(), name: '', period: '', items: [{}], createdAt: Date.now() } : await db.get('menus', id);
   if (!m) return go('#/menus');
   const isNew = id === 'new';

@@ -243,6 +243,9 @@ label.inline input[type=number] { width: 96px; margin: 0; }
 .bar { display: flex; gap: var(--s2); margin-bottom: var(--s3); }
 .bar input { background-color: var(--surface); }
 .bar select { width: auto; background-color: var(--surface); }
+.bar:has(#sort) { flex-wrap: wrap; }
+.bar:has(#sort) input { flex-basis: 100%; }
+.bar:has(#sort) select { flex: 1; }
 
 /* Toggle chips for multi-select (allergens) */
 .checks { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s2); }

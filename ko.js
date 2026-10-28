@@ -13,7 +13,7 @@ export const KO = {
   '(optional)': '(선택)', 'Notes': '메모', 'Note': '메모', 'Date': '날짜', 'Type': '종류', 'Title': '제목', 'Name': '이름', 'None': '없음',
   'Choose…': '선택…', 'Choose recipe…': '레시피 선택…', 'Choose dish…': '요리 선택…',   'Photo': '사진', 'Remove photo': '사진 삭제', 'Portions': '인분', 'portion': '인분', 'each': '개', 'Ingredient': '재료', 'Ingredients': '재료',
   'Recipe': '레시피', 'Method': '만드는 법', 'Total': '합계', 'Cost': '원가', 'Amount': '양', 'Unit': '단위', 'Qty': '양', 'Quantity': '양',
-  'Search ingredients': '재료 검색', 'Search recipes or ingredients': '레시피나 재료 검색', 'Category': '카테고리', 'All': '전체',
+  'Search ingredients': '재료 검색', 'Search recipes or ingredients': '레시피나 재료 검색', 'Category': '카테고리', 'All': '전체', 'Sort': '정렬', 'A–Z': '이름순', 'Newest': '최근 추가', 'Last edited': '최근 수정', 'Lowest cost': '원가 낮은순',
   'Uncategorised': '미분류', '(deleted)': '(삭제됨)', 'No price': '가격 없음', 'per portion': '1인분', 'Incomplete': '미완성',
   'Print or save as PDF': '인쇄 또는 PDF로 저장', 'Breakfast': '조식', 'Lunch': '점심', 'Dinner': '저녁', 'Function': '행사',
   'Prep shift': '프렙 근무', 'Other': '기타', 'breakfast': '조식', 'lunch': '점심', 'dinner': '저녁', 'School': '학교', 'Work': '직장',
