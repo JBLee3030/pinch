@@ -72,7 +72,7 @@ export const KO = {
   'Each time you cook this, note how it went and what to change. Your notes show up when you start cooking.': '만들 때마다 어땠는지, 다음엔 뭘 바꿀지 적어 두세요. 다음에 요리를 시작하면 그 메모가 보여요.',
 
   // Recipe edit
-  'New recipe': '새 레시피', 'Edit recipe': '레시피 수정', 'e.g. Pomodoro sauce': '예: 포모도로 소스', 'Ingredients, one per line': '재료 (한 줄에 하나씩)',
+  'New recipe': '새 레시피', 'Edit recipe': '레시피 수정', 'e.g. Tomato sauce': '예: Tomato sauce', 'Italian name': '이탈리아어 이름', 'e.g. Salsa di pomodoro': '예: Salsa di pomodoro', 'Ingredients, one per line': '재료 (한 줄에 하나씩)',
   'One per line, e.g.\n500 g tipo 00 flour\n5 eggs\n2 cloves garlic\n1/2 cup olive oil': '한 줄에 하나씩, 예:\n500 g tipo 00 flour\n5 eggs\n2 cloves garlic\n1/2 cup olive oil',
     'From a printed recipe:': '인쇄된 레시피라면:', 'open the Camera, point it at the page, tap the text icon, select the ingredients and tap Copy. Then paste here.': '카메라로 페이지를 비추고 텍스트 아이콘을 눌러 재료를 선택한 뒤 복사하세요. 그리고 여기에 붙여넣으세요.',
   'Add to recipe': '레시피에 추가', 'Ingredient or sub-recipe': '재료 또는 서브 레시피', '+ Add ingredient': '+ 재료 추가', 'Paste a list': '목록 붙여넣기',

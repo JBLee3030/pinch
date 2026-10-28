@@ -122,7 +122,7 @@ async function homeView() {
       : '<div class="card all-done"><b>All done for now</b><small>Nothing needs doing. Nice work.</small></div>'}
     ${favs.length ? `<h2 class="day">Favourites</h2><ul class="list">${favs.map(r => `<li><a href="#/recipe/${esc(r.id)}">
       ${r.photo ? `<img src="${esc(r.photo)}" alt="">` : '<span class="ph" aria-hidden="true"></span>'}
-      <div class="grow"><b>${esc(r.name)}</b><small>${esc(r.category || 'Uncategorised')}</small></div></a></li>`).join('')}</ul>` : ''}
+      <div class="grow"><b>${esc(r.name)}</b><small>${r.italian ? `<i translate="no">${esc(r.italian)}</i> · ` : ''}${esc(r.category || 'Uncategorised')}</small></div></a></li>`).join('')}</ul>` : ''}
     <h2 class="day">Tools</h2>
     <div class="tiles" role="navigation" aria-label="Tools">${TOOLS.map(([href, label, icon]) =>
       `<a href="${href}"><span class="tile-ic">${ICON[icon]}</span><span>${label}</span></a>`).join('')}</div>`,
@@ -248,9 +248,9 @@ async function recipeList() {
       <select id="cat" aria-label="Category"><option value="">All</option>${opts(cats)}</select>
       <select id="sort" aria-label="Sort">${[['name', 'A–Z'], ['new', 'Newest'], ['edited', 'Last edited'], ['cost', 'Lowest cost']]
         .map(([v, l]) => `<option value="${v}"${v === by ? ' selected' : ''}>${l}</option>`).join('')}</select></div>
-    <ul class="list">${recipes.map(r => `<li data-id="${esc(r.id)}" data-q="${esc([r.name, ...(r.items ?? []).map(it => it.recipeId ? recs.get(it.recipeId)?.name : ings.get(it.ingredientId)?.name)].filter(Boolean).join(' ').toLowerCase())}" data-cat="${esc(r.category)}"><a href="#/recipe/${esc(r.id)}">
+    <ul class="list">${recipes.map(r => `<li data-id="${esc(r.id)}" data-q="${esc([r.name, r.italian, ...(r.items ?? []).map(it => it.recipeId ? recs.get(it.recipeId)?.name : ings.get(it.ingredientId)?.name)].filter(Boolean).join(' ').toLowerCase())}" data-cat="${esc(r.category)}"><a href="#/recipe/${esc(r.id)}">
       ${r.photo ? `<img src="${esc(r.photo)}" alt="">` : '<span class="ph" aria-hidden="true"></span>'}
-      <div class="grow"><b>${esc(r.name)}</b><small>${esc(r.category || 'Uncategorised')}</small></div>
+      <div class="grow"><b>${esc(r.name)}</b><small>${r.italian ? `<i translate="no">${esc(r.italian)}</i> · ` : ''}${esc(r.category || 'Uncategorised')}</small></div>
       <span class="trail">${costLine(costs.get(r.id))}</span></a></li>`).join('')}</ul>`
     : `<div class="card welcome"><h2>Welcome to Pinch</h2>
         <ol class="steps">
@@ -295,6 +295,7 @@ async function recipeView(id) {
 
   page('recipes', r.name, `
     ${r.photo ? `<img class="hero" src="${esc(r.photo)}" alt="">` : ''}
+    ${r.italian ? `<p class="it-name" translate="no">${esc(r.italian)}</p>` : ''}
     <p class="muted">${esc(r.category || 'Uncategorised')} · ${/^https?:\/\//.test(r.sourceUrl ?? '') ? `From <a href="${esc(r.sourceUrl)}" target="_blank" rel="noopener">${esc(new URL(r.sourceUrl).hostname.replace(/^www\./, ''))}</a>` : esc({ school: 'From school', work: 'From work', own: 'My own', web: 'From the web', shared: 'Shared with me' }[r.source] || '')}${r.yieldQty ? ` · Yields ${esc(r.yieldQty)} ${esc(r.yieldUnit)}` : ''}</p>
     ${usedIn.length ? `<p class="muted">Used in: ${usedIn.map(x => `<a href="#/recipe/${esc(x.id)}">${esc(x.name)}</a>`).join(', ')}</p>` : ''}
     <div class="quick" role="navigation" aria-label="Recipe tools">
@@ -407,7 +408,7 @@ async function recipeCard(id) {
 
     sheet.innerHTML = `
       <div class="sheet-head">
-        <div><p class="eyebrow">Standard recipe card</p><h1>${esc(r.name)}</h1>
+        <div><p class="eyebrow">Standard recipe card</p><h1>${esc(r.name)}</h1>${r.italian ? `<p class="it-name" translate="no">${esc(r.italian)}</p>` : ''}
           <p class="muted">${[r.category, sourceLabel, s.cookName && `Prepared by ${s.cookName}`, new Date().toLocaleDateString('en-AU')].filter(Boolean).map(esc).join(' · ')}</p></div>
         ${r.photo ? `<img src="${esc(r.photo)}" alt="">` : ''}
       </div>
@@ -487,7 +488,8 @@ async function recipeEdit(id) {
       <p id="importMsg"><small>Paste a recipe link, take a photo of a printed or handwritten recipe, or paste a copied photo or screenshot here. Pinch fills in the form for you to check.</small></p>
     </div>` : ''}
     <input type="hidden" name="sourceUrl" value="${esc(r.sourceUrl)}">
-    <label>Name<input name="name" required placeholder="e.g. Pomodoro sauce" value="${esc(r.name)}"></label>
+    <label>Name<input name="name" required placeholder="e.g. Tomato sauce" value="${esc(r.name)}"></label>
+    <label>Italian name <small>(optional)</small><input name="italian" placeholder="e.g. Salsa di pomodoro" value="${esc(r.italian)}"></label>
     <h2>Ingredients</h2>
     <datalist id="ingOpts">${ingList.map(i => `<option value="${esc(i.name)}">`).join('')}${subs.map(x => `<option value="${esc(x.name + SUB)}">`).join('')}</datalist>
     <div class="paste" id="paste" ${typing ? '' : 'hidden'}>
@@ -628,7 +630,7 @@ async function recipeEdit(id) {
     for (const ing of created.values()) await db.put('ingredients', ing);
     await db.put('recipes', {
       ...r,
-      name: fd.get('name').trim(), category: fd.get('category').trim(), source: fd.get('source'),
+      name: fd.get('name').trim(), italian: fd.get('italian').trim(), category: fd.get('category').trim(), source: fd.get('source'),
       portions: num(fd.get('portions')), targetCostPct: num(fd.get('targetCostPct')), menuPrice: num(fd.get('menuPrice')),
       yieldQty: num(fd.get('yieldQty')), yieldUnit: fd.get('yieldUnit'),
       items, method: fd.get('method'), photo: await photoValue(fd, importedPhoto ?? r.photo), sourceUrl: fd.get('sourceUrl') || null,
@@ -2335,14 +2337,14 @@ async function loadSample() {
     I('s-par', 'Parmigiano Reggiano', 'kg', 45, 90, ['Milk']),
   ]);
   const t = Date.now();
-  await db.put('recipes', { id: 's-pomo', name: 'Pomodoro sauce', category: 'Sauce', source: 'school', portions: 10, targetCostPct: null, menuPrice: null, yieldQty: 2.2, yieldUnit: 'L',
+  await db.put('recipes', { id: 's-pomo', name: 'Tomato sauce', italian: 'Salsa di pomodoro', category: 'Sauce', source: 'school', portions: 10, targetCostPct: null, menuPrice: null, yieldQty: 2.2, yieldUnit: 'L',
     items: [{ ingredientId: 's-tom', qty: 2500, unit: 'g' }, { ingredientId: 's-oil', qty: 150, unit: 'ml' }, { ingredientId: 's-gar', qty: 40, unit: 'g' },
       { ingredientId: 's-oni', qty: 300, unit: 'g' }, { ingredientId: 's-bas', qty: 1, unit: 'each' }],
     method: '1. Sweat onion and garlic in olive oil, no colour.\n2. Add crushed tomatoes, simmer 45 min.\n3. Finish with torn basil. Season.', createdAt: t, updatedAt: t });
-  await db.put('recipes', { id: 's-pasta', name: 'Fresh egg pasta', category: 'Pasta', source: 'school', portions: 6, targetCostPct: null, menuPrice: null, yieldQty: 0.9, yieldUnit: 'kg',
+  await db.put('recipes', { id: 's-pasta', name: 'Fresh egg pasta', italian: "Pasta fresca all'uovo", category: 'Pasta', source: 'school', portions: 6, targetCostPct: null, menuPrice: null, yieldQty: 0.9, yieldUnit: 'kg',
     items: [{ ingredientId: 's-flo', qty: 600, unit: 'g' }, { ingredientId: 's-egg', qty: 6, unit: 'each' }, { ingredientId: 's-par', qty: 60, unit: 'g' }],
     method: '1. Well the flour, add eggs, bring together.\n2. Knead 10 min until smooth. Rest 30 min wrapped.\n3. Roll to setting 6, cut.', createdAt: t, updatedAt: t });
-  await db.put('recipes', { id: 's-tag', name: 'Tagliatelle al pomodoro', category: 'Main', source: 'school', portions: 1, targetCostPct: null, menuPrice: 26,
+  await db.put('recipes', { id: 's-tag', name: 'Tagliatelle with tomato sauce', italian: 'Tagliatelle al pomodoro', category: 'Main', source: 'school', portions: 1, targetCostPct: null, menuPrice: 26,
     items: [{ recipeId: 's-pasta', qty: 150, unit: 'g' }, { recipeId: 's-pomo', qty: 180, unit: 'ml' }, { ingredientId: 's-par', qty: 15, unit: 'g' },
       { ingredientId: 's-oil', qty: 10, unit: 'ml' }],
     method: '1. Cook tagliatelle 2 min in salted boiling water.\n2. Toss with hot pomodoro and a splash of pasta water.\n3. Plate, finish with parmigiano and olive oil.', createdAt: t, updatedAt: t });

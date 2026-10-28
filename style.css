@@ -706,3 +706,5 @@ button.running { background: var(--accent); color: #fff; font-variant-numeric: t
   .wf-sum .stat { font-size: 16pt; }
   .wf-n { border: 1px solid #191F28; background: none; color: #191F28; }
 }
+.it-name { margin: 0 0 var(--s1); color: var(--text-2); font-style: italic; }
+.sheet .it-name { margin: 2px 0 0; }
