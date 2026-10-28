@@ -126,8 +126,8 @@ export const readRecipePhoto = (image, type) => askClaude({ image, type });
 
 // Recipe names -> [{ name (English), italian }], same order. Same function and daily limit as photos.
 export const translateNames = async names => (await askClaude({ names })).dishes;
-// A recipe method -> the same method in Korean.
-export const methodInKorean = async text => (await askClaude({ translate: text })).text;
+// Method steps -> the same steps in Korean, one for one.
+export const stepsInKorean = async steps => (await askClaude({ translate: steps })).steps;
 
 async function askClaude(body) {
   const words = body.image ? 'read recipe photos' : 'translate';

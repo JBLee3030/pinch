@@ -281,16 +281,18 @@ async function recipeList() {
   document.getElementById('sample')?.addEventListener('click', async () => { await loadSample(); recipeList(); });
 }
 
-// A method as numbered steps, the numbers drawn like cook mode's.
-const stepItems = text => splitSteps(text).map((t, i) => `<li><span class="step-n" aria-hidden="true">${i + 1}</span><span>${esc(t)}</span></li>`).join('');
+// Method steps, numbered the way cook mode draws them.
+const stepItems = steps => steps.map((t, i) => `<li><span class="step-n" aria-hidden="true">${i + 1}</span><span>${esc(t)}</span></li>`).join('');
 
 // The method in Korean: translated once by Claude, kept with the recipe until the method changes.
+// Step by step, so step 3 in Korean is always step 3 in English.
+const hasKo = r => r.methodKo?.from === r.method && Array.isArray(r.methodKo.steps);
 async function methodKo(r) {
-  if (r.methodKo?.from !== r.method) {
-    r.methodKo = { from: r.method, text: await sync.methodInKorean(r.method) };
+  if (!hasKo(r)) {
+    r.methodKo = { from: r.method, steps: await sync.stepsInKorean(splitSteps(r.method)) };
     await db.put('recipes', { ...(await db.get('recipes', r.id)), methodKo: r.methodKo }); // not an edit: "Last edited" stays
   }
-  return r.methodKo.text;
+  return r.methodKo.steps;
 }
 
 // Every recipe's English name (the title) and Italian name (the subtitle) on one screen; Claude can fill them.
@@ -377,8 +379,8 @@ async function recipeView(id) {
           <input type="number" id="scale" min="1" step="1" inputmode="numeric" value="${esc(r.portions)}" aria-label="Portions">
           <button type="button" class="ghost" data-step="1" aria-label="More portions">+</button></div></div>
       <table><tbody id="items"></tbody></table></div>
-    ${r.method ? `<div class="card"><div class="wf-head"><h2>Method</h2><button type="button" class="ghost sm" id="ko">${r.methodKo?.from === r.method ? 'Show Korean' : 'Translate to Korean'}</button></div>
-      <ol class="method step-list" id="method">${stepItems(r.method)}</ol><p id="koMsg"></p></div>` : ''}
+    ${r.method ? `<div class="card"><div class="wf-head"><h2>Method</h2><button type="button" class="ghost sm" id="ko">${hasKo(r) ? 'Show Korean' : 'Translate to Korean'}</button></div>
+      <ol class="method step-list" id="method">${stepItems(splitSteps(r.method))}</ol><p id="koMsg"></p></div>` : ''}
     <div class="card practice"><h2>Practice</h2>
       ${attempts.length ? `
         <p class="practice-sum">${stars(avg)}<span class="muted">${rated.length ? `${fmtQty(avg)} average, ` : ''}${attempts.length} attempt${attempts.length === 1 ? '' : 's'}</span></p>
@@ -406,11 +408,12 @@ async function recipeView(id) {
   const koBtn = document.getElementById('ko');
   if (koBtn) koBtn.onclick = async () => {
     const box = document.getElementById('method'), msg = document.getElementById('koMsg');
-    if (box.dataset.ko) { delete box.dataset.ko; box.innerHTML = stepItems(r.method); koBtn.textContent = 'Show Korean'; return; }
+    if (box.dataset.ko) { delete box.dataset.ko; box.innerHTML = stepItems(splitSteps(r.method)); koBtn.textContent = 'Show Korean'; return; }
     koBtn.classList.add('busy');
     msg.innerHTML = '<small>Translating…</small>';
     try {
-      box.innerHTML = stepItems(await methodKo(r));
+      const en = splitSteps(r.method);
+      box.innerHTML = stepItems((await methodKo(r)).map((k, i) => k || en[i])); // a step Claude missed stays in English
       box.dataset.ko = '1';
       koBtn.textContent = 'Show original';
       msg.textContent = '';
@@ -1749,7 +1752,7 @@ async function cookView(id) {
     if (on) {
       koBtn.classList.add('busy');
       msg.innerHTML = '<small>Translating…</small>';
-      try { ko = splitSteps(await methodKo(r)); msg.textContent = ''; }
+      try { ko = await methodKo(r); msg.textContent = ''; }
       catch (err) { msg.innerHTML = `<small class="warn-text">${esc(err.message)}</small>`; on = false; }
       finally { koBtn.classList.remove('busy'); }
     }
@@ -1758,7 +1761,7 @@ async function cookView(id) {
     return on;
   };
   if (koBtn) {
-    if (koPref?.on && r.methodKo?.from === r.method) showKo(true); // cached: no call to Claude on open
+    if (koPref?.on && hasKo(r)) showKo(true); // cached: no call to Claude on open
     koBtn.onclick = async () => db.put('settings', { id: 'cookKo', on: await showKo(koBtn.getAttribute('aria-pressed') !== 'true') });
   }
   if (steps.length) {

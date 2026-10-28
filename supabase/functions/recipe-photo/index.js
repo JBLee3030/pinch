@@ -2,7 +2,7 @@
 // recipe's English and Italian names, servings, ingredient lines and steps, read by Claude. The app fills the New recipe form
 // with the result; nothing is saved here and the photo is not stored.
 // Also { names: [...] } -> each recipe name in English and Italian, for the app's Recipe names screen,
-// and { translate: method } -> the method in Korean, for the recipe screen.
+// and { translate: [step, ...] } -> each method step in Korean, one for one, for the recipe and cook screens.
 //
 // Signed-in Pinch users only, DAILY photos each per 24 hours (table photo_reads, see supabase.sql),
 // so the public app can't be used to run up the API bill.
@@ -69,21 +69,28 @@ Names:
 `;
 
 export const KO_SCHEMA = {
-  type: 'object', additionalProperties: false, required: ['text'],
-  properties: { text: { type: 'string' } },
+  type: 'object', additionalProperties: false, required: ['steps'],
+  properties: { steps: { type: 'array', items: { type: 'string' } } },
 };
 
-export const KO_PROMPT = `Translate this recipe method into natural Korean for a Korean cookery student in Australia.
+export const KO_PROMPT = `Translate these recipe method steps into natural Korean for a Korean cookery student in Australia.
 
-- Keep the line breaks and step numbers exactly as they are.
+- Return exactly one Korean step for each step below, in the same order: never merge, split or skip a step.
+- Leave out the step numbers.
 - Keep every number, amount, unit, time and temperature exactly as written.
 - For Italian or French dish and ingredient names and kitchen terms (soffritto, al dente, brunoise), keep the original word and add the Korean in brackets the first time it appears.
-- Translate only; don't add or leave out anything.
+- Translate only; don't add anything.
 
-Method:
+Steps:
 `;
 
-const MAX_NAMES = 200, MAX_TEXT = 8000;
+// One Korean step per step sent, whatever came back; a missing one stays empty.
+export function toSteps(o, steps) {
+  const k = Array.isArray(o?.steps) ? o.steps : [];
+  return steps.map((_, i) => String(k[i] ?? '').replace(/\s+/g, ' ').trim().slice(0, 1000));
+}
+
+const MAX_NAMES = 200, MAX_STEPS = 80, MAX_TEXT = 8000;
 const tidy = s => String(s ?? '').replace(/\s+/g, ' ').trim().slice(0, 120);
 
 // One entry per name sent, whatever came back; a missing English name keeps the original.
@@ -126,12 +133,12 @@ async function handle(req) {
   if (req.method !== 'POST') return reply({ error: 'Use POST' }, 405);
   const { image, type, names, translate } = await req.json().catch(() => ({}));
   if (translate !== undefined) {
-    if (typeof translate !== 'string' || !translate.trim() || translate.length > MAX_TEXT) return reply({ error: 'Send a method under 8,000 characters.' }, 400);
+    if (!Array.isArray(translate) || !translate.length || translate.length > MAX_STEPS || translate.some(s => typeof s !== 'string')
+      || translate.join('').length > MAX_TEXT) return reply({ error: 'Send up to 80 method steps, under 8,000 characters.' }, 400);
     const denied = await allow(req.headers.get('Authorization') ?? '');
     if (denied) return denied;
-    return ask([{ type: 'text', text: KO_PROMPT + translate.trim() }], KO_SCHEMA, 'low', out => out?.text
-      ? reply({ text: String(out.text).trim() })
-      : reply({ error: 'Couldn’t read that. Try again.' }, 502));
+    return ask([{ type: 'text', text: KO_PROMPT + translate.map((s, i) => `${i + 1}. ${s}`).join('\n') }], KO_SCHEMA, 'low',
+      out => reply({ steps: toSteps(out, translate) }));
   }
   if (names !== undefined) {
     if (!Array.isArray(names) || !names.length || names.length > MAX_NAMES || names.some(n => typeof n !== 'string' || !n.trim() || n.length > 120)) {

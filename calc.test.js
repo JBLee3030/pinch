@@ -5,7 +5,7 @@ import { tr } from './i18n.js';
 import { recipeCaption, postNumber } from './caption.js';
 import { parseRecipes, buildTimeline, ingredientTotals, equipmentIn, clockLabel, plan, dayRows } from './workflow.js';
 import { fillPlanXml } from './docx.js';
-import { toRecipe, SCHEMA, toNames, NAMES_SCHEMA, KO_SCHEMA } from './supabase/functions/recipe-photo/index.js';
+import { toRecipe, SCHEMA, toNames, NAMES_SCHEMA, KO_SCHEMA, toSteps } from './supabase/functions/recipe-photo/index.js';
 import { DECKS, ALL_CARDS, review, pickSession, isDue, isLearned } from './study.js';
 import { extractRecipe, safeUrl } from './supabase/functions/recipe-import/index.js';
 import { parseIngredientLine as P, matchIngredient, splitSteps, findDurations, fmtDuration } from './parse.js';
@@ -412,6 +412,7 @@ assert.equal(niceAmount(2, 'portion'), '2 portion');
   assert.deepEqual(SCHEMA.required.sort(), Object.keys(SCHEMA.properties).sort());        // structured outputs need every field required
   assert.deepEqual(NAMES_SCHEMA.properties.dishes.items.required.sort(), ['italian', 'name']);
   assert.deepEqual(KO_SCHEMA.required, Object.keys(KO_SCHEMA.properties));
+  assert.deepEqual(toSteps({ steps: ['  끓여요. '] }, ['Boil.', 'Drain.']), ['끓여요.', '']); // always one per step
   assert.deepEqual(toNames({ dishes: [{ name: ' Tomato  sauce', italian: 'Salsa di pomodoro' }] }, ['Salsa di pomodoro', 'Focaccia']),
     [{ name: 'Tomato sauce', italian: 'Salsa di pomodoro' }, { name: 'Focaccia', italian: '' }]); // a missing entry keeps the name
 }
