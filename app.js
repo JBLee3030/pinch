@@ -1165,6 +1165,9 @@ async function workflowView(examId) {
   const fromBook = r => ({ name: r.name, yield: r.portions ? portionsLabel(r.portions) : '', prep: '', cook: '', equipment: '',
     items: (r.items ?? []).map(it => ({ qty: it.qty, unit: it.unit, name: it.recipeId ? recs.get(it.recipeId)?.name ?? '' : ings.get(it.ingredientId)?.name ?? '' })).filter(it => it.name),
     steps: splitSteps(r.method) });
+  // Does r use recipe id, directly or through its own sub-recipes?
+  const uses = (r, id, seen = new Set()) => (r.items ?? []).some(it => it.recipeId && !seen.has(it.recipeId)
+    && (seen.add(it.recipeId), it.recipeId === id || uses(recs.get(it.recipeId) ?? {}, id, seen)));
   const field = (k, label, attrs = '') => `<label>${label}<input name="${k}" value="${esc(w[k])}" ${attrs}></label>`;
   // Pick the day's dishes, get every step in the order to do it. The picker folds away once dishes are chosen.
   page('home', 'Work flow plan', `
@@ -1215,7 +1218,7 @@ async function workflowView(examId) {
     const v = read();
     books = v.picked.map(id => recs.get(id)).filter(Boolean);
     document.getElementById('pickN').textContent = books.length ? `(${books.length})` : '';
-    current = books.length ? workflowPlan(books.map(fromBook)) : null;
+    current = books.length ? workflowPlan(books.map(r => ({ ...fromBook(r), needs: books.flatMap((b, k) => uses(r, b.id) ? [k] : []) }))) : null;
     if (!current) { out.innerHTML = ''; return; }
     const { recipes: rs, timeline, totals } = current;
     out.innerHTML = `<div class="card"><div class="wf-head"><h2>Order</h2><button type="button" class="ghost sm no-print" id="ko" aria-pressed="false">Korean</button></div>

@@ -82,18 +82,28 @@ export function stepTime(text) {
 }
 
 // -> { rows: [{ at (minutes), time, task, equipment, part: 'am' | 'pm', ri, si }], over: minutes past 2:00 pm }
+// A recipe's needs (indexes of other recipes in the list, its sub-recipes) must be finished before it starts.
 export function buildTimeline(recipes, day = DAY) {
-  const jobs = recipes.map((r, ri) => ({ ri, name: r.name, next: 0, ready: day.start, steps: r.steps.map(stepTime) }));
+  const jobs = recipes.map((r, ri) => ({ ri, name: r.name, next: 0, ready: day.start, steps: r.steps.map(stepTime),
+    needs: (r.needs ?? []).filter(k => k !== ri && recipes[k]) }));
   const left = j => j.steps.slice(j.next).reduce((n, s) => n + s.work + s.wait, 0);
+  // The longest chain goes first: a dish's own time plus the longest dish waiting on it
+  const chain = (j, seen = new Set([j])) => left(j) + Math.max(0, ...jobs.filter(d => d.needs.includes(j.ri) && !seen.has(d)).map(d => chain(d, new Set([...seen, d]))));
+  const doneAt = j => (j.next >= j.steps.length ? j.ready : Infinity);
   // Plating and serving wait for the afternoon service, after set up
-  const avail = j => Math.max(j.ready, SERVE.test(j.steps[j.next].text) ? day.back : 0);
+  const avail = j => Math.max(j.ready, ...j.needs.map(k => doneAt(jobs[k])), SERVE.test(j.steps[j.next].text) ? day.back : 0);
   const rows = [];
   let t = day.start;
   while (jobs.some(j => j.next < j.steps.length)) {
     if (t >= day.lunch && t < day.back) t = day.back;
     const open = jobs.filter(j => j.next < j.steps.length && avail(j) <= t);
-    if (!open.length) { t = Math.max(t, Math.min(...jobs.filter(j => j.next < j.steps.length).map(avail))); continue; }
-    const j = open.sort((a, b) => left(b) - left(a) || a.ri - b.ri)[0], s = j.steps[j.next++];
+    if (!open.length) {
+      const waiting = jobs.filter(j => j.next < j.steps.length), soonest = Math.min(...waiting.map(avail));
+      if (soonest === Infinity) waiting.forEach(j => { j.needs = []; }); // recipes that need each other: drop the rule
+      else t = Math.max(t, soonest);
+      continue;
+    }
+    const j = open.sort((a, b) => chain(b) - chain(a) || a.ri - b.ri)[0], s = j.steps[j.next++];
     const until = s.wait ? ` (until ${clockLabel(t + s.work + s.wait)})` : '';
     rows.push({ at: t, time: clockLabel(t), task: `${j.name}: ${s.text}${until}`, equipment: equipmentIn(s.text).join(', '), part: t < day.lunch ? 'am' : 'pm',
       ri: j.ri, si: j.next - 1 }); // which recipe and step, for the app's order list

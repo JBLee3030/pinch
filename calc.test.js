@@ -479,6 +479,14 @@ assert.equal(niceAmount(2, 'portion'), '2 portion');
   assert.deepEqual(dayRows({ rows }).map(r => r.time).slice(0, 3), ['08:00 am', '08:00 am', '08:15 am']); // wash and gather first
   assert.deepEqual(dayRows({ rows }).filter(r => r.fixed).map(r => r.time), ['08:00 am', '08:00 am', '12:00 pm', '12:30 pm', '2:00 pm']);
   assert.ok(buildTimeline([{ name: 'Stock', steps: ['Simmer for 7 hours.'] }]).over > 0);
+  { // a sub-recipe is finished, waits included, before the dish that uses it starts
+    const dish = { name: 'Tagliatelle', steps: ['Cook pasta 2 min.', 'Toss with sauce.'], needs: [1] };
+    const sauce = { name: 'Sauce', steps: ['Sweat onion.', 'Simmer for 45 min.', 'Add basil.'] };
+    const r = buildTimeline([dish, sauce]).rows;
+    assert.deepEqual(r.map(x => x.task.split(':')[0]), ['Sauce', 'Sauce', 'Sauce', 'Tagliatelle', 'Tagliatelle']);
+    assert.ok(r[3].at >= r[1].at + 5 + 45);                                  // after the simmer, not just after its 5 min of work
+    assert.equal(buildTimeline([{ ...dish, needs: [1] }, { ...sauce, needs: [0] }]).rows.length, 5); // a loop doesn't hang
+  }
 
   const totals = ingredientTotals([ragu, panna]);
   const milk = totals.find(t => t.name === 'Milk');
