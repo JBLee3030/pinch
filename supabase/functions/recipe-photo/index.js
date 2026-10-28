@@ -2,7 +2,8 @@
 // recipe's English and Italian names, servings, ingredient lines and steps, read by Claude. The app fills the New recipe form
 // with the result; nothing is saved here and the photo is not stored.
 // Also { names: [...] } -> each recipe name in English and Italian, for the app's Recipe names screen,
-// and { translate: [step, ...] } -> each method step in Korean, one for one, for the recipe and cook screens.
+// and { translate: [step, ...] } -> each method step in Korean, one for one, for the recipe and cook screens,
+// and { merge: { recipes: [{ name, steps }], notes } } -> one ordered work plan from the day's recipes and the student's own notes.
 //
 // Signed-in Pinch users only, DAILY photos each per 24 hours (table photo_reads, see supabase.sql),
 // so the public app can't be used to run up the API bill.
@@ -90,7 +91,37 @@ export function toSteps(o, steps) {
   return steps.map((_, i) => String(k[i] ?? '').replace(/\s+/g, ' ').trim().slice(0, 1000));
 }
 
-const MAX_NAMES = 200, MAX_STEPS = 80, MAX_TEXT = 8000;
+export const MERGE_SCHEMA = {
+  type: 'object', additionalProperties: false, required: ['steps'],
+  properties: { steps: { type: 'array', items: {
+    type: 'object', additionalProperties: false, required: ['dish', 'en', 'ko'],
+    properties: { dish: { type: 'string' }, en: { type: 'string' }, ko: { type: 'string' } },
+  } } },
+};
+
+export const MERGE_PROMPT = `A cookery student is making these dishes in one practical class, alone at one bench. Below are the recipes and the student's own notes from practising them (often in Korean, steps separated by ">").
+
+Make one work plan: every task in the order to do it.
+
+- Follow the student's notes for the order and for how they actually do things (which board, how fine, oven temperature, what to prepare early). Their notes win over the recipe order.
+- Fill in any recipe step the notes leave out, where it fits best. Don't lose amounts, times or temperatures from either.
+- Only tasks for the dishes listed. Leave out note steps for other dishes. If the notes say the same task twice, keep it once.
+- A sub-recipe is finished before the dish that uses it, unless the notes say otherwise.
+- One short task per entry, in the order to do them.
+- dish: exactly one of the dish names below, or empty for a task shared by several dishes (setting up the bench, gathering ingredients).
+- en: the task in plain kitchen English. ko: the same task in natural Korean, keeping Italian and French food words in the original (the way the notes do).
+
+`;
+
+// Bounded and tidied; a dish that isn't one of the day's dishes becomes a shared task.
+export function toMerged(o, names) {
+  const t = (s, n) => String(s ?? '').replace(/\s+/g, ' ').trim().slice(0, n);
+  return (Array.isArray(o?.steps) ? o.steps : []).slice(0, 200)
+    .map(x => ({ dish: names.includes(t(x?.dish, 120)) ? t(x.dish, 120) : '', en: t(x?.en, 600), ko: t(x?.ko, 600) }))
+    .filter(x => x.en || x.ko);
+}
+
+const MAX_NAMES = 200, MAX_STEPS = 80, MAX_TEXT = 8000, MAX_DISHES = 12, MAX_NOTES = 8000;
 const tidy = s => String(s ?? '').replace(/\s+/g, ' ').trim().slice(0, 120);
 
 // One entry per name sent, whatever came back; a missing English name keeps the original.
@@ -131,7 +162,22 @@ async function allow(auth) {
 async function handle(req) {
   if (req.method === 'OPTIONS') return new Response(null, { headers: CORS });
   if (req.method !== 'POST') return reply({ error: 'Use POST' }, 405);
-  const { image, type, names, translate } = await req.json().catch(() => ({}));
+  const { image, type, names, translate, merge } = await req.json().catch(() => ({}));
+  if (merge !== undefined) {
+    const rs = merge?.recipes, notes = merge?.notes;
+    if (!Array.isArray(rs) || !rs.length || rs.length > MAX_DISHES || typeof notes !== 'string' || notes.length > MAX_NOTES
+      || rs.some(r => typeof r?.name !== 'string' || !Array.isArray(r.steps) || r.steps.length > MAX_STEPS || r.steps.some(s => typeof s !== 'string'))
+      || JSON.stringify(rs).length > 30000) return reply({ error: 'Pick up to 12 dishes, with notes under 8,000 characters.' }, 400);
+    const denied = await allow(req.headers.get('Authorization') ?? '');
+    if (denied) return denied;
+    const names = rs.map(r => tidy(r.name));
+    const text = MERGE_PROMPT + rs.map((r, i) => `Dish: ${names[i]}\n${r.steps.map((s, k) => `${k + 1}. ${s}`).join('\n')}`).join('\n\n')
+      + `\n\nThe student's notes:\n${notes.trim() || '(none)'}`;
+    return ask([{ type: 'text', text }], MERGE_SCHEMA, 'medium', out => {
+      const steps = toMerged(out, names);
+      return steps.length ? reply({ steps }) : reply({ error: 'Couldn’t read that. Try again.' }, 502);
+    });
+  }
   if (translate !== undefined) {
     if (!Array.isArray(translate) || !translate.length || translate.length > MAX_STEPS || translate.some(s => typeof s !== 'string')
       || translate.join('').length > MAX_TEXT) return reply({ error: 'Send up to 80 method steps, under 8,000 characters.' }, 400);

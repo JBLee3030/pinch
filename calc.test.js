@@ -5,7 +5,7 @@ import { tr } from './i18n.js';
 import { recipeCaption, postNumber } from './caption.js';
 import { parseRecipes, buildTimeline, ingredientTotals, equipmentIn, clockLabel, plan, dayRows } from './workflow.js';
 import { fillPlanXml } from './docx.js';
-import { toRecipe, SCHEMA, toNames, NAMES_SCHEMA, KO_SCHEMA, toSteps } from './supabase/functions/recipe-photo/index.js';
+import { toRecipe, SCHEMA, toNames, NAMES_SCHEMA, KO_SCHEMA, toSteps, MERGE_SCHEMA, toMerged } from './supabase/functions/recipe-photo/index.js';
 import { DECKS, ALL_CARDS, review, pickSession, isDue, isLearned } from './study.js';
 import { extractRecipe, safeUrl } from './supabase/functions/recipe-import/index.js';
 import { parseIngredientLine as P, matchIngredient, splitSteps, findDurations, fmtDuration } from './parse.js';
@@ -413,6 +413,9 @@ assert.equal(niceAmount(2, 'portion'), '2 portion');
   assert.deepEqual(NAMES_SCHEMA.properties.dishes.items.required.sort(), ['italian', 'name']);
   assert.deepEqual(KO_SCHEMA.required, Object.keys(KO_SCHEMA.properties));
   assert.deepEqual(toSteps({ steps: ['  끓여요. '] }, ['Boil.', 'Drain.']), ['끓여요.', '']); // always one per step
+  assert.deepEqual(MERGE_SCHEMA.properties.steps.items.required.sort(), ['dish', 'en', 'ko']);
+  assert.deepEqual(toMerged({ steps: [{ dish: 'Risotto', en: ' Sweat  onion', ko: '양파 스웨팅' }, { dish: 'Pizza', en: 'Set up', ko: '' }, { dish: 'Risotto', en: '', ko: '' }] }, ['Risotto']),
+    [{ dish: 'Risotto', en: 'Sweat onion', ko: '양파 스웨팅' }, { dish: '', en: 'Set up', ko: '' }]); // unknown dish -> shared, empty dropped
   assert.deepEqual(toNames({ dishes: [{ name: ' Tomato  sauce', italian: 'Salsa di pomodoro' }] }, ['Salsa di pomodoro', 'Focaccia']),
     [{ name: 'Tomato sauce', italian: 'Salsa di pomodoro' }, { name: 'Focaccia', italian: '' }]); // a missing entry keeps the name
 }

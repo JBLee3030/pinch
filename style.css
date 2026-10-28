@@ -719,3 +719,6 @@ h2.day { font: 700 15px/1.4 var(--font); color: var(--text-2); }
 .bar-title.on-scroll.shown { opacity: 1; }
 @media (prefers-reduced-motion: reduce) { .bar-title.on-scroll { transition: none; } }
 button.ghost[aria-pressed=true] { background: var(--accent-weak); color: var(--accent); }
+.tag { display: inline-block; margin-left: var(--s2); padding: 2px var(--s2); border-radius: var(--r-pill); background: var(--accent-weak); color: var(--accent); font: 600 12.5px/1.4 var(--font); vertical-align: middle; }
+#notesBox textarea { margin-top: var(--s3); }
+#notesBox button { margin-top: var(--s3); }

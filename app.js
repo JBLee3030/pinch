@@ -1175,6 +1175,10 @@ async function workflowView(examId) {
       <details class="more" id="pickBox" ${w.picked.length ? '' : 'open'}><summary>Today's dishes <span class="muted" id="pickN"></span></summary>
         <div class="checks">${recipes.map(r => `<label><input type="checkbox" name="picked" value="${esc(r.id)}" ${w.picked.includes(r.id) ? 'checked' : ''}> <span translate="no">${esc(r.name)}</span></label>`).join('')}</div>
       </details>
+      <details class="more" id="notesBox"><summary>My notes</summary>
+        <textarea name="notes" rows="8" aria-label="My notes">${esc(w.notes ?? '')}</textarea>
+        <button type="button" class="wide" id="merge">Make one plan with my notes</button><p id="mergeMsg"></p>
+      </details>
     </form>
     <div id="out"></div>
     <details class="more no-print" id="word"><summary>Fill the school's Word form</summary>
@@ -1189,25 +1193,30 @@ async function workflowView(examId) {
     </details>`, { back: exam ? `#/exam/${esc(exam.id)}/edit` : '#/home' });
 
   const form = document.getElementById('f'), details = document.getElementById('details'), out = document.getElementById('out');
-  let current = null, books = [];
+  let current = null, books = [], merged = w.merged ?? null;
   const read = () => {
     const fd = new FormData(form), dd = new FormData(details);
-    return { ...Object.fromEntries(['name', 'studentId', 'trainer', 'group', 'date', 'assessment'].map(k => [k, dd.get(k).trim()])), picked: fd.getAll('picked') };
+    return { ...Object.fromEntries(['name', 'studentId', 'trainer', 'group', 'date', 'assessment'].map(k => [k, dd.get(k).trim()])),
+      picked: fd.getAll('picked'), notes: fd.get('notes') };
   };
-  const save = () => db.put('settings', { id: 'workflow', ...read() });
+  const save = () => db.put('settings', { id: 'workflow', ...read(), merged });
+  // A plan merged with the notes stays in use until the dishes or the notes change
+  const keyOf = v => `${v.picked.join(',')}\n${v.notes.trim()}`;
+  const useMerged = () => merged?.key === keyOf(read());
   // Korean under each step: each dish's method is translated once and kept with the recipe, like cook mode.
   const showKo = async on => {
     const btn = document.getElementById('ko'), msg = document.getElementById('koMsg');
     let ko = [];
-    if (on) {
+    if (on && !useMerged()) { // a merged plan already has its Korean
       btn.classList.add('busy');
       msg.innerHTML = '<small>Translating…</small>';
       try { ko = await Promise.all(books.map(methodKo)); msg.textContent = ''; }
       catch (err) { msg.innerHTML = `<small class="warn-text">${esc(err.message)}</small>`; on = false; }
       finally { btn.classList.remove('busy'); }
     }
-    out.querySelectorAll('[data-step]').forEach(li => {
-      const [ri, si] = li.dataset.step.split(':').map(Number), el = li.querySelector('.step-ko'), t = ko[ri]?.[si] ?? '';
+    out.querySelectorAll('.order li').forEach(li => {
+      const [ri, si] = (li.dataset.step ?? '').split(':').map(Number), el = li.querySelector('.step-ko');
+      const t = !on ? '' : li.dataset.m ? merged.steps[li.dataset.m].ko : ko[ri]?.[si] ?? '';
       el.textContent = t;
       el.hidden = !t;
     });
@@ -1220,22 +1229,40 @@ async function workflowView(examId) {
     document.getElementById('pickN').textContent = books.length ? `(${books.length})` : '';
     current = books.length ? workflowPlan(books.map(r => ({ ...fromBook(r), needs: books.flatMap((b, k) => uses(r, b.id) ? [k] : []) }))) : null;
     if (!current) { out.innerHTML = ''; return; }
-    const { recipes: rs, timeline, totals } = current;
-    out.innerHTML = `<div class="card"><div class="wf-head"><h2>Order</h2><button type="button" class="ghost sm no-print" id="ko" aria-pressed="false">Korean</button></div>
+    const { recipes: rs, timeline, totals } = current, mine = useMerged();
+    const item = (attr, n, dish, text) => `<li ${attr}><span class="step-n" aria-hidden="true">${n}</span>
+      <span>${dish ? `<small class="order-dish" translate="no">${esc(dish)}</small>` : ''}<span translate="no">${esc(text)}</span><small class="step-ko" translate="no" hidden></small></span></li>`;
+    out.innerHTML = `<div class="card"><div class="wf-head"><h2>Order${mine ? ' <span class="tag">With my notes</span>' : ''}</h2><button type="button" class="ghost sm no-print" id="ko" aria-pressed="false">Korean</button></div>
         <p id="koMsg"></p>
-        <ol class="step-list order">${timeline.rows.map((x, i) => `<li data-step="${x.ri}:${x.si}"><span class="step-n" aria-hidden="true">${i + 1}</span>
-          <span><small class="order-dish" translate="no">${esc(rs[x.ri].name)}</small><span translate="no">${esc(rs[x.ri].steps[x.si])}</span><small class="step-ko" translate="no" hidden></small></span></li>`).join('')}</ol></div>
+        <ol class="step-list order">${mine
+          ? merged.steps.map((x, i) => item(`data-m="${i}"`, i + 1, x.dish, x.en || x.ko)).join('')
+          : timeline.rows.map((x, i) => item(`data-step="${x.ri}:${x.si}"`, i + 1, rs[x.ri].name, rs[x.ri].steps[x.si])).join('')}</ol></div>
       <div class="card wf"><h2>Ingredients</h2>
         <table><tbody>${totals.map(t => { const used = t.per.map((q, i) => q == null ? '' : `${rs[i].name} ${typeof q === 'number' ? niceAmount(q, t.unit) : q}`).filter(Boolean);
           return `<tr><td><span translate="no">${esc(t.name)}</span>${used.length > 1 ? `<br><small translate="no">${esc(used.join(' · '))}</small>` : ''}</td>
           <td class="n">${esc(t.total > 0 ? niceAmount(t.total, t.unit) : 'q.b.')}</td></tr>`; }).join('')}</tbody></table></div>`;
     const btn = document.getElementById('ko');
     btn.onclick = async () => db.put('settings', { id: 'cookKo', on: await showKo(btn.getAttribute('aria-pressed') !== 'true') });
-    if (koPref?.on && books.every(hasKo)) showKo(true); // all translated already: no call to Claude
+    if (koPref?.on && (mine || books.every(hasKo))) showKo(true); // Korean already there: no call to Claude
   };
   form.addEventListener('change', () => { draw(); save(); });
   details.addEventListener('change', save);
   draw();
+  document.getElementById('merge').onclick = async e => {
+    const v = read(), msg = document.getElementById('mergeMsg');
+    if (!books.length) { msg.innerHTML = '<small class="warn-text">Pick today\'s dishes first.</small>'; return; }
+    e.target.classList.add('busy');
+    msg.innerHTML = '<small>Making the plan… this takes up to a minute.</small>';
+    try {
+      merged = { key: keyOf(v), steps: await sync.mergePlan(books.map(r => ({ name: r.name, steps: splitSteps(r.method) })), v.notes) };
+      await save();
+      msg.textContent = '';
+      document.getElementById('notesBox').open = false;
+      draw();
+    } catch (err) {
+      msg.innerHTML = `<small class="warn-text">${esc(err.message)}</small>`;
+    } finally { e.target.classList.remove('busy'); }
+  };
 
   document.getElementById('tplFile').onchange = async e => {
     const file = e.target.files[0], msg = document.getElementById('tplMsg');

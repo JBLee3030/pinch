@@ -36,7 +36,7 @@ export const KO = {
   // Reading a recipe photo
   'Read a recipe photo': '레시피 사진으로 읽기', 'Reading the photo… this takes about 10 to 30 seconds.': '사진을 읽는 중… 10~30초 정도 걸려요.',
   'Paste a recipe link, take a photo of a printed or handwritten recipe, or paste a copied photo or screenshot here. Pinch fills in the form for you to check.': '레시피 링크를 붙여넣거나, 인쇄되거나 손으로 쓴 레시피를 찍거나, 복사한 사진·스크린샷을 여기에 붙여넣으세요. Pinch가 칸을 채워 주면 확인만 하면 돼요.',
-  'Reading photos is turned off in the demo.': '데모에서는 사진 읽기가 꺼져 있어요.', 'Translating is turned off in the demo.': '데모에서는 번역이 꺼져 있어요.', 'Sign in (Settings → Account) to translate.': '번역하려면 로그인하세요 (설정 → 계정과 동기화).',
+  'Reading photos is turned off in the demo.': '데모에서는 사진 읽기가 꺼져 있어요.', 'Translating is turned off in the demo.': '데모에서는 번역이 꺼져 있어요.', 'Claude is turned off in the demo.': '데모에서는 Claude 기능이 꺼져 있어요.', 'Sign in (Settings → Account) to make a plan with Claude.': 'Claude로 플랜을 만들려면 로그인하세요 (설정 → 계정과 동기화).', 'Sign in (Settings → Account) to translate.': '번역하려면 로그인하세요 (설정 → 계정과 동기화).',
   'Translate to Korean': '한국어로 번역', 'Korean': '한국어', 'Show original': '원문 보기', 'Show Korean': '한국어 보기', 'Translating…': '번역하는 중…', 'Sign in (Settings → Account) to read recipe photos.': '사진을 읽으려면 로그인하세요 (설정 → 계정과 동기화).',
   'You’re offline. Connect to the internet to read a photo.': '오프라인이에요. 사진을 읽으려면 인터넷에 연결하세요.', 'Photo reading isn’t set up yet.': '사진 읽기가 아직 설정되지 않았어요.',
   'Send a JPEG, PNG or WebP photo under 4 MB.': '4 MB 이하의 JPEG, PNG, WebP 사진을 보내세요.', 'Busy right now. Try again in a minute.': '지금 바빠요. 1분 뒤에 다시 해 보세요.',
@@ -256,7 +256,8 @@ export const KO = {
   'Student ID': '학번', 'Trainer': '트레이너', 'Group': '그룹', 'Assessment no.': '평가 번호',
   'Download Word file': '워드 파일 받기', 'Change form': '양식 바꾸기', 'Paste your recipes': '레시피 붙여넣기', 'Or paste recipes': '또는 레시피 붙여넣기', 'Today\'s dishes': '오늘 만들 요리', 'Add from your book': '내 레시피북에서 추가',
   'Paste them all at once: each recipe\'s name, its ingredients and its method. A copied photo or screenshot of a recipe works too.': '여러 개를 한 번에 붙여넣어도 돼요. 레시피마다 이름, 재료, 만드는 법이 있으면 돼요. 레시피 사진이나 스크린샷을 복사해 붙여넣어도 돼요.',
-  'Your work plan and ingredients list show here.': '워크 플랜과 재료 목록이 여기 나와요.', 'Work plan': '워크 플랜', 'Order': '순서', 'Copy': '복사',
+  'Your work plan and ingredients list show here.': '워크 플랜과 재료 목록이 여기 나와요.', 'Work plan': '워크 플랜', 'Order': '순서', 'My notes': '내 노트', 'Make one plan with my notes': '노트와 합쳐서 플랜 만들기', 'With my notes': '노트 반영',
+  'Pick today\'s dishes first.': '오늘 만들 요리를 먼저 고르세요.', 'Making the plan… this takes up to a minute.': '플랜을 만드는 중… 1분쯤 걸려요.', 'Copy': '복사',
   'Fill the school\'s Word form': '학교 워드 양식 채우기', 'Add the Work Flow Plan Word file (.docx) once. Pinch fills it in with this plan.': 'Work Flow Plan 워드 파일(.docx)을 한 번만 올리면 이 플랜으로 채워줘요.',
   'Paste your recipes first.': '레시피를 먼저 붙여넣으세요.',
   'Long jobs (simmering, setting, resting) start first and other work fits in while they wait. Plating goes after set up. Steps without a time count as 10 min.': '오래 걸리는 작업(졸이기, 굳히기, 휴지)을 먼저 시작하고 기다리는 동안 다른 작업을 넣어요. 플레이팅은 셋업 뒤에 해요. 시간이 안 적힌 단계는 10분으로 잡아요.',
