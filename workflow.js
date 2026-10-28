@@ -81,7 +81,7 @@ export function stepTime(text) {
   return wait >= PASSIVE ? { text, work: 5, wait } : { text, work: Math.max(10, Math.min(wait, 30)), wait: 0 };
 }
 
-// -> { rows: [{ at (minutes), time, task, equipment, part: 'am' | 'pm' }], over: minutes past 2:00 pm }
+// -> { rows: [{ at (minutes), time, task, equipment, part: 'am' | 'pm', ri, si }], over: minutes past 2:00 pm }
 export function buildTimeline(recipes, day = DAY) {
   const jobs = recipes.map((r, ri) => ({ ri, name: r.name, next: 0, ready: day.start, steps: r.steps.map(stepTime) }));
   const left = j => j.steps.slice(j.next).reduce((n, s) => n + s.work + s.wait, 0);
@@ -95,7 +95,8 @@ export function buildTimeline(recipes, day = DAY) {
     if (!open.length) { t = Math.max(t, Math.min(...jobs.filter(j => j.next < j.steps.length).map(avail))); continue; }
     const j = open.sort((a, b) => left(b) - left(a) || a.ri - b.ri)[0], s = j.steps[j.next++];
     const until = s.wait ? ` (until ${clockLabel(t + s.work + s.wait)})` : '';
-    rows.push({ at: t, time: clockLabel(t), task: `${j.name}: ${s.text}${until}`, equipment: equipmentIn(s.text).join(', '), part: t < day.lunch ? 'am' : 'pm' });
+    rows.push({ at: t, time: clockLabel(t), task: `${j.name}: ${s.text}${until}`, equipment: equipmentIn(s.text).join(', '), part: t < day.lunch ? 'am' : 'pm',
+      ri: j.ri, si: j.next - 1 }); // which recipe and step, for the app's order list
     t += s.work;
     j.ready = t + s.wait;
   }

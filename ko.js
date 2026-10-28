@@ -256,7 +256,7 @@ export const KO = {
   'Student ID': '학번', 'Trainer': '트레이너', 'Group': '그룹', 'Assessment no.': '평가 번호',
   'Download Word file': '워드 파일 받기', 'Change form': '양식 바꾸기', 'Paste your recipes': '레시피 붙여넣기', 'Or paste recipes': '또는 레시피 붙여넣기', 'Today\'s dishes': '오늘 만들 요리', 'Add from your book': '내 레시피북에서 추가',
   'Paste them all at once: each recipe\'s name, its ingredients and its method. A copied photo or screenshot of a recipe works too.': '여러 개를 한 번에 붙여넣어도 돼요. 레시피마다 이름, 재료, 만드는 법이 있으면 돼요. 레시피 사진이나 스크린샷을 복사해 붙여넣어도 돼요.',
-  'Your work plan and ingredients list show here.': '워크 플랜과 재료 목록이 여기 나와요.', 'Work plan': '워크 플랜', 'Copy': '복사',
+  'Your work plan and ingredients list show here.': '워크 플랜과 재료 목록이 여기 나와요.', 'Work plan': '워크 플랜', 'Order': '순서', 'Copy': '복사',
   'Fill the school\'s Word form': '학교 워드 양식 채우기', 'Add the Work Flow Plan Word file (.docx) once. Pinch fills it in with this plan.': 'Work Flow Plan 워드 파일(.docx)을 한 번만 올리면 이 플랜으로 채워줘요.',
   'Paste your recipes first.': '레시피를 먼저 붙여넣으세요.',
   'Long jobs (simmering, setting, resting) start first and other work fits in while they wait. Plating goes after set up. Steps without a time count as 10 min.': '오래 걸리는 작업(졸이기, 굳히기, 휴지)을 먼저 시작하고 기다리는 동안 다른 작업을 넣어요. 플레이팅은 셋업 뒤에 해요. 시간이 안 적힌 단계는 10분으로 잡아요.',

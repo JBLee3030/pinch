@@ -3,7 +3,7 @@ import * as sync from './sync.js';
 import { LANG, locale, setLang } from './i18n.js';
 import { DECKS, review, pickSession, isDue, isLearned } from './study.js';
 import { cardArt } from './cardart.js';
-import { parseRecipes, plan as workflowPlan, dayRows, amount } from './workflow.js';
+import { plan as workflowPlan } from './workflow.js';
 import { fillPlan, templateProblem } from './docx.js';
 import { recipeCaption, postNumber, LIMIT } from './caption.js';
 import { parseIngredientLine, matchIngredient, splitSteps, findDurations, fmtDuration } from './parse.js';
@@ -1156,30 +1156,25 @@ const toBase64 = file => new Promise(res => { const r = new FileReader(); r.onlo
 const fromBase64 = b64 => Uint8Array.from(atob(b64), c => c.charCodeAt(0));
 
 async function workflowView(examId) {
-  const [recipes, ings, s, saved, tpl, exam] = await Promise.all([db.all('recipes'), ingMap(), settings(),
-    db.get('settings', 'workflow'), db.get('settings', 'workflowTemplate'), examId ? db.get('exams', examId) : null]);
+  const [recipes, ings, s, saved, tpl, exam, koPref] = await Promise.all([db.all('recipes'), ingMap(), settings(),
+    db.get('settings', 'workflow'), db.get('settings', 'workflowTemplate'), examId ? db.get('exams', examId) : null, db.get('settings', 'cookKo')]);
   recipes.sort(byName);
   const recs = toMap(recipes), w = { name: s.cookName, picked: [], ...saved };
   w.date = exam?.date ?? today(); // the plan is for one day: never yesterday's date
-  if (exam) Object.assign(w, { picked: exam.recipeIds ?? [], paste: '' });
+  if (exam) w.picked = exam.recipeIds ?? [];
   const fromBook = r => ({ name: r.name, yield: r.portions ? portionsLabel(r.portions) : '', prep: '', cook: '', equipment: '',
     items: (r.items ?? []).map(it => ({ qty: it.qty, unit: it.unit, name: it.recipeId ? recs.get(it.recipeId)?.name ?? '' : ings.get(it.ingredientId)?.name ?? '' })).filter(it => it.name),
     steps: splitSteps(r.method) });
   const field = (k, label, attrs = '') => `<label>${label}<input name="${k}" value="${esc(w[k])}" ${attrs}></label>`;
-  const SHOW = 8;
+  // Pick the day's dishes, get every step in the order to do it. The picker folds away once dishes are chosen.
   page('home', 'Work flow plan', `
     <form id="f" class="no-print" onsubmit="return false">
-      ${recipes.length ? `<h2>Today's dishes</h2>
-        ${recipes.length > SHOW ? '<div class="bar"><input type="search" id="dq" placeholder="Search your recipes" aria-label="Search your recipes"></div>' : ''}
-        <div class="checks" id="dishPick">${recipes.map((r, i) => `<label data-q="${esc(r.name.toLowerCase())}" ${i >= SHOW && !w.picked.includes(r.id) ? 'hidden' : ''}>
-          <input type="checkbox" name="picked" value="${esc(r.id)}" ${w.picked.includes(r.id) ? 'checked' : ''}> ${esc(r.name)}</label>`).join('')}</div>
-        ${recipes.length > SHOW ? `<button type="button" class="link" id="allDishes">Show all ${recipes.length} recipes</button>` : ''}` : ''}
-      <label style="margin-top:16px">${recipes.length ? 'Or paste recipes' : 'Paste your recipes'}<textarea name="paste" rows="8" placeholder="Beef ragu&#10;Ingredients&#10;500 g beef mince&#10;1 onion&#10;Method&#10;1. Dice the onion.&#10;2. Simmer for 90 minutes.&#10;&#10;Panna cotta&#10;Ingredients&#10;…">${esc(w.paste)}</textarea></label>
-      <p class="muted" id="pasteNote"><small>Paste them all at once: each recipe's name, its ingredients and its method. A copied photo or screenshot of a recipe works too.</small></p>
+      <details class="more" id="pickBox" ${w.picked.length ? '' : 'open'}><summary>Today's dishes <span class="muted" id="pickN"></span></summary>
+        <div class="checks">${recipes.map(r => `<label><input type="checkbox" name="picked" value="${esc(r.id)}" ${w.picked.includes(r.id) ? 'checked' : ''}> <span translate="no">${esc(r.name)}</span></label>`).join('')}</div>
+      </details>
     </form>
     <div id="out"></div>
     <details class="more no-print" id="word"><summary>Fill the school's Word form</summary>
-      <p class="muted"><small>${tpl ? `Form: <span translate="no">${esc(tpl.name)}</span>` : 'Add the Work Flow Plan Word file (.docx) once. Pinch fills it in with this plan.'}</small></p>
       <label class="btn ghost">${tpl ? 'Change form' : 'Choose the Word file'}<input type="file" id="tplFile" accept=".docx,${DOCX}" hidden></label>
       <p id="tplMsg"></p>
       <form id="details" onsubmit="return false">
@@ -1191,77 +1186,53 @@ async function workflowView(examId) {
     </details>`, { back: exam ? `#/exam/${esc(exam.id)}/edit` : '#/home' });
 
   const form = document.getElementById('f'), details = document.getElementById('details'), out = document.getElementById('out');
-  let current = null;
+  let current = null, books = [];
   const read = () => {
     const fd = new FormData(form), dd = new FormData(details);
-    return { ...Object.fromEntries(['name', 'studentId', 'trainer', 'group', 'date', 'assessment'].map(k => [k, dd.get(k).trim()])),
-      paste: fd.get('paste').trim(), picked: fd.getAll('picked') };
+    return { ...Object.fromEntries(['name', 'studentId', 'trainer', 'group', 'date', 'assessment'].map(k => [k, dd.get(k).trim()])), picked: fd.getAll('picked') };
   };
   const save = () => db.put('settings', { id: 'workflow', ...read() });
-  // Tab-separated, so it pastes into a Word or Excel table as rows and columns
-  const tsv = rows => rows.map(r => r.join('\t')).join('\n');
+  // Korean under each step: each dish's method is translated once and kept with the recipe, like cook mode.
+  const showKo = async on => {
+    const btn = document.getElementById('ko'), msg = document.getElementById('koMsg');
+    let ko = [];
+    if (on) {
+      btn.classList.add('busy');
+      msg.innerHTML = '<small>Translating…</small>';
+      try { ko = await Promise.all(books.map(methodKo)); msg.textContent = ''; }
+      catch (err) { msg.innerHTML = `<small class="warn-text">${esc(err.message)}</small>`; on = false; }
+      finally { btn.classList.remove('busy'); }
+    }
+    out.querySelectorAll('[data-step]').forEach(li => {
+      const [ri, si] = li.dataset.step.split(':').map(Number), el = li.querySelector('.step-ko'), t = ko[ri]?.[si] ?? '';
+      el.textContent = t;
+      el.hidden = !t;
+    });
+    btn.setAttribute('aria-pressed', String(on));
+    return on;
+  };
   const draw = () => {
-    const v = read(), list = [...v.picked.map(id => recs.get(id)).filter(Boolean).map(fromBook), ...parseRecipes(v.paste)];
-    current = list.length ? workflowPlan(list) : null;
-    if (!current) { out.innerHTML = '<p class="empty">Your work plan and ingredients list show here.</p>'; return; }
-    const { recipes: rs, timeline, totals } = current, warn = [], day = dayRows(timeline);
-    if (timeline.over) warn.push(`Runs ${timeline.over} min past 2:00 pm. Check the long steps.`);
-    rs.filter(r => !r.items.length).forEach(r => warn.push(`No ingredients found for ${r.name}.`));
-    out.innerHTML = `${warn.map(x => `<p class="warn-text no-print"><small>${esc(x)}</small></p>`).join('')}
-      <div class="card stat-card wf-sum"><p class="stat-label">${dateLabel(read().date || today())}</p>
-        <p class="stat">${rs.length} dish${rs.length === 1 ? '' : 'es'}</p>
-        <p class="stat-sub">${totals.length} ingredients · last task ${esc(timeline.rows.at(-1)?.time ?? '')}</p>
-        <p class="muted"><small translate="no">${rs.map(r => esc(r.name)).join(', ')}</small></p>
-        <button type="button" class="ghost sm no-print" id="print">${ICON.printer}Print</button></div>
-      <div class="card wf"><div class="wf-head"><h2>Work plan</h2><button type="button" class="ghost sm no-print" data-copy="plan">Copy</button></div>
-        <table><tbody>${day.map(x => `<tr class="${x.fixed ? 'fixed' : ''}"><td class="t">${esc(x.time)}</td>
-          <td><span translate="${x.fixed ? 'yes' : 'no'}">${esc(x.task)}</span>${x.equipment ? `<br><small translate="no">${esc(x.equipment)}</small>` : ''}</td></tr>`).join('')}</tbody></table></div>
-      <div class="card wf"><div class="wf-head"><h2>Ingredients</h2><button type="button" class="ghost sm no-print" data-copy="ings">Copy</button></div>
+    const v = read();
+    books = v.picked.map(id => recs.get(id)).filter(Boolean);
+    document.getElementById('pickN').textContent = books.length ? `(${books.length})` : '';
+    current = books.length ? workflowPlan(books.map(fromBook)) : null;
+    if (!current) { out.innerHTML = ''; return; }
+    const { recipes: rs, timeline, totals } = current;
+    out.innerHTML = `<div class="card"><div class="wf-head"><h2>Order</h2><button type="button" class="ghost sm no-print" id="ko" aria-pressed="false">Korean</button></div>
+        <p id="koMsg"></p>
+        <ol class="step-list order">${timeline.rows.map((x, i) => `<li data-step="${x.ri}:${x.si}"><span class="step-n" aria-hidden="true">${i + 1}</span>
+          <span><small class="order-dish" translate="no">${esc(rs[x.ri].name)}</small><span translate="no">${esc(rs[x.ri].steps[x.si])}</span><small class="step-ko" translate="no" hidden></small></span></li>`).join('')}</ol></div>
+      <div class="card wf"><h2>Ingredients</h2>
         <table><tbody>${totals.map(t => { const used = t.per.map((q, i) => q == null ? '' : `${rs[i].name} ${typeof q === 'number' ? niceAmount(q, t.unit) : q}`).filter(Boolean);
           return `<tr><td><span translate="no">${esc(t.name)}</span>${used.length > 1 ? `<br><small translate="no">${esc(used.join(' · '))}</small>` : ''}</td>
-          <td class="n">${esc(t.total > 0 ? niceAmount(t.total, t.unit) : 'q.b.')}</td></tr>`; }).join('')}</tbody></table></div>
-      ${rs.map((r, k) => `<div class="card wf wf-recipe"><h2><span class="wf-n">${k + 1}</span><span translate="no">${esc(r.name)}</span></h2>
-        ${(meta => meta.length ? `<p class="muted"><small>${meta.map(x => `<span>${esc(x)}</span>`).join(' · ')}</small></p>` : '')([r.yield, r.prep && `Prep ${r.prep}`, r.cook && `Cook ${r.cook}`].filter(Boolean))}
-        ${r.items.length ? `<table><tbody>${r.items.map(it => `<tr><td class="n">${esc(niceAmount(it.qty, it.unit))}</td><td translate="no">${esc(it.name)}</td></tr>`).join('')}</tbody></table>` : ''}
-        ${r.steps.length ? `<ol class="wf-steps" translate="no">${r.steps.map(st => `<li>${esc(st)}</li>`).join('')}</ol>` : ''}
-        ${r.equipment ? `<p class="muted"><small>${esc(r.equipment)}</small></p>` : ''}</div>`).join('')}
-      <p class="muted no-print"><small>Long jobs (simmering, setting, resting) start first and other work fits in while they wait. Plating goes after set up. Steps without a time count as 10 min.</small></p>`;
-    document.getElementById('print').onclick = () => print();
-    out.querySelectorAll('[data-copy]').forEach(btn => btn.onclick = async () => {
-      const text = btn.dataset.copy === 'plan'
-        ? tsv([['Time', 'Task', 'Equipment'], ...day.map(x => [x.time, x.task, x.equipment])])
-        : tsv([['Ingredient', 'Unit', 'Total', ...rs.map(r => r.name)], ...totals.map(t => [t.name, t.total > 0 ? t.unit : '', t.total > 0 ? amount(t.total) : 'q.b.', ...t.per.map(amount)])]);
-      await navigator.clipboard.writeText(text);
-      btn.textContent = 'Copied';
-    });
+          <td class="n">${esc(t.total > 0 ? niceAmount(t.total, t.unit) : 'q.b.')}</td></tr>`; }).join('')}</tbody></table></div>`;
+    const btn = document.getElementById('ko');
+    btn.onclick = async () => db.put('settings', { id: 'cookKo', on: await showKo(btn.getAttribute('aria-pressed') !== 'true') });
+    if (koPref?.on && books.every(hasKo)) showKo(true); // all translated already: no call to Claude
   };
-  const pick = document.getElementById('dishPick');
-  document.getElementById('dq')?.addEventListener('input', e => {
-    const q = e.target.value.trim().toLowerCase();
-    pick.querySelectorAll('label').forEach((l, i) => { l.hidden = q ? !l.dataset.q.includes(q) : i >= SHOW && !l.querySelector('input').checked; });
-  });
-  const all = document.getElementById('allDishes');
-  if (all) all.onclick = () => { pick.querySelectorAll('label').forEach(l => { l.hidden = false; }); all.remove(); };
-  form.addEventListener('input', e => { if (e.target.id !== 'dq') draw(); });
-  form.addEventListener('change', save);
+  form.addEventListener('change', () => { draw(); save(); });
   details.addEventListener('change', save);
   draw();
-  // A pasted photo of a recipe: read on the server, added to the box as text in the usual layout
-  const box = form.elements.paste, note = document.getElementById('pasteNote');
-  document.onpaste = async e => {
-    const img = pastedImage(e);
-    if (!img) return;
-    e.preventDefault();
-    note.innerHTML = '<small>Reading the photo… this takes about 10 to 30 seconds.</small>';
-    try {
-      const rec = await sync.readRecipePhoto((await readPhoto(img, 1600, 0.85)).split(',')[1], 'image/jpeg');
-      box.value = [box.value.trim(), [rec.name, rec.servings ? `Serves ${rec.servings}` : '', 'Ingredients', ...rec.ingredients, 'Method',
-        ...rec.steps.map((st, i) => `${i + 1}. ${st}`)].filter(Boolean).join('\n')].filter(Boolean).join('\n\n');
-      note.innerHTML = `<small class="ok-text">Added ${esc(rec.name)}. Check it below.</small>`;
-      draw();
-      save();
-    } catch (err) { note.innerHTML = `<small class="warn-text">${esc(err.message)}</small>`; }
-  };
 
   document.getElementById('tplFile').onchange = async e => {
     const file = e.target.files[0], msg = document.getElementById('tplMsg');
