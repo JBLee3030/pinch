@@ -122,13 +122,18 @@ export async function importRecipe(url) {
 
 // ---- Recipe photo reading (Edge Function supabase/functions/recipe-photo). Signed-in users only:
 // the function calls a paid API, so it takes the user's own token, never the public anon key.
-export async function readRecipePhoto(base64, type) {
+export const readRecipePhoto = (image, type) => askClaude({ image, type });
+
+// Recipe names -> [{ name (English), italian }], same order. Same function and daily limit as photos.
+export const translateNames = async names => (await askClaude({ names })).dishes;
+
+async function askClaude(body) {
   if (db.DEMO) throw new Error('Reading photos is turned off in the demo.');
   if (!state.session) throw new Error('Sign in (Settings → Account) to read recipe photos.');
   let res;
   try {
     res = await fetch(`${BASE}/functions/v1/recipe-photo`, {
-      method: 'POST', body: JSON.stringify({ image: base64, type }),
+      method: 'POST', body: JSON.stringify(body),
       headers: { 'Content-Type': 'application/json', apikey: KEY, Authorization: `Bearer ${await accessToken()}` },
     });
   } catch {

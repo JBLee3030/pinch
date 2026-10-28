@@ -41,7 +41,8 @@ export const KO = {
   'Send a JPEG, PNG or WebP photo under 4 MB.': '4 MB 이하의 JPEG, PNG, WebP 사진을 보내세요.', 'Busy right now. Try again in a minute.': '지금 바빠요. 1분 뒤에 다시 해 보세요.',
   'This photo couldn’t be read. Try another photo, or paste the text.': '이 사진은 읽을 수 없어요. 다른 사진으로 하거나 글을 붙여넣으세요.',
   'No recipe found in that photo. Get the whole recipe in frame, in good light.': '사진에서 레시피를 찾지 못했어요. 밝은 곳에서 레시피 전체가 나오게 찍어 주세요.',
-  'Couldn’t read the photo. Try again.': '사진을 읽지 못했어요. 다시 해 보세요.',
+  'Couldn’t read the photo. Try again.': '사진을 읽지 못했어요. 다시 해 보세요.', 'Couldn’t read that. Try again.': '읽지 못했어요. 다시 해 보세요.',
+  'This couldn’t be read. Try again, or type it in.': '읽을 수 없어요. 다시 하거나 직접 입력하세요.',
 
   // Sharing and favourites
   'Share': '공유', 'Send to a classmate': '동기에게 보내기', 'A link with the recipe, its sub-recipes and ingredients. They save it into their own Pinch.': '레시피, 서브 레시피, 재료가 담긴 링크예요. 받은 사람이 자기 Pinch에 저장해요.',
@@ -72,7 +73,9 @@ export const KO = {
   'Each time you cook this, note how it went and what to change. Your notes show up when you start cooking.': '만들 때마다 어땠는지, 다음엔 뭘 바꿀지 적어 두세요. 다음에 요리를 시작하면 그 메모가 보여요.',
 
   // Recipe edit
-  'New recipe': '새 레시피', 'Edit recipe': '레시피 수정', 'e.g. Tomato sauce': '예: Tomato sauce', 'Italian name': '이탈리아어 이름', 'e.g. Salsa di pomodoro': '예: Salsa di pomodoro', 'Ingredients, one per line': '재료 (한 줄에 하나씩)',
+  'New recipe': '새 레시피', 'Edit recipe': '레시피 수정', 'e.g. Tomato sauce': '예: Tomato sauce', 'Italian name': '이탈리아어 이름', 'English and Italian names': '영어·이탈리아어 이름', 'Recipe names': '레시피 이름', 'English': '영어', 'Italian': '이탈리아어', 'Fill in with Claude': 'Claude로 채우기',
+  'Translates the names of recipes with no Italian name yet: English as the title, Italian underneath. Check them, then Save.': '이탈리아어 이름이 아직 없는 레시피 이름을 번역해요. 영어는 제목, 이탈리아어는 그 아래에 들어가요. 확인하고 저장하세요.',
+  'Every recipe has an Italian name.': '모든 레시피에 이탈리아어 이름이 있어요.', 'Translating… this takes a few seconds.': '번역하는 중… 몇 초 걸려요.', 'e.g. Salsa di pomodoro': '예: Salsa di pomodoro', 'Ingredients, one per line': '재료 (한 줄에 하나씩)',
   'One per line, e.g.\n500 g tipo 00 flour\n5 eggs\n2 cloves garlic\n1/2 cup olive oil': '한 줄에 하나씩, 예:\n500 g tipo 00 flour\n5 eggs\n2 cloves garlic\n1/2 cup olive oil',
     'From a printed recipe:': '인쇄된 레시피라면:', 'open the Camera, point it at the page, tap the text icon, select the ingredients and tap Copy. Then paste here.': '카메라로 페이지를 비추고 텍스트 아이콘을 눌러 재료를 선택한 뒤 복사하세요. 그리고 여기에 붙여넣으세요.',
   'Add to recipe': '레시피에 추가', 'Ingredient or sub-recipe': '재료 또는 서브 레시피', '+ Add ingredient': '+ 재료 추가', 'Paste a list': '목록 붙여넣기',
@@ -267,6 +270,7 @@ const dur = (h, m, s) => [h && `${h}시간`, m && `${m}분`, s && `${s}초`].fil
 
 // [pattern, Korean]: $1… are the captured parts, themselves translated. A function gets them as arguments.
 export const KO_PATTERNS = [
+  [/^Filled (\d+) recipes\. Check them, then Save\.$/, '레시피 $1개를 채웠어요. 확인하고 저장하세요.'],
   // Units, amounts, durations
   [/^([\d.]+) portions?$/, q => portions(q)],
   [/^(.+) · ([\d.]+) portions?$/, (c, q) => `${c} · ${portions(q)}`],
@@ -390,6 +394,7 @@ export const KO_PATTERNS = [
   [/^Read (\d+) ingredients and (\d+) steps\. Check them, then Save\.$/, '재료 $1개, 단계 $2개를 읽었어요. 확인하고 저장하세요.'],
   [/^That's (\d+) photos today\. Try again tomorrow, or paste the text instead\.$/, '오늘은 사진 $1장을 다 썼어요. 내일 다시 하거나 글을 붙여넣으세요.'],
   [/^Couldn’t read the photo \((.+)\)\.(?: Try again\.)?$/, '사진을 읽지 못했어요 ($1). 다시 해 보세요.'],
+  [/^Couldn’t read that \((.+)\)\. Try again\.$/, '읽지 못했어요 ($1). 다시 해 보세요.'],
   [/^(\d+) without a price\. Recipes using them show an incomplete cost\.$/, '가격 없는 재료 $1개. 이 재료를 쓰는 레시피는 원가가 미완성으로 나와요.'],
   [/^in (\d+) recipes?$/, '레시피 $1개에 사용'],
   [/^([\d.]+) hours in the kitchen$/, '주방에서 $1시간'],

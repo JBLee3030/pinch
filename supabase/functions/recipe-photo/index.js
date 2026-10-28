@@ -1,6 +1,7 @@
 // Supabase Edge Function: a photo of a recipe (printed, handwritten, a screen or a whiteboard) -> the
 // recipe's English and Italian names, servings, ingredient lines and steps, read by Claude. The app fills the New recipe form
 // with the result; nothing is saved here and the photo is not stored.
+// Also { names: [...] } -> each recipe name in English and Italian, for the app's Recipe names screen.
 //
 // Signed-in Pinch users only, DAILY photos each per 24 hours (table photo_reads, see supabase.sql),
 // so the public app can't be used to run up the API bill.
@@ -44,6 +45,37 @@ export const PROMPT = `This photo shows a recipe: printed, handwritten, on a scr
 
 Leave out anything that isn't part of the recipe (page numbers, headers, adverts, nutrition tables).`;
 
+export const NAMES_SCHEMA = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['dishes'],
+  properties: {
+    dishes: { type: 'array', items: {
+      type: 'object', additionalProperties: false, required: ['name', 'italian'],
+      properties: { name: { type: 'string' }, italian: { type: 'string' } },
+    } },
+  },
+};
+
+export const NAMES_PROMPT = `These are recipe names from a cook's recipe app (an Italian-focused cookery course). For each one, in the same order, give:
+
+- name: the dish's name in English. If it is in another language, translate it the way an English menu would ("Tagliatelle al pomodoro" → "Tagliatelle with tomato sauce"). If it is already English, keep it as written.
+- italian: the dish's Italian name: the name as written if it is Italian, otherwise the usual Italian name for an Italian dish ("Fresh egg pasta" → "Pasta fresca all'uovo"). Empty when the dish isn't Italian and has no Italian name.
+
+Return exactly one entry per name.
+
+Names:
+`;
+
+const MAX_NAMES = 200;
+const tidy = s => String(s ?? '').replace(/\s+/g, ' ').trim().slice(0, 120);
+
+// One entry per name sent, whatever came back; a missing English name keeps the original.
+export function toNames(o, names) {
+  const d = Array.isArray(o?.dishes) ? o.dishes : [];
+  return names.map((n, i) => ({ name: tidy(d[i]?.name) || n, italian: tidy(d[i]?.italian) }));
+}
+
 // What the model returned -> what the app fills in, tidied and bounded.
 export function toRecipe(o) {
   const lines = a => (Array.isArray(a) ? a : []).map(x => String(x).replace(/\s+/g, ' ').trim()).filter(Boolean).slice(0, 80);
@@ -76,13 +108,30 @@ async function allow(auth) {
 async function handle(req) {
   if (req.method === 'OPTIONS') return new Response(null, { headers: CORS });
   if (req.method !== 'POST') return reply({ error: 'Use POST' }, 405);
-  const { image, type } = await req.json().catch(() => ({}));
+  const { image, type, names } = await req.json().catch(() => ({}));
+  if (names !== undefined) {
+    if (!Array.isArray(names) || !names.length || names.length > MAX_NAMES || names.some(n => typeof n !== 'string' || !n.trim() || n.length > 120)) {
+      return reply({ error: `Send 1 to ${MAX_NAMES} recipe names.` }, 400);
+    }
+    const denied = await allow(req.headers.get('Authorization') ?? '');
+    if (denied) return denied;
+    const list = names.map(tidy);
+    return ask([{ type: 'text', text: NAMES_PROMPT + list.map((n, i) => `${i + 1}. ${n}`).join('\n') }], NAMES_SCHEMA, 'low', out => reply({ dishes: toNames(out, list) }));
+  }
   if (typeof image !== 'string' || !image || image.length > MAX_BASE64 || !TYPES.includes(type)) {
     return reply({ error: 'Send a JPEG, PNG or WebP photo under 4 MB.' }, 400);
   }
   const denied = await allow(req.headers.get('Authorization') ?? '');
   if (denied) return denied;
+  return ask([
+    { type: 'image', source: { type: 'base64', media_type: type, data: image } },
+    { type: 'text', text: PROMPT },
+  ], SCHEMA, 'medium', out => out?.found
+    ? reply(toRecipe(out))
+    : reply({ error: 'No recipe found in that photo. Get the whole recipe in frame, in good light.' }, 422));
+}
 
+async function ask(content, schema, effort, done) {
   const { default: Anthropic } = await import('npm:@anthropic-ai/sdk');
   const client = new Anthropic(); // ANTHROPIC_API_KEY from the function's secrets
   try {
@@ -91,22 +140,17 @@ async function handle(req) {
       max_tokens: 16000,
       betas: ['server-side-fallback-2026-07-01'],
       fallbacks: 'default', // if a safety check ever declines, Anthropic retries on its recommended model
-      output_config: { effort: 'medium', format: { type: 'json_schema', schema: SCHEMA } },
-      messages: [{ role: 'user', content: [
-        { type: 'image', source: { type: 'base64', media_type: type, data: image } },
-        { type: 'text', text: PROMPT },
-      ] }],
+      output_config: { effort, format: { type: 'json_schema', schema } },
+      messages: [{ role: 'user', content }],
     });
-    if (msg.stop_reason === 'refusal') return reply({ error: 'This photo couldn’t be read. Try another photo, or paste the text.' }, 422);
+    if (msg.stop_reason === 'refusal') return reply({ error: 'This couldn’t be read. Try again, or type it in.' }, 422);
     const text = msg.content.find(b => b.type === 'text')?.text;
-    const out = text ? JSON.parse(text) : null;
-    if (!out?.found) return reply({ error: 'No recipe found in that photo. Get the whole recipe in frame, in good light.' }, 422);
-    return reply(toRecipe(out));
+    return done(text ? JSON.parse(text) : null);
   } catch (e) {
     if (e instanceof Anthropic.AuthenticationError) return reply({ error: 'Photo reading isn’t set up yet.' }, 500);
     if (e instanceof Anthropic.RateLimitError) return reply({ error: 'Busy right now. Try again in a minute.' }, 503);
-    if (e instanceof Anthropic.APIError) return reply({ error: `Couldn’t read the photo (${e.status ?? 'error'}). Try again.` }, 502);
-    return reply({ error: 'Couldn’t read the photo. Try again.' }, 502);
+    if (e instanceof Anthropic.APIError) return reply({ error: `Couldn’t read that (${e.status ?? 'error'}). Try again.` }, 502);
+    return reply({ error: 'Couldn’t read that. Try again.' }, 502);
   }
 }
 

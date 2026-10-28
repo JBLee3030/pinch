@@ -251,7 +251,8 @@ async function recipeList() {
     <ul class="list">${recipes.map(r => `<li data-id="${esc(r.id)}" data-q="${esc([r.name, r.italian, ...(r.items ?? []).map(it => it.recipeId ? recs.get(it.recipeId)?.name : ings.get(it.ingredientId)?.name)].filter(Boolean).join(' ').toLowerCase())}" data-cat="${esc(r.category)}"><a href="#/recipe/${esc(r.id)}">
       ${r.photo ? `<img src="${esc(r.photo)}" alt="">` : '<span class="ph" aria-hidden="true"></span>'}
       <div class="grow"><b>${esc(r.name)}</b><small>${r.italian ? `<i translate="no">${esc(r.italian)}</i> · ` : ''}${esc(r.category || 'Uncategorised')}</small></div>
-      <span class="trail">${costLine(costs.get(r.id))}</span></a></li>`).join('')}</ul>`
+      <span class="trail">${costLine(costs.get(r.id))}</span></a></li>`).join('')}</ul>
+    <a class="btn ghost wide" href="#/recipes/names">English and Italian names</a>`
     : `<div class="card welcome"><h2>Welcome to Pinch</h2>
         <ol class="steps">
           <li><b>Write a recipe.</b> Type ingredients as you go. Pinch works out cost per portion, allergens and a recipe card.</li>
@@ -278,6 +279,42 @@ async function recipeList() {
     db.put('settings', { id: 'recipeSort', by });
   });
   document.getElementById('sample')?.addEventListener('click', async () => { await loadSample(); recipeList(); });
+}
+
+// Every recipe's English name (the title) and Italian name (the subtitle) on one screen; Claude can fill them.
+async function recipeNames() {
+  const recipes = (await db.all('recipes')).sort(byName);
+  page('recipes', 'Recipe names', `
+    <div class="card"><button type="button" class="wide" id="tr">Fill in with Claude</button>
+      <p id="trMsg"><small>Translates the names of recipes with no Italian name yet: English as the title, Italian underneath. Check them, then Save.</small></p></div>
+    <form id="f">${recipes.map(r => `<div class="card">
+      <label>English<input name="n-${esc(r.id)}" required value="${esc(r.name)}"></label>
+      <label>Italian <small>(optional)</small><input name="i-${esc(r.id)}" value="${esc(r.italian)}"></label></div>`).join('')}
+      <div class="cta-bar"><button>Save</button></div></form>`, { back: '#/recipes' });
+
+  const f = document.getElementById('f'), msg = document.getElementById('trMsg');
+  const field = (k, r) => f.elements[`${k}-${r.id}`];
+  document.getElementById('tr').onclick = async e => {
+    const todo = recipes.filter(r => !field('i', r).value.trim());
+    if (!todo.length) { msg.innerHTML = '<small class="ok-text">Every recipe has an Italian name.</small>'; return; }
+    e.target.classList.add('busy');
+    msg.innerHTML = '<small>Translating… this takes a few seconds.</small>';
+    try {
+      const out = await sync.translateNames(todo.map(r => field('n', r).value.trim() || r.name));
+      todo.forEach((r, i) => { field('n', r).value = out[i].name; field('i', r).value = out[i].italian; });
+      msg.innerHTML = `<small class="ok-text">Filled ${todo.length} recipes. Check them, then Save.</small>`;
+    } catch (err) {
+      msg.innerHTML = `<small class="warn-text">${esc(err.message)}</small>`;
+    } finally { e.target.classList.remove('busy'); }
+  };
+  f.onsubmit = async e => {
+    e.preventDefault();
+    for (const r of recipes) {
+      const name = field('n', r).value.trim(), italian = field('i', r).value.trim();
+      if (name !== r.name || italian !== (r.italian ?? '')) await db.put('recipes', { ...r, name, italian, updatedAt: Date.now() });
+    }
+    go('#/recipes');
+  };
 }
 
 async function recipeView(id) {
@@ -2426,6 +2463,7 @@ const routes = [
   [/^#\/check\/([^/]+)$/, checklistDay],
   [/^#\/check\/([^/]+)\/edit$/, checklistEdit],
   [/^#\/recipes$/, recipeList],
+  [/^#\/recipes\/names$/, recipeNames],
   [/^#\/allergens$/, allergenChart],
   [/^#\/recipe\/([^/]+)$/, recipeView],
   [/^#\/recipe\/([^/]+)\/edit$/, recipeEdit],
