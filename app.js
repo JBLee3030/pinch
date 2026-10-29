@@ -1238,8 +1238,12 @@ async function workflowView(examId) {
           return `<tr><td><span translate="no">${esc(t.name)}</span>${used.length > 1 ? `<br><small translate="no">${esc(used.join(' · '))}</small>` : ''}</td>
           <td class="n">${esc(t.total > 0 ? niceAmount(t.total, t.unit) : 'q.b.')}</td></tr>`; }).join('')}</tbody></table></div>
       <div class="cta-bar no-print"><button type="button" id="cook">Start cooking</button></div>`;
-    const st = steps, bs = books, day = { steps: st, koReady, ko: () => koFor(st, bs) };
-    document.getElementById('cook').onclick = () => { dayCook = day; go('#/workflow/cook'); };
+    // The same plan picks up where you left off; a new plan starts at step 1
+    document.getElementById('cook').onclick = async () => {
+      const was = await db.get('settings', 'dayCook'), same = JSON.stringify(was?.steps) === JSON.stringify(steps);
+      await db.put('settings', { id: 'dayCook', steps, bookIds: books.map(b => b.id), at: same ? was.at ?? 0 : 0 });
+      go('#/workflow/cook');
+    };
     const btn = document.getElementById('ko');
     btn.onclick = async () => db.put('settings', { id: 'cookKo', on: await showKo(btn.getAttribute('aria-pressed') !== 'true') });
     if (koPref?.on && koReady) showKo(true); // Korean already there: no call to Claude
@@ -1707,14 +1711,16 @@ function cookStepsHtml(steps) {
       <div class="cook-nav" id="cookNav"><button type="button" class="ghost" id="prev">Back</button><button type="button" id="next">Next step</button></div></div>`;
 }
 // ko(): the Korean for every step (may ask Claude); koReady: it's already there, so it can show on open.
-async function cookSteps(steps, { ko, koReady, finish, timerId = null }) {
+// start: the step to open on; onStep(at) hears every move, to remember it.
+async function cookSteps(steps, { ko, koReady, finish, timerId = null, start = 0, onStep = () => {} }) {
   keepAwake(true);
   drawTimers();
   const koPref = await db.get('settings', 'cookKo');
   const stepsEl = document.getElementById('steps'), prev = document.getElementById('prev'), next = document.getElementById('next');
   const calm = matchMedia('(prefers-reduced-motion: reduce)').matches;
-  let at = 0;
+  let at = start;
   const drawSteps = scroll => {
+    onStep(at);
     stepsEl.querySelectorAll('li').forEach((li, i) => {
       li.classList.toggle('now', i === at);
       li.classList.toggle('done', i < at);
@@ -1744,7 +1750,7 @@ async function cookSteps(steps, { ko, koReady, finish, timerId = null }) {
   };
   if (koPref?.on && koReady) showKo(true); // no call to Claude on open
   koBtn.onclick = async () => db.put('settings', { id: 'cookKo', on: await showKo(koBtn.getAttribute('aria-pressed') !== 'true') });
-  drawSteps(false);
+  drawSteps(at > 0);
   prev.onclick = () => { at = Math.max(0, at - 1); drawSteps(true); };
   next.onclick = () => {
     if (at === steps.length - 1) return finish();
@@ -1799,17 +1805,24 @@ async function cookView(id) {
 // Korean for plan steps: a merged plan carries its own; recipe steps use each recipe's translation.
 async function koFor(steps, books) {
   if (!steps.some(x => x.ri != null)) return steps.map(x => x.ko ?? '');
-  const ko = await Promise.all(books.map(methodKo));
+  const ko = await Promise.all(books.map(b => (b ? methodKo(b) : []))); // a recipe deleted since: no Korean
   return steps.map(x => ko[x.ri]?.[x.si] ?? '');
 }
 
-// The day's work flow plan, cooked step by step. Set by the plan screen.
-// ponytail: kept in memory only; after a reload the plan screen opens instead.
-let dayCook = null;
-function dayCookView() {
-  if (!dayCook) return go('#/workflow');
-  page('home', 'Work flow plan', cookStepsHtml(dayCook.steps), { back: '#/workflow' });
-  cookSteps(dayCook.steps, { ...dayCook, finish: () => go('#/workflow') });
+// The day's work flow plan, cooked step by step. The plan screen saves it (settings 'dayCook':
+// steps, the recipes' ids, and the step you're on), so a reload or another phone opens where you left off.
+async function dayCookView() {
+  const d = await db.get('settings', 'dayCook');
+  if (!d?.steps?.length) return go('#/workflow');
+  const books = await Promise.all(d.bookIds.map(id => db.get('recipes', id)));
+  page('home', 'Work flow plan', cookStepsHtml(d.steps), { back: '#/workflow' });
+  cookSteps(d.steps, {
+    ko: () => koFor(d.steps, books),
+    koReady: !d.steps.some(x => x.ri != null) || books.every(b => !b || hasKo(b)),
+    start: Math.min(d.at ?? 0, d.steps.length - 1),
+    onStep: at => at !== d.at && db.put('settings', Object.assign(d, { at })),
+    finish: async () => { await db.put('settings', { ...d, at: 0 }); go('#/workflow'); },
+  });
 }
 
 // ---------- Ingredients: price, trim yield and allergens, used by recipe costing and allergen lists ----------
