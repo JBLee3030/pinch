@@ -1193,7 +1193,7 @@ async function workflowView(examId) {
     </details>`, { back: exam ? `#/exam/${esc(exam.id)}/edit` : '#/home' });
 
   const form = document.getElementById('f'), details = document.getElementById('details'), out = document.getElementById('out');
-  let current = null, books = [], merged = w.merged ?? null;
+  let current = null, books = [], merged = w.merged ?? null, steps = [];
   const read = () => {
     const fd = new FormData(form), dd = new FormData(details);
     return { ...Object.fromEntries(['name', 'studentId', 'trainer', 'group', 'date', 'assessment'].map(k => [k, dd.get(k).trim()])),
@@ -1207,19 +1207,14 @@ async function workflowView(examId) {
   const showKo = async on => {
     const btn = document.getElementById('ko'), msg = document.getElementById('koMsg');
     let ko = [];
-    if (on && !useMerged()) { // a merged plan already has its Korean
+    if (on) {
       btn.classList.add('busy');
       msg.innerHTML = '<small>Translating…</small>';
-      try { ko = await Promise.all(books.map(methodKo)); msg.textContent = ''; }
+      try { ko = await koFor(steps, books); msg.textContent = ''; }
       catch (err) { msg.innerHTML = `<small class="warn-text">${esc(err.message)}</small>`; on = false; }
       finally { btn.classList.remove('busy'); }
     }
-    out.querySelectorAll('.order li').forEach(li => {
-      const [ri, si] = (li.dataset.step ?? '').split(':').map(Number), el = li.querySelector('.step-ko');
-      const t = !on ? '' : li.dataset.m ? merged.steps[li.dataset.m].ko : ko[ri]?.[si] ?? '';
-      el.textContent = t;
-      el.hidden = !t;
-    });
+    out.querySelectorAll('.order .step-ko').forEach((el, i) => { el.textContent = ko[i] ?? ''; el.hidden = !ko[i]; });
     btn.setAttribute('aria-pressed', String(on));
     return on;
   };
@@ -1230,20 +1225,24 @@ async function workflowView(examId) {
     current = books.length ? workflowPlan(books.map(r => ({ ...fromBook(r), needs: books.flatMap((b, k) => uses(r, b.id) ? [k] : []) }))) : null;
     if (!current) { out.innerHTML = ''; return; }
     const { recipes: rs, timeline, totals } = current, mine = useMerged();
-    const item = (attr, n, dish, text) => `<li ${attr}><span class="step-n" aria-hidden="true">${n}</span>
-      <span>${dish ? `<small class="order-dish" translate="no">${esc(dish)}</small>` : ''}<span translate="no">${esc(text)}</span><small class="step-ko" translate="no" hidden></small></span></li>`;
+    // [{ text, dish, ko? (merged), ri, si (from the recipes) }]
+    steps = mine ? merged.steps.map(x => ({ text: x.en || x.ko, dish: x.dish, ko: x.ko }))
+      : timeline.rows.map(x => ({ text: rs[x.ri].steps[x.si], dish: rs[x.ri].name, ri: x.ri, si: x.si }));
+    const koReady = mine || books.every(hasKo);
     out.innerHTML = `<div class="card"><div class="wf-head"><h2>Order${mine ? ' <span class="tag">With my notes</span>' : ''}</h2><button type="button" class="ghost sm no-print" id="ko" aria-pressed="false">Korean</button></div>
         <p id="koMsg"></p>
-        <ol class="step-list order">${mine
-          ? merged.steps.map((x, i) => item(`data-m="${i}"`, i + 1, x.dish, x.en || x.ko)).join('')
-          : timeline.rows.map((x, i) => item(`data-step="${x.ri}:${x.si}"`, i + 1, rs[x.ri].name, rs[x.ri].steps[x.si])).join('')}</ol></div>
+        <ol class="step-list order">${steps.map((x, i) => `<li><span class="step-n" aria-hidden="true">${i + 1}</span>
+          <span>${x.dish ? `<small class="order-dish" translate="no">${esc(x.dish)}</small>` : ''}<span translate="no">${esc(x.text)}</span><small class="step-ko" translate="no" hidden></small></span></li>`).join('')}</ol></div>
       <div class="card wf"><h2>Ingredients</h2>
         <table><tbody>${totals.map(t => { const used = t.per.map((q, i) => q == null ? '' : `${rs[i].name} ${typeof q === 'number' ? niceAmount(q, t.unit) : q}`).filter(Boolean);
           return `<tr><td><span translate="no">${esc(t.name)}</span>${used.length > 1 ? `<br><small translate="no">${esc(used.join(' · '))}</small>` : ''}</td>
-          <td class="n">${esc(t.total > 0 ? niceAmount(t.total, t.unit) : 'q.b.')}</td></tr>`; }).join('')}</tbody></table></div>`;
+          <td class="n">${esc(t.total > 0 ? niceAmount(t.total, t.unit) : 'q.b.')}</td></tr>`; }).join('')}</tbody></table></div>
+      <div class="cta-bar no-print"><button type="button" id="cook">Start cooking</button></div>`;
+    const st = steps, bs = books, day = { steps: st, koReady, ko: () => koFor(st, bs) };
+    document.getElementById('cook').onclick = () => { dayCook = day; go('#/workflow/cook'); };
     const btn = document.getElementById('ko');
     btn.onclick = async () => db.put('settings', { id: 'cookKo', on: await showKo(btn.getAttribute('aria-pressed') !== 'true') });
-    if (koPref?.on && (mine || books.every(hasKo))) showKo(true); // Korean already there: no call to Claude
+    if (koPref?.on && koReady) showKo(true); // Korean already there: no call to Claude
   };
   form.addEventListener('change', () => { draw(); save(); });
   details.addEventListener('change', save);
@@ -1693,37 +1692,28 @@ document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible' && location.hash.endsWith('/cook')) keepAwake(true);
 });
 
-async function cookView(id) {
-  const r = await db.get('recipes', id);
-  if (!r) return go('#/recipes');
-  const [ings, recipes, attempts, koPref] = await Promise.all([ingMap(), db.all('recipes'), attemptsFor(id), db.get('settings', 'cookKo')]);
-  const lastNext = attempts.find(a => a.next);
-  const recs = toMap(recipes);
-  const steps = splitSteps(r.method);
-  let at = 0, portions = r.portions;
-  const ticked = new Set();
-
-  // Every step on one screen: the one you're on is big and outlined, done ones are dimmed, the rest wait below.
-  page('recipes', r.name, `
-    ${lastNext ? `<p class="tip"><small><b>Last time (${esc(dateLabel(lastNext.date))}), you noted:</b> ${esc(lastNext.next)}</small></p>` : ''}
-    <details class="more cook-ings" ${steps.length ? '' : 'open'}><summary>Ingredients (${(r.items ?? []).length})</summary>
-      <label class="inline">Portions <input id="cookPortions" type="number" min="1" step="1" inputmode="numeric" value="${esc(r.portions)}"></label>
-      <ul class="checklist" id="checklist"></ul></details>
-    ${steps.length ? `<div class="cook-head"><p class="step-count" id="stepCount"></p>
+// Step-by-step cooking, shared by one recipe and the day's work flow plan. steps: [{ text, dish? }].
+// The step you're on is big and outlined, done ones are dimmed, the rest wait below.
+function cookStepsHtml(steps) {
+  return `<div class="cook-head"><p class="step-count" id="stepCount"></p>
       <button type="button" class="ghost sm" id="ko" aria-pressed="false">Korean</button></div><p id="koMsg"></p>
-      <ol class="cook-steps" id="steps">${steps.map((t, i) => {
-        const ds = findDurations(t);
-        return `<li data-i="${i}"><button type="button" class="cook-step" data-go="${i}"><span class="step-n" aria-hidden="true">${i + 1}</span><span>${esc(t)}<small class="step-ko" translate="no" hidden></small></span></button>
-          ${ds.length ? `<div class="step-timers">${ds.map(d => `<button type="button" class="tint sm" data-timer="${d.seconds}" data-label="${esc(`Step ${i + 1}: ${fmtDuration(d.seconds)}`)}">Start ${esc(fmtDuration(d.seconds))} timer</button>`).join('')}</div>` : ''}</li>`;
-      }).join('')}</ol>
-      <div class="cook-dock"><div id="cookTimers" aria-live="polite"></div>
-        <div class="cook-nav" id="cookNav"><button type="button" class="ghost" id="prev">Back</button><button type="button" id="next">Next step</button></div></div>`
-      : `<p class="muted center">No method yet. <a href="#/recipe/${esc(r.id)}/edit">Add the steps</a> to cook step by step.</p>`}`, { back: `#/recipe/${esc(r.id)}` });
+    <ol class="cook-steps" id="steps">${steps.map(({ text, dish }, i) => {
+      const ds = findDurations(text);
+      return `<li data-i="${i}"><button type="button" class="cook-step" data-go="${i}"><span class="step-n" aria-hidden="true">${i + 1}</span>
+        <span>${dish ? `<small class="order-dish" translate="no">${esc(dish)}</small>` : ''}${esc(text)}<small class="step-ko" translate="no" hidden></small></span></button>
+        ${ds.length ? `<div class="step-timers">${ds.map(d => `<button type="button" class="tint sm" data-timer="${d.seconds}" data-label="${esc(`Step ${i + 1}: ${fmtDuration(d.seconds)}`)}">Start ${esc(fmtDuration(d.seconds))} timer</button>`).join('')}</div>` : ''}</li>`;
+    }).join('')}</ol>
+    <div class="cook-dock"><div id="cookTimers" aria-live="polite"></div>
+      <div class="cook-nav" id="cookNav"><button type="button" class="ghost" id="prev">Back</button><button type="button" id="next">Next step</button></div></div>`;
+}
+// ko(): the Korean for every step (may ask Claude); koReady: it's already there, so it can show on open.
+async function cookSteps(steps, { ko, koReady, finish, timerId = null }) {
   keepAwake(true);
   drawTimers();
-
+  const koPref = await db.get('settings', 'cookKo');
   const stepsEl = document.getElementById('steps'), prev = document.getElementById('prev'), next = document.getElementById('next');
   const calm = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let at = 0;
   const drawSteps = scroll => {
     stepsEl.querySelectorAll('li').forEach((li, i) => {
       li.classList.toggle('now', i === at);
@@ -1736,6 +1726,57 @@ async function cookView(id) {
     next.textContent = at === steps.length - 1 ? 'Finish' : 'Next step';
     if (scroll) stepsEl.children[at].scrollIntoView({ block: 'center', behavior: calm ? 'auto' : 'smooth' });
   };
+  // Korean under each step, for reading along; the choice is remembered everywhere.
+  const koBtn = document.getElementById('ko');
+  const showKo = async on => {
+    const msg = document.getElementById('koMsg');
+    let k = [];
+    if (on) {
+      koBtn.classList.add('busy');
+      msg.innerHTML = '<small>Translating…</small>';
+      try { k = await ko(); msg.textContent = ''; }
+      catch (err) { msg.innerHTML = `<small class="warn-text">${esc(err.message)}</small>`; on = false; }
+      finally { koBtn.classList.remove('busy'); }
+    }
+    stepsEl.querySelectorAll('.step-ko').forEach((el, i) => { el.textContent = k[i] ?? ''; el.hidden = !k[i]; });
+    koBtn.setAttribute('aria-pressed', String(on));
+    return on;
+  };
+  if (koPref?.on && koReady) showKo(true); // no call to Claude on open
+  koBtn.onclick = async () => db.put('settings', { id: 'cookKo', on: await showKo(koBtn.getAttribute('aria-pressed') !== 'true') });
+  drawSteps(false);
+  prev.onclick = () => { at = Math.max(0, at - 1); drawSteps(true); };
+  next.onclick = () => {
+    if (at === steps.length - 1) return finish();
+    at++;
+    drawSteps(true);
+  };
+  stepsEl.addEventListener('click', e => {
+    const t = e.target.closest('[data-timer]');
+    if (t) return timers.some(x => x.label === t.dataset.label && !x.done) || startTimer(t.dataset.label, Number(t.dataset.timer), timerId); // already running: no second one
+    const s = e.target.closest('[data-go]');
+    if (s) { at = Number(s.dataset.go); drawSteps(false); }
+  });
+}
+
+async function cookView(id) {
+  const r = await db.get('recipes', id);
+  if (!r) return go('#/recipes');
+  const [ings, recipes, attempts] = await Promise.all([ingMap(), db.all('recipes'), attemptsFor(id)]);
+  const lastNext = attempts.find(a => a.next);
+  const recs = toMap(recipes);
+  const steps = splitSteps(r.method);
+  let portions = r.portions;
+  const ticked = new Set();
+
+  page('recipes', r.name, `
+    ${lastNext ? `<p class="tip"><small><b>Last time (${esc(dateLabel(lastNext.date))}), you noted:</b> ${esc(lastNext.next)}</small></p>` : ''}
+    <details class="more cook-ings" ${steps.length ? '' : 'open'}><summary>Ingredients (${(r.items ?? []).length})</summary>
+      <label class="inline">Portions <input id="cookPortions" type="number" min="1" step="1" inputmode="numeric" value="${esc(r.portions)}"></label>
+      <ul class="checklist" id="checklist"></ul></details>
+    ${steps.length ? cookStepsHtml(steps.map(text => ({ text })))
+      : `<p class="muted center">No method yet. <a href="#/recipe/${esc(r.id)}/edit">Add the steps</a> to cook step by step.</p>`}`, { back: `#/recipe/${esc(r.id)}` });
+
   const drawChecklist = () => {
     const f = portions / r.portions;
     document.getElementById('checklist').innerHTML = (r.items ?? []).map((it, i) => {
@@ -1745,47 +1786,30 @@ async function cookView(id) {
     }).join('') || '<li class="muted">No ingredients yet.</li>';
   };
   drawChecklist();
-  // Korean under each step, for reading along; the choice is remembered for every recipe.
-  const koBtn = document.getElementById('ko');
-  const showKo = async on => {
-    const msg = document.getElementById('koMsg');
-    let ko = [];
-    if (on) {
-      koBtn.classList.add('busy');
-      msg.innerHTML = '<small>Translating…</small>';
-      try { ko = await methodKo(r); msg.textContent = ''; }
-      catch (err) { msg.innerHTML = `<small class="warn-text">${esc(err.message)}</small>`; on = false; }
-      finally { koBtn.classList.remove('busy'); }
-    }
-    stepsEl.querySelectorAll('.step-ko').forEach((el, i) => { el.textContent = ko[i] ?? ''; el.hidden = !ko[i]; });
-    koBtn.setAttribute('aria-pressed', String(on));
-    return on;
-  };
-  if (koBtn) {
-    if (koPref?.on && hasKo(r)) showKo(true); // cached: no call to Claude on open
-    koBtn.onclick = async () => db.put('settings', { id: 'cookKo', on: await showKo(koBtn.getAttribute('aria-pressed') !== 'true') });
-  }
-  if (steps.length) {
-    drawSteps(false);
-    prev.onclick = () => { at = Math.max(0, at - 1); drawSteps(true); };
-    next.onclick = () => {
-      if (at === steps.length - 1) return go(`#/recipe/${r.id}/attempt`); // Finish: how did it go?
-      at++;
-      drawSteps(true);
-    };
-    stepsEl.addEventListener('click', e => {
-      const t = e.target.closest('[data-timer]');
-      if (t) return timers.some(x => x.label === t.dataset.label && !x.done) || startTimer(t.dataset.label, Number(t.dataset.timer), r.id); // already running: no second one
-      const s = e.target.closest('[data-go]');
-      if (s) { at = Number(s.dataset.go); drawSteps(false); }
-    });
-  }
+  if (steps.length) cookSteps(steps.map(text => ({ text })), { ko: () => methodKo(r), koReady: hasKo(r), timerId: r.id, finish: () => go(`#/recipe/${r.id}/attempt`) });
+  else keepAwake(true);
   document.getElementById('cookPortions').addEventListener('input', e => { portions = Number(e.target.value) || r.portions; drawChecklist(); });
   document.getElementById('checklist').addEventListener('change', e => {
     const i = Number(e.target.dataset.i);
     if (e.target.checked) ticked.add(i); else ticked.delete(i);
     e.target.closest('label').classList.toggle('got', e.target.checked);
   });
+}
+
+// Korean for plan steps: a merged plan carries its own; recipe steps use each recipe's translation.
+async function koFor(steps, books) {
+  if (!steps.some(x => x.ri != null)) return steps.map(x => x.ko ?? '');
+  const ko = await Promise.all(books.map(methodKo));
+  return steps.map(x => ko[x.ri]?.[x.si] ?? '');
+}
+
+// The day's work flow plan, cooked step by step. Set by the plan screen.
+// ponytail: kept in memory only; after a reload the plan screen opens instead.
+let dayCook = null;
+function dayCookView() {
+  if (!dayCook) return go('#/workflow');
+  page('home', 'Work flow plan', cookStepsHtml(dayCook.steps), { back: '#/workflow' });
+  cookSteps(dayCook.steps, { ...dayCook, finish: () => go('#/workflow') });
 }
 
 // ---------- Ingredients: price, trim yield and allergens, used by recipe costing and allergen lists ----------
@@ -2537,6 +2561,7 @@ const routes = [
   [/^#\/timers$/, timersView],
   [/^#\/exam\/([^/]+)\/edit$/, examEdit],
   [/^#\/prep$/, prepView],
+  [/^#\/workflow\/cook$/, dayCookView],
   [/^#\/workflow(?:\/([^/]+))?$/, workflowView],
   [/^#\/menus$/, menusView],
   [/^#\/menu\/([^/]+)$/, menuView],
